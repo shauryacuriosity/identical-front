@@ -9,9 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VisualisationRouteImport } from './routes/visualisation'
 import { Route as DatasetsRouteImport } from './routes/datasets'
 import { Route as IndexRouteImport } from './routes/index'
 
+const VisualisationRoute = VisualisationRouteImport.update({
+  id: '/visualisation',
+  path: '/visualisation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DatasetsRoute = DatasetsRouteImport.update({
   id: '/datasets',
   path: '/datasets',
@@ -26,31 +32,42 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/datasets': typeof DatasetsRoute
+  '/visualisation': typeof VisualisationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/datasets': typeof DatasetsRoute
+  '/visualisation': typeof VisualisationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/datasets': typeof DatasetsRoute
+  '/visualisation': typeof VisualisationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/datasets'
+  fullPaths: '/' | '/datasets' | '/visualisation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/datasets'
-  id: '__root__' | '/' | '/datasets'
+  to: '/' | '/datasets' | '/visualisation'
+  id: '__root__' | '/' | '/datasets' | '/visualisation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DatasetsRoute: typeof DatasetsRoute
+  VisualisationRoute: typeof VisualisationRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/visualisation': {
+      id: '/visualisation'
+      path: '/visualisation'
+      fullPath: '/visualisation'
+      preLoaderRoute: typeof VisualisationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/datasets': {
       id: '/datasets'
       path: '/datasets'
@@ -71,6 +88,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DatasetsRoute: DatasetsRoute,
+  VisualisationRoute: VisualisationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
