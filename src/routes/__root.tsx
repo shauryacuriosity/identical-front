@@ -1,6 +1,6 @@
 import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, User } from "lucide-react";
+import { User, ChevronDown } from "lucide-react";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -8,13 +8,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "eAsia App" },
+      { title: "eAsia — Public health data workbench" },
+      { name: "description", content: "Join, aggregate, and analyse public health datasets." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -27,7 +28,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     return (
       <div className="flex min-h-screen items-center justify-center flex-col gap-3">
         <p>{error.message}</p>
-        <button onClick={() => { router.invalidate(); reset(); }}>Retry</button>
+        <button onClick={() => { router.invalidate(); reset(); }} className="text-coral underline">Retry</button>
       </div>
     );
   },
@@ -42,52 +43,56 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TopBar() {
+function AppHeader() {
   const { pathname } = useLocation();
   const tabs = [
+    { to: "/", label: "Home" },
     { to: "/datasets", label: "Datasets" },
     { to: "/visualisation", label: "Visualisation" },
     { to: "/ai-analysis", label: "AI Analysis" },
   ];
   return (
-    <header className="relative px-6 pt-5 pb-4">
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 text-sm font-semibold text-foreground/90">eAsia App</div>
-      <div className="flex items-end justify-between gap-3 mt-6">
-        <div className="flex items-end gap-2">
-          <Link
-            to="/"
-            className={`flex h-14 w-14 items-center justify-center rounded-t-2xl rounded-b-md transition-all ${
-              pathname === "/" ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)]" : "text-foreground hover:bg-card/60"
-            }`}
-            aria-label="Home"
-          >
-            <Home className="h-6 w-6" strokeWidth={2.25} />
-          </Link>
-          <nav className="flex items-end gap-1 ml-2">
-            {tabs.map((t) => {
-              const active = pathname === t.to;
-              return (
-                <Link
-                  key={t.to}
-                  to={t.to}
-                  className={`px-6 h-12 flex items-center rounded-t-2xl text-base font-semibold transition-all ${
-                    active
-                      ? "bg-primary text-primary-foreground shadow-[var(--shadow-soft)]"
-                      : "text-foreground hover:bg-card/50"
-                  }`}
-                >
-                  {t.label}
-                </Link>
-              );
-            })}
-          </nav>
+    <header className="sticky top-0 z-30 backdrop-blur-md bg-canvas/80 border-b border-hairline">
+      <div className="mx-auto max-w-[1280px] h-14 px-6 flex items-center justify-between">
+        {/* Wordmark */}
+        <Link to="/" className="flex items-baseline gap-2 group">
+          <span className="font-serif text-2xl text-ink leading-none" style={{ letterSpacing: "-0.03em" }}>
+            eAsia
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-medium">workbench</span>
+        </Link>
+
+        {/* Center tabs */}
+        <nav className="flex items-center gap-1 h-full">
+          {tabs.map((t) => {
+            const active = t.to === "/" ? pathname === "/" : pathname.startsWith(t.to);
+            return (
+              <Link
+                key={t.to}
+                to={t.to}
+                className="relative h-14 px-4 flex items-center text-[13.5px] font-medium transition-colors"
+              >
+                <span className={active ? "text-ink" : "text-ink-2 hover:text-ink"}>{t.label}</span>
+                {active && (
+                  <span className="absolute left-3 right-3 bottom-0 h-[2px] bg-coral rounded-full" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Right: workspace + profile */}
+        <div className="flex items-center gap-2">
+          <button className="hidden sm:flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[12.5px] text-ink-2 hover:bg-surface-hover hover:text-ink transition">
+            <span className="h-4 w-4 rounded-[4px] bg-coral/15 border border-coral/30" />
+            UOW Capstone
+            <ChevronDown className="h-3.5 w-3.5 text-ink-3" />
+          </button>
+          <div className="h-5 w-px bg-hairline mx-1" />
+          <button className="h-8 w-8 rounded-full bg-surface border border-hairline flex items-center justify-center text-ink-2 hover:text-ink hover:border-coral/40 transition" aria-label="Profile">
+            <User className="h-4 w-4" strokeWidth={1.75} />
+          </button>
         </div>
-        <button
-          className="h-11 w-11 rounded-full border border-foreground/30 flex items-center justify-center text-foreground hover:bg-card/60 transition"
-          aria-label="Profile"
-        >
-          <User className="h-5 w-5" strokeWidth={2} />
-        </button>
       </div>
     </header>
   );
@@ -98,8 +103,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <div className="min-h-screen flex flex-col">
-        <TopBar />
-        <main className="flex-1 px-6 pb-8">
+        <AppHeader />
+        <main className="flex-1">
           <Outlet />
         </main>
       </div>
