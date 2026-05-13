@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisualisationRouteImport } from './routes/visualisation'
 import { Route as DatasetsRouteImport } from './routes/datasets'
+import { Route as AiAnalysisRouteImport } from './routes/ai-analysis'
 import { Route as IndexRouteImport } from './routes/index'
 
 const VisualisationRoute = VisualisationRouteImport.update({
@@ -23,6 +24,11 @@ const DatasetsRoute = DatasetsRouteImport.update({
   path: '/datasets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiAnalysisRoute = AiAnalysisRouteImport.update({
+  id: '/ai-analysis',
+  path: '/ai-analysis',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai-analysis': typeof AiAnalysisRoute
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai-analysis': typeof AiAnalysisRoute
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai-analysis': typeof AiAnalysisRoute
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/datasets' | '/visualisation'
+  fullPaths: '/' | '/ai-analysis' | '/datasets' | '/visualisation'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/datasets' | '/visualisation'
-  id: '__root__' | '/' | '/datasets' | '/visualisation'
+  to: '/' | '/ai-analysis' | '/datasets' | '/visualisation'
+  id: '__root__' | '/' | '/ai-analysis' | '/datasets' | '/visualisation'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiAnalysisRoute: typeof AiAnalysisRoute
   DatasetsRoute: typeof DatasetsRoute
   VisualisationRoute: typeof VisualisationRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DatasetsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-analysis': {
+      id: '/ai-analysis'
+      path: '/ai-analysis'
+      fullPath: '/ai-analysis'
+      preLoaderRoute: typeof AiAnalysisRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiAnalysisRoute: AiAnalysisRoute,
   DatasetsRoute: DatasetsRoute,
   VisualisationRoute: VisualisationRoute,
 }
