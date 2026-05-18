@@ -85,7 +85,7 @@ function AppHeader() {
         <div className="flex items-center gap-2">
           <button className="hidden sm:flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[12.5px] text-ink-2 hover:bg-surface-hover hover:text-ink transition">
             <span className="h-4 w-4 rounded-[4px] bg-coral/15 border border-coral/30" />
-            UOW Capstone
+            UOW eAsia
             <ChevronDown className="h-3.5 w-3.5 text-ink-3" />
           </button>
           <div className="h-5 w-px bg-hairline mx-1" />
