@@ -316,6 +316,11 @@ function AiAnalysisPage() {
   const [runName, setRunName] = useState("Untitled run");
   const [editingName, setEditingName] = useState(false);
 
+  // Function mode — what are you running?
+  type FnMode = "full" | "predict" | "discover" | "labels";
+  const [fnMode, setFnMode] = useState<FnMode>("full");
+  const [metsLabelCol, setMetsLabelCol] = useState<string | null>(null);
+
   const [clinical, setClinical] = useState(CLINICAL);
   const [dietary, setDietary] = useState(DIETARY);
 
@@ -325,21 +330,48 @@ function AiAnalysisPage() {
   const [excludePregnant, setExcludePregnant] = useState(true);
   const [requireComplete, setRequireComplete] = useState(true);
 
-  const [assocOn, setAssocOn] = useState(true);
+  // Prediction section
+  const [predictOn, setPredictOn] = useState(true);
+  const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("xgb");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [xgbDepth, setXgbDepth] = useState(5);
+  const [xgbTrees, setXgbTrees] = useState(300);
+  const [lrReg, setLrReg] = useState(1.0);
+  const [lrPenalty, setLrPenalty] = useState<"l1" | "l2">("l2");
+
+  // Subgroup discovery section
   const [subgroupOn, setSubgroupOn] = useState(true);
+  const [clusterAlg, setClusterAlg] = useState<"kmeans">("kmeans");
   const [k, setK] = useState(4);
+  const [kAuto, setKAuto] = useState(false);
+  const [dimRed, setDimRed] = useState<"pca">("pca");
 
   const [currentStep, setCurrentStep] = useState<StepKey>("map");
   const [completed, setCompleted] = useState<Set<StepKey>>(new Set());
+  const [skipped, setSkipped] = useState<Set<StepKey>>(new Set());
+
+  // Effective on-flags based on fnMode
+  const showPredict = fnMode === "full" || fnMode === "predict";
+  const showSubgroup = fnMode === "full" || fnMode === "discover";
+  const methodSkipped = fnMode === "labels";
 
   // Run state
-  const RUN_STEPS = [
-    "Computing MetS labels…",
-    "Filtering cohort…",
-    "Training XGBoost…",
-    "Computing SHAP values…",
-    "Running K-Means clustering…",
-  ];
+  const RUN_STEPS = useMemo(() => {
+    const steps: string[] = ["Computing MetS labels…", "Filtering cohort…"];
+    if (!methodSkipped) {
+      if (showPredict && predictOn) {
+        if (predictModel === "xgb") steps.push("Training XGBoost…");
+        else if (predictModel === "logreg") steps.push("Fitting Logistic Regression…");
+        else steps.push("Training XGBoost + Logistic Regression…");
+        steps.push("Computing SHAP values…");
+      }
+      if (showSubgroup && subgroupOn) steps.push("Running K-Means clustering…");
+    } else {
+      steps.push("Writing labelled dataset…");
+    }
+    return steps;
+  }, [methodSkipped, showPredict, predictOn, predictModel, showSubgroup, subgroupOn]);
+
   const [runProgress, setRunProgress] = useState(-1); // -1 = not started, n = currently on step n
   const runStarted = runProgress >= 0;
   const runComplete = runProgress >= RUN_STEPS.length;
@@ -376,16 +408,44 @@ function AiAnalysisPage() {
 
   const cohortSummary = `${cohort.included.toLocaleString()} of ${TOTAL_ROWS.toLocaleString()} rows · age ${ageMin}–${ageMax} · ${sex === "All" ? "all sexes" : sex} · ${excludePregnant ? "pregnant excluded" : "pregnant included"}`;
 
-  const methodSummary = [
-    assocOn && "Association",
-    subgroupOn && `Subgroup Discovery (k=${k})`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const predictSummary = (() => {
+    if (!showPredict || !predictOn) return null;
+    if (predictModel === "xgb") return "XGBoost";
+    if (predictModel === "logreg") return "Logistic Regression";
+    return "XGBoost + LogReg";
+  })();
+  const subgroupSummary = (() => {
+    if (!showSubgroup || !subgroupOn) return null;
+    const kPart = kAuto ? "k=auto" : `k=${k}`;
+    return `K-Means (${kPart}, PCA)`;
+  })();
+  const methodSummary = [predictSummary, subgroupSummary].filter(Boolean).join(" · ");
 
   const advanceFrom = (from: StepKey, to: StepKey) => {
     setCompleted((c) => new Set(c).add(from));
     setCurrentStep(to);
+  };
+
+  // Step 2 → next: skip Method when in "labels" mode
+  const continueFromCohort = () => {
+    if (methodSkipped) {
+      setCompleted((c) => {
+        const next = new Set(c);
+        next.add("cohort");
+        next.add("method");
+        return next;
+      });
+      setSkipped((s) => new Set(s).add("method"));
+      setCurrentStep("run");
+      setRunProgress(0);
+    } else {
+      setSkipped((s) => {
+        const next = new Set(s);
+        next.delete("method");
+        return next;
+      });
+      advanceFrom("cohort", "method");
+    }
   };
 
   const reopen = (key: StepKey) => {
