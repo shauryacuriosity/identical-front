@@ -799,69 +799,257 @@ function AiAnalysisPage() {
 
           <div className="flex justify-end mt-6">
             <button
-              onClick={() => advanceFrom("cohort", "method")}
+              onClick={continueFromCohort}
               className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
             >
-              Continue to Method →
+              {methodSkipped ? "Continue to Run →" : "Continue to Method →"}
             </button>
           </div>
         </StepShell>
 
-        {/* STEP 3 — Method */}
-        <StepShell
-          index={3}
-          title="Select method"
-          state={stepState("method")}
-          summary={methodSummary || "No methods selected"}
-          onExpand={() => reopen("method")}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-            <MethodCard
-              icon={<Network className="h-5 w-5" strokeWidth={1.75} />}
-              title="Association"
-              description="Identify which dietary and demographic factors predict MetS in this cohort. Produces model accuracy report, ranked feature importance (SHAP), and per-subject predictions."
-              selected={assocOn}
-              onToggle={() => setAssocOn((v) => !v)}
-            />
-            <MethodCard
-              icon={<Boxes className="h-5 w-5" strokeWidth={1.75} />}
-              title="Subgroup Discovery"
-              description="Find sub-populations with distinct dietary patterns and MetS risk. Produces cluster profiles, PCA scatter, and per-cluster prevalence."
-              selected={subgroupOn}
-              onToggle={() => setSubgroupOn((v) => !v)}
-            >
-              {subgroupOn && (
-                <div className="mt-4 pt-4 border-t border-hairline/60 flex items-center gap-3">
-                  <label className="text-[12px] text-ink-2">Number of clusters (k)</label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setK((v) => Math.max(2, v - 1)); }}
-                      className="h-7 w-7 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                    >−</button>
-                    <span className="mono w-8 text-center text-[13px] text-ink tabular">{k}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setK((v) => Math.min(8, v + 1)); }}
-                      className="h-7 w-7 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                    >+</button>
+        {/* STEP 3 — Method (skipped in labels mode) */}
+        {!methodSkipped && (
+          <StepShell
+            index={3}
+            title="Select method"
+            state={stepState("method")}
+            summary={methodSummary || "No methods selected"}
+            onExpand={() => reopen("method")}
+          >
+            <div className="space-y-4 pt-4">
+              {/* SECTION A — Prediction */}
+              {showPredict && (
+                <MethodSection
+                  icon={<Network className="h-5 w-5" strokeWidth={1.75} />}
+                  title="Prediction"
+                  subtitle="supervised · what predicts MetS in this cohort?"
+                  enabled={predictOn}
+                  onToggle={() => setPredictOn((v) => !v)}
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Model
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={predictModel === "xgb"}
+                          onSelect={() => setPredictModel("xgb")}
+                          title="XGBoost"
+                          hint="recommended — handles non-linearities and missing data well"
+                        />
+                        <RadioRow
+                          checked={predictModel === "logreg"}
+                          onSelect={() => setPredictModel("logreg")}
+                          title="Logistic Regression"
+                          hint="more interpretable, smaller sample sizes"
+                        />
+                        <RadioRow
+                          checked={predictModel === "both"}
+                          onSelect={() => setPredictModel("both")}
+                          title="Compare both"
+                          hint="runs side-by-side, shows comparative metrics"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Advanced */}
+                    <div className="rounded-lg border border-hairline/70 bg-canvas/40">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAdvancedOpen((o) => !o);
+                        }}
+                        className="w-full flex items-center justify-between px-3 h-9 text-[12.5px] text-ink-2 hover:text-ink"
+                      >
+                        <span>Advanced</span>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-ink-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      {advancedOpen && (
+                        <div className="px-3 pb-4 pt-1 space-y-4 border-t border-hairline/60">
+                          {(predictModel === "xgb" || predictModel === "both") && (
+                            <div className="space-y-3">
+                              {predictModel === "both" && (
+                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
+                                  XGBoost
+                                </div>
+                              )}
+                              <SliderRow
+                                label="max_depth"
+                                value={xgbDepth}
+                                min={2}
+                                max={8}
+                                onChange={setXgbDepth}
+                              />
+                              <SliderRow
+                                label="n_estimators"
+                                value={xgbTrees}
+                                min={100}
+                                max={1000}
+                                step={50}
+                                onChange={setXgbTrees}
+                              />
+                            </div>
+                          )}
+                          {(predictModel === "logreg" || predictModel === "both") && (
+                            <div className="space-y-3">
+                              {predictModel === "both" && (
+                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
+                                  Logistic Regression
+                                </div>
+                              )}
+                              <SliderRow
+                                label="regularization (C)"
+                                value={lrReg}
+                                min={0.01}
+                                max={10}
+                                step={0.01}
+                                decimals={2}
+                                onChange={setLrReg}
+                              />
+                              <div className="flex items-center justify-between gap-3">
+                                <label className="text-[12.5px] text-ink-2">Penalty</label>
+                                <div className="flex gap-1">
+                                  {(["l1", "l2"] as const).map((p) => (
+                                    <button
+                                      key={p}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setLrPenalty(p);
+                                      }}
+                                      className={`h-7 px-3 rounded-md text-[12px] border ${
+                                        lrPenalty === p
+                                          ? "bg-coral text-white border-coral"
+                                          : "bg-surface border-hairline text-ink-2 hover:border-coral/40"
+                                      }`}
+                                    >
+                                      {p.toUpperCase()}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-[12.5px] text-ink-3 italic">
+                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking,
+                      per-subject predictions.
+                    </p>
                   </div>
-                </div>
+                </MethodSection>
               )}
-            </MethodCard>
-          </div>
 
-          <div className="flex justify-end mt-6">
-            <button
-              onClick={() => {
-                advanceFrom("method", "run");
-                setRunProgress(0);
-              }}
-              disabled={!assocOn && !subgroupOn}
-              className="h-11 px-5 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Run analysis
-            </button>
-          </div>
-        </StepShell>
+              {/* SECTION B — Subgroup Discovery */}
+              {showSubgroup && (
+                <MethodSection
+                  icon={<Boxes className="h-5 w-5" strokeWidth={1.75} />}
+                  title="Subgroup Discovery"
+                  subtitle="unsupervised · what sub-populations exist?"
+                  enabled={subgroupOn}
+                  onToggle={() => setSubgroupOn((v) => !v)}
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Clustering algorithm
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={clusterAlg === "kmeans"}
+                          onSelect={() => setClusterAlg("kmeans")}
+                          title="K-Means"
+                          hint="recommended"
+                        />
+                        <RadioRow disabled title="Hierarchical clustering" soon />
+                        <RadioRow disabled title="DBSCAN" soon />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                          Number of clusters (k)
+                        </label>
+                        <label className="flex items-center gap-2 text-[12px] text-ink-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={kAuto}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setKAuto(e.target.checked);
+                            }}
+                            className="accent-coral"
+                          />
+                          Auto-select via silhouette score
+                        </label>
+                      </div>
+                      <div className={`flex items-center gap-1 ${kAuto ? "opacity-40 pointer-events-none" : ""}`}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setK((v) => Math.max(2, v - 1));
+                          }}
+                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                        >
+                          −
+                        </button>
+                        <span className="mono w-10 text-center text-[13px] text-ink tabular">{k}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setK((v) => Math.min(8, v + 1));
+                          }}
+                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Dimensionality reduction for visualisation
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={dimRed === "pca"}
+                          onSelect={() => setDimRed("pca")}
+                          title="PCA"
+                          hint="recommended"
+                        />
+                        <RadioRow disabled title="t-SNE" soon />
+                        <RadioRow disabled title="UMAP" soon />
+                      </div>
+                    </div>
+
+                    <p className="text-[12.5px] text-ink-3 italic">
+                      Produces cluster profiles, PCA scatter, per-cluster MetS prevalence.
+                    </p>
+                  </div>
+                </MethodSection>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => {
+                  advanceFrom("method", "run");
+                  setRunProgress(0);
+                }}
+                disabled={(!predictOn || !showPredict) && (!subgroupOn || !showSubgroup)}
+                className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Run Analysis
+              </button>
+            </div>
+          </StepShell>
+        )}
+
 
         {/* STEP 4 — Run */}
         {(currentStep === "run" || completed.has("run")) && (
