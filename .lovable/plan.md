@@ -1,93 +1,73 @@
 
-## What's changing & why
+## What's being built
 
-Right now `/ai-analysis` is a generic chat prompt — wrong product. The real eAsia workflow is a structured, supervised pipeline a public-health researcher walks through once per analysis run. This plan replaces that screen with the four-step Map → Cohort → Method → Run flow on a single page, reusing the existing warm-cream / coral / Fraunces / Inter / JetBrains Mono tokens already in `src/styles.css`. No new colors. No backend. Visual shell + local state only.
+A new `/ai-analysis/results` route (linked from Step 4's "View Results →" button) showing the deliverable of one MetS run. Same warm-cream / coral / Fraunces / Inter / JetBrains Mono tokens — no new colors, no backend. Recharts for the two plots.
 
 ## File scope
 
-- **Rewrite** `src/routes/ai-analysis.tsx` — the entire workflow.
-- **New** `src/components/analysis/StepIndicator.tsx` — sticky 4-step rail.
-- **New** `src/components/analysis/MappingRow.tsx` — single field row with confidence pill.
-- **New** `src/components/analysis/ConfidencePill.tsx` — the sage/amber/coral pill (see UX note).
-- **New** `src/components/analysis/CohortPreview.tsx` — live cohort stats card.
-- **New** `src/components/analysis/MethodCard.tsx` — selectable Association / Subgroup card.
-- **New** `src/components/analysis/RunProgress.tsx` — Step 4 progress list (simulated timers).
-- No changes to Home, Datasets, Visualisation, `__root.tsx`, or `styles.css`.
+- **New** `src/routes/ai-analysis.results.tsx` — the dashboard.
+- **Edit** `src/routes/ai-analysis.tsx` — wire the "View Results →" button to navigate here.
+- Reuse the existing `--data-sage / --data-ochre / --data-slate / --coral` tokens already in `styles.css` for the four cluster colours — these are perceptually spaced (different hue families: red, green, blue, yellow-brown), which is the strongest defence against colour-vision deficiencies.
 
-## Page structure
+That's it — no new shared components, no `styles.css` change, no Cloud.
+
+## The four-panel composition
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│ Breadcrumb: Analysis · [Untitled run]   (editable)      │
-│ ────────────────────────────────────────────────────    │
-│ ● Map ──── ○ Cohort ──── ○ Method ──── ○ Run   (sticky) │
-├─────────────────────────────────────────────────────────┤
-│ STEP 1 — expanded                                       │
-│   Dataset_A_dietary.csv ▾                               │
-│                                                         │
-│   MetS Clinical Criteria                                │
-│     Waist circumference   →  waist_circ   [auto·0.94]   │
-│     Triglycerides         →  trig_mg_dl   [auto·0.89]   │
-│     ...                                                 │
-│                                                         │
-│   Demographics & Dietary Features                       │
-│     Age                   →  age_years    [auto·0.98]   │
-│     Dietary fibre         →  fibre_g      [review·0.71] │
-│     ...                                                 │
-│     + Add field                                         │
-│                                                         │
-│   ⓘ MetS labels are computed using NCEP ATP III...      │
-│                                            [Continue →] │
-├─────────────────────────────────────────────────────────┤
-│ STEP 2 — collapsed until step 1 confirmed               │
-│ STEP 3 — collapsed                                       │
-│ STEP 4 — appears on Run                                  │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ Breadcrumb · run name                  [New] [Export Report] │
+├──────────────────────────────────────────────────────────────┤
+│ PANEL 1 — Run summary (full width)                           │
+│  Cohort   │   Model performance   │   ROC sparkline          │
+├──────────────────────────────┬───────────────────────────────┤
+│ PANEL 2 — SHAP bars  (55%)   │ PANEL 3 — Cluster scatter +   │
+│                              │   2×2 summary grid    (45%)   │
+├──────────────────────────────┴───────────────────────────────┤
+│ PANEL 4 — Per-subject predictions table (full width)         │
+├──────────────────────────────────────────────────────────────┤
+│ Run manifest (muted mono caption)                            │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Steps collapse to a single-line summary when complete (e.g. "Cohort · 1,847 of 2,431 rows · age 20–65 · all sexes · pregnant excluded"). Click to re-edit, which marks downstream steps stale.
+### Why this layout
 
-## Confidence pill — the UX choice your supervisor will look at
+The reading order mirrors how an epidemiologist defends a finding in a paper:
+**"what we ran" → "did it work" → "what mattered" → "are there subgroups" → "the receipts."** Panel 1 establishes legitimacy (cohort + honest test-set performance) before any conclusion is shown. Panels 2 and 3 are the *finding* — they sit side-by-side because they answer two different but complementary questions about the same model run, and a researcher wants to read across them ("sodium is the top predictor — does it dominate a specific cluster?"). Panel 4 is intentionally last and visually quieter: per-subject predictions are evidence the model is real, not the headline insight.
 
-The pill is doing two jobs at once: showing the AI suggestion *and* the level of human attention required. So color encodes **action**, not just score:
+### Why Panels 2 and 3 are paired side-by-side, not stacked
 
-| Score | Color | Label | Why |
-|---|---|---|---|
-| ≥0.85 | sage (`--data-sage` at ~15% tint) | `auto · 0.94` | Safe to accept — scanning, not deciding |
-| 0.65–0.84 | ochre (`--data-ochre` ~18%) | `review · 0.72` | Should glance — not alarming |
-| <0.65 | coral (`--coral-tint`) | `needs review · 0.48` | Pulls the eye — same family as primary CTA |
-| unmapped | dashed `--hairline` | `select column` | Clearly empty, not styled like a value |
+The scatter and the bar chart are doing different jobs at the same level of abstraction: SHAP says *which variables* drive the model globally; clustering says *which groups of people* sit at different points in dietary space. Stacking them would imply a hierarchy — they're peers. Putting them side-by-side at 55/45 gives SHAP slightly more visual weight (it's the primary causal-feeling story) while keeping the scatter at a size where 4 clusters are clearly separated.
 
-All inline, never modal — clicking the column-name chip opens a small inline dropdown of the dataset's columns; the pill recomputes (re-mapped manually = neutral grey "manual"). This keeps the researcher in flow and makes the "human reviewed AI" story visible at a glance.
+### The scatter ↔ cluster-summary-cards relationship
 
-## The lab-values-label-only annotation
+The PCA scatter and the 2×2 grid of cluster cards beneath it are the **same data, two encodings** — the scatter shows *separation* (are the groups actually distinct?), the cards show *meaning* (what does each group represent clinically?). The coloured dot on each card matches the cluster colour in the scatter exactly, so the eye binds them without a legend. The four labels — "Low-fibre, high-sodium" / "Balanced traditional" / "High-energy refined-carb" / "Mediterranean-style" — are the human-readable translation of the cluster centroid. MetS prevalence on each card lets the researcher immediately rank-order clusters by risk and verify the clusters are clinically meaningful, not just statistical artefacts. Cards are hoverable (lift + coral hairline) so they read as "drillable" even though the drill-in isn't wired this prompt.
 
-After Step 1's mapping list, a quiet `--surface-hover` info card with a small `info` icon:
+### Why test-set metrics, honestly
 
-> MetS labels are computed using NCEP ATP III criteria from the clinical fields above. The model predicts MetS from diet and demographics only — lab values are used to *label*, not to *predict*. This is the eAsia framing.
+This is the methodological backbone of the screen and the bit a peer-reviewer or supervisor will scrutinise hardest. Training-set metrics inflate — a model can memorise its training data and still be useless on a new cohort. Showing **AUC 0.76 / Sensitivity 0.71 / Specificity 0.74 on n=480** (a held-out 20% split) signals three things at once: (1) we evaluated on data the model never saw, (2) we report multiple metrics so a single number can't hide class-imbalance failure modes, (3) we expose `n` so the reader can judge how much to trust the confidence intervals. A small italic caption ("honest test-set metrics") makes the methodological choice explicit rather than buried. For a marketing video this single phrase is the difference between "demo dashboard" and "research tool" — it's the one thing actual epidemiologists will pause and read.
 
-This is annotation chrome, not interactive — same typographic weight as body, italicised "label" / "predict" to mirror the methodological distinction. It sits at the bottom of Step 1 so it's read after the researcher sees both groups (clinical vs dietary), which is when the distinction makes sense. We're not hiding it behind a tooltip because it's the core scientific claim of the product.
+## Panel implementation details
 
-## Step details
+**Panel 1 — Run summary.** Single card, 3-column CSS grid. Big numbers in Fraunces + tabular. ROC sparkline is a Recharts `<LineChart>` of ~12 hand-tuned `(fpr, tpr)` points with a coral `<Area>` fill underneath and a dashed grey 45° reference line. No axes labels — it's a sparkline. Caption beneath.
 
-**Step 1 — Map.** Two grouped sections (Clinical Criteria, Demographics & Dietary). Hard-coded suggestion rows from the spec. Each row: target label (Inter semibold) · `→` · column chip (JetBrains Mono) · confidence pill (right-aligned). "+ Add field" ghost row at the bottom of group B. Annotation card. `Continue to Cohort` coral button, right-aligned.
+**Panel 2 — SHAP.** Recharts `<BarChart layout="vertical">` with the 10 features from the spec, hard-coded in a typed array. Coral bars, hairline `<CartesianGrid>` horizontal only. Y-axis labels = feature name + unit (unit in mono via a custom tick renderer). Value labels at end of each bar in mono. Italic note about fibre below.
 
-**Step 2 — Cohort.** Two-column layout: controls on the left (dual-handle Radix slider for age, chip group for sex, two toggle rows), CohortPreview card on the right with row count, MetS prevalence, stacked sage/coral bar, mean age + sex split. Numbers update via a small deterministic mock formula from filter inputs (no backend). `Continue to Method`.
+**Panel 3 — Clusters.** Recharts `<ScatterChart>` with 4 `<Scatter>` series, each a different `--data-*` colour. ~80 jittered points per cluster generated deterministically (seeded `Math.random()` replacement using index) so the layout is stable across reloads but doesn't ship a real CSV. Centroids as larger ring markers (same colour, stroke only, no fill). Axes labelled "PC1 (28% var)" / "PC2 (19% var)" in mono. Below: 2×2 grid of cards, each with a 10×10px coloured dot, label, `n =` and MetS prevalence in mono.
 
-**Step 3 — Method.** Two MethodCards side-by-side, both checkable independently, both default on. Selection state = coral hairline + faint coral-tint surface. Subgroup card reveals a small `k` numeric stepper (2–8) when active. `Run analysis` button, larger, coral filled.
+**Panel 4 — Predictions table.** Plain `<table>` (not shadcn — lighter), 8 hard-coded rows. `predicted_risk` cell renders the number in mono next to a 60px thin coral bar (`<div>` with width = risk × 100%). `mets_flag` is a small pill (coral-tint or sage-tint). `cluster` is a coloured dot + mono number. `key_features` are three subtle chips (`bg-surface-hover`, `border-hairline`, mono text) with `↑` / `↓` arrows. Pagination caption beneath, non-interactive.
 
-**Step 4 — Run.** Status list with five rows, each starting as pending dot → spinner → check. Simulated via `setTimeout` chain (rough 600–1200ms each). Sticky indicator updates: first three checks, last one as "Running…". When all done: plain-language line + `Run complete · View Results →` button (links nowhere yet — wired in next prompt).
+**Run manifest.** Single line at the bottom, `text-[11px] text-ink-3 mono`, separators with `·`. Reads like a footer, not a panel.
 
-## State
+## Header behaviour
 
-Single `useState` per step, plus a `currentStep` cursor. No global store, no Cloud, no server fns — visual shell only. All mock data lives at the top of the file as typed constants so it's trivial to wire to real data later.
+Breadcrumb shows `Analysis · {editable run name} · {dataset}`. Run name editable on click (same pattern as the existing AI Analysis screen). Right side: `New Analysis` ghost button (navigates back to `/ai-analysis`, resets state), `Export Report` coral filled button (`console.log("export", { runId, ... })` — no PDF yet).
 
 ## Out of scope
 
-- Results screen (next prompt).
-- Real column parsing from a CSV.
-- Wiring the dataset dropdown to the Datasets screen.
-- Saving / loading runs.
-- Backend, ML, SHAP, K-Means — only the visual progress simulation.
+- Real PDF export.
+- Drill-into-cluster / drill-into-subject (cards and rows hover but don't navigate).
+- Real model artefacts — all numbers from the spec are hard-coded as typed constants at the top of the file.
+- Saved-runs list.
+- Storing the run server-side.
 
 Approve and I'll build it in one pass.
