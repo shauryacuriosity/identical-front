@@ -126,31 +126,39 @@ function StepIndicator({
   current,
   completed,
   running,
+  skipped,
 }: {
   current: StepKey;
   completed: Set<StepKey>;
   running: boolean;
+  skipped?: Set<StepKey>;
 }) {
   return (
     <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline">
       <ol className="mx-auto max-w-[1280px] flex items-center gap-2">
         {STEPS.map((s, i) => {
-          const isDone = completed.has(s.key);
-          const isActive = current === s.key;
+          const isSkipped = skipped?.has(s.key) ?? false;
+          const isDone = completed.has(s.key) && !isSkipped;
+          const isActive = current === s.key && !isSkipped;
           const isRunStepRunning = s.key === "run" && running;
+          const nextSkipped = skipped?.has(STEPS[i + 1]?.key);
           return (
             <li key={s.key} className="flex items-center gap-2 flex-1 last:flex-none">
-              <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-2 ${isSkipped ? "opacity-50" : ""}`}>
                 <span
                   className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] tabular border transition-colors ${
-                    isDone
-                      ? "bg-coral text-white border-coral"
-                      : isActive
-                        ? "bg-coral-tint text-coral border-coral/40"
-                        : "bg-surface text-ink-3 border-hairline"
+                    isSkipped
+                      ? "bg-surface text-ink-3 border-dashed border-hairline"
+                      : isDone
+                        ? "bg-coral text-white border-coral"
+                        : isActive
+                          ? "bg-coral-tint text-coral border-coral/40"
+                          : "bg-surface text-ink-3 border-hairline"
                   }`}
                 >
-                  {isDone ? (
+                  {isSkipped ? (
+                    <span className="text-[9px]">—</span>
+                  ) : isDone ? (
                     <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                   ) : isRunStepRunning ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -164,9 +172,16 @@ function StepIndicator({
                   }`}
                 >
                   {s.label}
+                  {isSkipped && (
+                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">n/a</span>
+                  )}
                 </span>
               </div>
-              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-hairline" />}
+              {i < STEPS.length - 1 && (
+                <div
+                  className={`flex-1 h-px ${isSkipped || nextSkipped ? "border-t border-dashed border-hairline" : "bg-hairline"}`}
+                />
+              )}
             </li>
           );
         })}
@@ -301,6 +316,11 @@ function AiAnalysisPage() {
   const [runName, setRunName] = useState("Untitled run");
   const [editingName, setEditingName] = useState(false);
 
+  // Function mode — what are you running?
+  type FnMode = "full" | "predict" | "discover" | "labels";
+  const [fnMode, setFnMode] = useState<FnMode>("full");
+  const [metsLabelCol, setMetsLabelCol] = useState<string | null>(null);
+
   const [clinical, setClinical] = useState(CLINICAL);
   const [dietary, setDietary] = useState(DIETARY);
 
@@ -310,21 +330,48 @@ function AiAnalysisPage() {
   const [excludePregnant, setExcludePregnant] = useState(true);
   const [requireComplete, setRequireComplete] = useState(true);
 
-  const [assocOn, setAssocOn] = useState(true);
+  // Prediction section
+  const [predictOn, setPredictOn] = useState(true);
+  const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("xgb");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [xgbDepth, setXgbDepth] = useState(5);
+  const [xgbTrees, setXgbTrees] = useState(300);
+  const [lrReg, setLrReg] = useState(1.0);
+  const [lrPenalty, setLrPenalty] = useState<"l1" | "l2">("l2");
+
+  // Subgroup discovery section
   const [subgroupOn, setSubgroupOn] = useState(true);
+  const [clusterAlg, setClusterAlg] = useState<"kmeans">("kmeans");
   const [k, setK] = useState(4);
+  const [kAuto, setKAuto] = useState(false);
+  const [dimRed, setDimRed] = useState<"pca">("pca");
 
   const [currentStep, setCurrentStep] = useState<StepKey>("map");
   const [completed, setCompleted] = useState<Set<StepKey>>(new Set());
+  const [skipped, setSkipped] = useState<Set<StepKey>>(new Set());
+
+  // Effective on-flags based on fnMode
+  const showPredict = fnMode === "full" || fnMode === "predict";
+  const showSubgroup = fnMode === "full" || fnMode === "discover";
+  const methodSkipped = fnMode === "labels";
 
   // Run state
-  const RUN_STEPS = [
-    "Computing MetS labels…",
-    "Filtering cohort…",
-    "Training XGBoost…",
-    "Computing SHAP values…",
-    "Running K-Means clustering…",
-  ];
+  const RUN_STEPS = useMemo(() => {
+    const steps: string[] = ["Computing MetS labels…", "Filtering cohort…"];
+    if (!methodSkipped) {
+      if (showPredict && predictOn) {
+        if (predictModel === "xgb") steps.push("Training XGBoost…");
+        else if (predictModel === "logreg") steps.push("Fitting Logistic Regression…");
+        else steps.push("Training XGBoost + Logistic Regression…");
+        steps.push("Computing SHAP values…");
+      }
+      if (showSubgroup && subgroupOn) steps.push("Running K-Means clustering…");
+    } else {
+      steps.push("Writing labelled dataset…");
+    }
+    return steps;
+  }, [methodSkipped, showPredict, predictOn, predictModel, showSubgroup, subgroupOn]);
+
   const [runProgress, setRunProgress] = useState(-1); // -1 = not started, n = currently on step n
   const runStarted = runProgress >= 0;
   const runComplete = runProgress >= RUN_STEPS.length;
@@ -361,16 +408,44 @@ function AiAnalysisPage() {
 
   const cohortSummary = `${cohort.included.toLocaleString()} of ${TOTAL_ROWS.toLocaleString()} rows · age ${ageMin}–${ageMax} · ${sex === "All" ? "all sexes" : sex} · ${excludePregnant ? "pregnant excluded" : "pregnant included"}`;
 
-  const methodSummary = [
-    assocOn && "Association",
-    subgroupOn && `Subgroup Discovery (k=${k})`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const predictSummary = (() => {
+    if (!showPredict || !predictOn) return null;
+    if (predictModel === "xgb") return "XGBoost";
+    if (predictModel === "logreg") return "Logistic Regression";
+    return "XGBoost + LogReg";
+  })();
+  const subgroupSummary = (() => {
+    if (!showSubgroup || !subgroupOn) return null;
+    const kPart = kAuto ? "k=auto" : `k=${k}`;
+    return `K-Means (${kPart}, PCA)`;
+  })();
+  const methodSummary = [predictSummary, subgroupSummary].filter(Boolean).join(" · ");
 
   const advanceFrom = (from: StepKey, to: StepKey) => {
     setCompleted((c) => new Set(c).add(from));
     setCurrentStep(to);
+  };
+
+  // Step 2 → next: skip Method when in "labels" mode
+  const continueFromCohort = () => {
+    if (methodSkipped) {
+      setCompleted((c) => {
+        const next = new Set(c);
+        next.add("cohort");
+        next.add("method");
+        return next;
+      });
+      setSkipped((s) => new Set(s).add("method"));
+      setCurrentStep("run");
+      setRunProgress(0);
+    } else {
+      setSkipped((s) => {
+        const next = new Set(s);
+        next.delete("method");
+        return next;
+      });
+      advanceFrom("cohort", "method");
+    }
   };
 
   const reopen = (key: StepKey) => {
@@ -413,7 +488,7 @@ function AiAnalysisPage() {
         )}
       </div>
 
-      <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} />
+      <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} skipped={skipped} />
 
       <div className="mt-6 flex flex-col gap-4">
         {/* STEP 1 — Map */}
@@ -425,7 +500,44 @@ function AiAnalysisPage() {
           onExpand={() => reopen("map")}
         >
           <div className="space-y-6 pt-4">
-            <p className="text-[13.5px] text-ink-2 -mt-2">
+            {/* Function-mode selector */}
+            <div>
+              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                What are you running?
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["full", "Full analysis", "predict + discover"],
+                    ["predict", "Prediction only", null],
+                    ["discover", "Subgroup discovery only", null],
+                    ["labels", "Generate labels only", null],
+                  ] as const
+                ).map(([key, label, hint]) => {
+                  const active = fnMode === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setFnMode(key)}
+                      className={`h-7 px-3 rounded-full text-[12.5px] border transition-colors ${
+                        active
+                          ? "bg-coral text-white border-coral"
+                          : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                      }`}
+                    >
+                      {label}
+                      {hint && (
+                        <span className={`ml-1.5 text-[11px] ${active ? "text-white/75" : "text-ink-3"}`}>
+                          · {hint}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <p className="text-[13.5px] text-ink-2">
               Confirm how your dataset columns map to the fields we need.
             </p>
 
@@ -437,12 +549,51 @@ function AiAnalysisPage() {
               </button>
             </div>
 
-            {/* Group A */}
+            {/* Group A — MetS Clinical */}
             <div>
-              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                MetS Clinical Criteria
-              </h3>
-              <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
+              <div className="flex items-baseline gap-2 mb-2">
+                <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                  MetS Clinical Criteria
+                </h3>
+                {fnMode === "predict" && metsLabelCol && (
+                  <span className="text-[11px] text-ink-3 italic">optional · used for verification</span>
+                )}
+                {fnMode === "discover" && (
+                  <span className="text-[11px] text-ink-3 italic">optional · clustering doesn't need a label</span>
+                )}
+              </div>
+              <div
+                className={`rounded-xl border border-hairline bg-canvas/40 px-4 ${
+                  fnMode === "discover" || (fnMode === "predict" && metsLabelCol) ? "opacity-70" : ""
+                }`}
+              >
+                {fnMode === "predict" && (
+                  <div className="grid grid-cols-[1fr_16px_1fr_auto] items-center gap-3 py-2.5 border-b border-hairline/60">
+                    <span className="text-[13.5px] text-ink font-medium">
+                      MetS label
+                      <span className="ml-1.5 text-[11px] text-ink-3 font-normal">
+                        (if already in your data)
+                      </span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-ink-3" />
+                    <div>
+                      <button
+                        onClick={() =>
+                          setMetsLabelCol((c) => (c ? null : "mets_label"))
+                        }
+                        className={`mono inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] border transition-colors ${
+                          metsLabelCol
+                            ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
+                            : "border-dashed border-hairline text-ink-3 hover:text-ink"
+                        }`}
+                      >
+                        {metsLabelCol ?? "Select column"}
+                        <ChevronDown className="h-3 w-3 text-ink-3" />
+                      </button>
+                    </div>
+                    <span />
+                  </div>
+                )}
                 {clinical.map((r, i) => (
                   <MappingRow
                     key={r.target}
@@ -459,30 +610,32 @@ function AiAnalysisPage() {
               </div>
             </div>
 
-            {/* Group B */}
-            <div>
-              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                Demographics & Dietary Features
-              </h3>
-              <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
-                {dietary.map((r, i) => (
-                  <MappingRow
-                    key={r.target}
-                    row={r}
-                    onChange={(col) =>
-                      setDietary((rows) => {
-                        const next = [...rows];
-                        next[i] = { ...next[i], column: col, score: null };
-                        return next;
-                      })
-                    }
-                  />
-                ))}
-                <button className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-3 hover:text-coral transition-colors border-t border-hairline/60">
-                  <Plus className="h-3.5 w-3.5" /> Add field
-                </button>
+            {/* Group B — Demographics & Dietary (hidden in labels mode) */}
+            {fnMode !== "labels" && (
+              <div>
+                <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                  Demographics & Dietary Features
+                </h3>
+                <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
+                  {dietary.map((r, i) => (
+                    <MappingRow
+                      key={r.target}
+                      row={r}
+                      onChange={(col) =>
+                        setDietary((rows) => {
+                          const next = [...rows];
+                          next[i] = { ...next[i], column: col, score: null };
+                          return next;
+                        })
+                      }
+                    />
+                  ))}
+                  <button className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-3 hover:text-coral transition-colors border-t border-hairline/60">
+                    <Plus className="h-3.5 w-3.5" /> Add field
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Annotation */}
             <div className="flex gap-3 rounded-xl bg-surface-hover border border-hairline/70 p-4">
@@ -646,69 +799,257 @@ function AiAnalysisPage() {
 
           <div className="flex justify-end mt-6">
             <button
-              onClick={() => advanceFrom("cohort", "method")}
+              onClick={continueFromCohort}
               className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
             >
-              Continue to Method →
+              {methodSkipped ? "Continue to Run →" : "Continue to Method →"}
             </button>
           </div>
         </StepShell>
 
-        {/* STEP 3 — Method */}
-        <StepShell
-          index={3}
-          title="Select method"
-          state={stepState("method")}
-          summary={methodSummary || "No methods selected"}
-          onExpand={() => reopen("method")}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-            <MethodCard
-              icon={<Network className="h-5 w-5" strokeWidth={1.75} />}
-              title="Association"
-              description="Identify which dietary and demographic factors predict MetS in this cohort. Produces model accuracy report, ranked feature importance (SHAP), and per-subject predictions."
-              selected={assocOn}
-              onToggle={() => setAssocOn((v) => !v)}
-            />
-            <MethodCard
-              icon={<Boxes className="h-5 w-5" strokeWidth={1.75} />}
-              title="Subgroup Discovery"
-              description="Find sub-populations with distinct dietary patterns and MetS risk. Produces cluster profiles, PCA scatter, and per-cluster prevalence."
-              selected={subgroupOn}
-              onToggle={() => setSubgroupOn((v) => !v)}
-            >
-              {subgroupOn && (
-                <div className="mt-4 pt-4 border-t border-hairline/60 flex items-center gap-3">
-                  <label className="text-[12px] text-ink-2">Number of clusters (k)</label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setK((v) => Math.max(2, v - 1)); }}
-                      className="h-7 w-7 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                    >−</button>
-                    <span className="mono w-8 text-center text-[13px] text-ink tabular">{k}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setK((v) => Math.min(8, v + 1)); }}
-                      className="h-7 w-7 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                    >+</button>
+        {/* STEP 3 — Method (skipped in labels mode) */}
+        {!methodSkipped && (
+          <StepShell
+            index={3}
+            title="Select method"
+            state={stepState("method")}
+            summary={methodSummary || "No methods selected"}
+            onExpand={() => reopen("method")}
+          >
+            <div className="space-y-4 pt-4">
+              {/* SECTION A — Prediction */}
+              {showPredict && (
+                <MethodSection
+                  icon={<Network className="h-5 w-5" strokeWidth={1.75} />}
+                  title="Prediction"
+                  subtitle="supervised · what predicts MetS in this cohort?"
+                  enabled={predictOn}
+                  onToggle={() => setPredictOn((v) => !v)}
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Model
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={predictModel === "xgb"}
+                          onSelect={() => setPredictModel("xgb")}
+                          title="XGBoost"
+                          hint="recommended — handles non-linearities and missing data well"
+                        />
+                        <RadioRow
+                          checked={predictModel === "logreg"}
+                          onSelect={() => setPredictModel("logreg")}
+                          title="Logistic Regression"
+                          hint="more interpretable, smaller sample sizes"
+                        />
+                        <RadioRow
+                          checked={predictModel === "both"}
+                          onSelect={() => setPredictModel("both")}
+                          title="Compare both"
+                          hint="runs side-by-side, shows comparative metrics"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Advanced */}
+                    <div className="rounded-lg border border-hairline/70 bg-canvas/40">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAdvancedOpen((o) => !o);
+                        }}
+                        className="w-full flex items-center justify-between px-3 h-9 text-[12.5px] text-ink-2 hover:text-ink"
+                      >
+                        <span>Advanced</span>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-ink-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
+                        />
+                      </button>
+                      {advancedOpen && (
+                        <div className="px-3 pb-4 pt-1 space-y-4 border-t border-hairline/60">
+                          {(predictModel === "xgb" || predictModel === "both") && (
+                            <div className="space-y-3">
+                              {predictModel === "both" && (
+                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
+                                  XGBoost
+                                </div>
+                              )}
+                              <SliderRow
+                                label="max_depth"
+                                value={xgbDepth}
+                                min={2}
+                                max={8}
+                                onChange={setXgbDepth}
+                              />
+                              <SliderRow
+                                label="n_estimators"
+                                value={xgbTrees}
+                                min={100}
+                                max={1000}
+                                step={50}
+                                onChange={setXgbTrees}
+                              />
+                            </div>
+                          )}
+                          {(predictModel === "logreg" || predictModel === "both") && (
+                            <div className="space-y-3">
+                              {predictModel === "both" && (
+                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
+                                  Logistic Regression
+                                </div>
+                              )}
+                              <SliderRow
+                                label="regularization (C)"
+                                value={lrReg}
+                                min={0.01}
+                                max={10}
+                                step={0.01}
+                                decimals={2}
+                                onChange={setLrReg}
+                              />
+                              <div className="flex items-center justify-between gap-3">
+                                <label className="text-[12.5px] text-ink-2">Penalty</label>
+                                <div className="flex gap-1">
+                                  {(["l1", "l2"] as const).map((p) => (
+                                    <button
+                                      key={p}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setLrPenalty(p);
+                                      }}
+                                      className={`h-7 px-3 rounded-md text-[12px] border ${
+                                        lrPenalty === p
+                                          ? "bg-coral text-white border-coral"
+                                          : "bg-surface border-hairline text-ink-2 hover:border-coral/40"
+                                      }`}
+                                    >
+                                      {p.toUpperCase()}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="text-[12.5px] text-ink-3 italic">
+                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking,
+                      per-subject predictions.
+                    </p>
                   </div>
-                </div>
+                </MethodSection>
               )}
-            </MethodCard>
-          </div>
 
-          <div className="flex justify-end mt-6">
-            <button
-              onClick={() => {
-                advanceFrom("method", "run");
-                setRunProgress(0);
-              }}
-              disabled={!assocOn && !subgroupOn}
-              className="h-11 px-5 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Run analysis
-            </button>
-          </div>
-        </StepShell>
+              {/* SECTION B — Subgroup Discovery */}
+              {showSubgroup && (
+                <MethodSection
+                  icon={<Boxes className="h-5 w-5" strokeWidth={1.75} />}
+                  title="Subgroup Discovery"
+                  subtitle="unsupervised · what sub-populations exist?"
+                  enabled={subgroupOn}
+                  onToggle={() => setSubgroupOn((v) => !v)}
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Clustering algorithm
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={clusterAlg === "kmeans"}
+                          onSelect={() => setClusterAlg("kmeans")}
+                          title="K-Means"
+                          hint="recommended"
+                        />
+                        <RadioRow disabled title="Hierarchical clustering" soon />
+                        <RadioRow disabled title="DBSCAN" soon />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                          Number of clusters (k)
+                        </label>
+                        <label className="flex items-center gap-2 text-[12px] text-ink-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={kAuto}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              setKAuto(e.target.checked);
+                            }}
+                            className="accent-coral"
+                          />
+                          Auto-select via silhouette score
+                        </label>
+                      </div>
+                      <div className={`flex items-center gap-1 ${kAuto ? "opacity-40 pointer-events-none" : ""}`}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setK((v) => Math.max(2, v - 1));
+                          }}
+                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                        >
+                          −
+                        </button>
+                        <span className="mono w-10 text-center text-[13px] text-ink tabular">{k}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setK((v) => Math.min(8, v + 1));
+                          }}
+                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                        Dimensionality reduction for visualisation
+                      </div>
+                      <div className="space-y-1.5">
+                        <RadioRow
+                          checked={dimRed === "pca"}
+                          onSelect={() => setDimRed("pca")}
+                          title="PCA"
+                          hint="recommended"
+                        />
+                        <RadioRow disabled title="t-SNE" soon />
+                        <RadioRow disabled title="UMAP" soon />
+                      </div>
+                    </div>
+
+                    <p className="text-[12.5px] text-ink-3 italic">
+                      Produces cluster profiles, PCA scatter, per-cluster MetS prevalence.
+                    </p>
+                  </div>
+                </MethodSection>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => {
+                  advanceFrom("method", "run");
+                  setRunProgress(0);
+                }}
+                disabled={(!predictOn || !showPredict) && (!subgroupOn || !showSubgroup)}
+                className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Run Analysis
+              </button>
+            </div>
+          </StepShell>
+        )}
+
 
         {/* STEP 4 — Run */}
         {(currentStep === "run" || completed.has("run")) && (
@@ -807,53 +1148,147 @@ function ToggleRow({
   );
 }
 
-function MethodCard({
+function MethodSection({
   icon,
   title,
-  description,
-  selected,
+  subtitle,
+  enabled,
   onToggle,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
-  description: string;
-  selected: boolean;
+  subtitle: string;
+  enabled: boolean;
   onToggle: () => void;
-  children?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <div
-      onClick={onToggle}
-      className={`rounded-2xl border p-5 cursor-pointer transition-all ${
-        selected
-          ? "border-coral/50 bg-coral-tint/40"
-          : "border-hairline bg-surface hover:border-coral/30"
+      className={`rounded-2xl border transition-all ${
+        enabled ? "border-coral/50 bg-coral-tint/30" : "border-hairline bg-surface"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 p-5 text-left"
+      >
         <div className="flex items-center gap-3">
           <span
             className={`h-9 w-9 rounded-lg flex items-center justify-center ${
-              selected ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
+              enabled ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
             }`}
           >
             {icon}
           </span>
-          <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
-            {title}
-          </h3>
+          <div>
+            <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+              {title}
+            </h3>
+            <div className="text-[12px] text-ink-3 mt-0.5">{subtitle}</div>
+          </div>
         </div>
         <span
           className={`h-5 w-5 rounded-md border flex items-center justify-center ${
-            selected ? "bg-coral border-coral" : "border-hairline bg-surface"
+            enabled ? "bg-coral border-coral" : "border-hairline bg-surface"
           }`}
         >
-          {selected && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
+          {enabled && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
         </span>
-      </div>
-      <p className="mt-3 text-[13px] text-ink-2 leading-relaxed">{description}</p>
-      {children}
+      </button>
+      {enabled && <div className="px-5 pb-5 pt-1 border-t border-hairline/60">{children}</div>}
     </div>
   );
 }
+
+function RadioRow({
+  checked,
+  onSelect,
+  title,
+  hint,
+  disabled,
+  soon,
+}: {
+  checked?: boolean;
+  onSelect?: () => void;
+  title: string;
+  hint?: string;
+  disabled?: boolean;
+  soon?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onSelect?.();
+      }}
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg border text-left transition-colors ${
+        disabled
+          ? "border-dashed border-hairline bg-surface opacity-50 cursor-not-allowed"
+          : checked
+            ? "border-coral/50 bg-surface"
+            : "border-hairline bg-surface hover:border-coral/40"
+      }`}
+    >
+      <span
+        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+          checked ? "border-coral" : "border-hairline"
+        }`}
+      >
+        {checked && <span className="h-2 w-2 rounded-full bg-coral" />}
+      </span>
+      <span className="text-[13px] text-ink font-medium">{title}</span>
+      {hint && <span className="text-[12px] text-ink-3">· {hint}</span>}
+      {soon && (
+        <span className="ml-auto text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5">
+          coming soon
+        </span>
+      )}
+    </button>
+  );
+}
+
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  decimals = 0,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  decimals?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="mono text-[12px] text-ink-2">{label}</label>
+        <span className="mono text-[12px] text-ink tabular">{value.toFixed(decimals)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1 appearance-none bg-hairline rounded-full accent-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
+      />
+      <div className="flex justify-between text-[10px] text-ink-3 mono tabular">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+}
+

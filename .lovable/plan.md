@@ -1,109 +1,104 @@
-# Styling pass: adopt Adrian's Figma tokens
+# AI Analysis: input-adaptivity + richer Method step
 
-This is **styling only**. No layout, hierarchy, copy, component, or interaction is being changed. Every screen Sha built stays exactly as is — we're just retoning the surface.
+Two refinements applied to `src/routes/ai-analysis.tsx` (and a small touch to `src/routes/ai-analysis.results.tsx` only if Method summary copy changes). All styling from the previous pass — coral, Montserrat, hairlines, shadows, radii — is preserved verbatim. The 4-step indicator (Map → Cohort → Method → Run) stays.
 
-## 1. Tokens adopted from Adrian's Figma (exact hex)
+---
 
-### Surfaces
-| Token | Hex | Used for |
-|---|---|---|
-| `--canvas` (page bg) | `#fff5f5` | App background (replaces current warm-paper oklch) |
-| `--surface` (card) | `#ffffff` | Cards, panels, modals |
-| `--surface-hover` | `#f9d7d7` | Hover states, dropdown row highlight |
+## 1. Addressing Zhuojin's input-adaptivity concern
 
-### Accent (coral identity)
-| Token | Hex | Used for |
-|---|---|---|
-| `--coral` (accent primary) | `#e8928e` | Active tab pill, primary buttons, accent icons, ring |
-| `--coral-hover` | `#e46576` | Hover on primary actions |
-| `--coral-deep` (accent highlight) | `#6e4a4a` | Strong emphasis, used sparingly (e.g. selected chip border) |
-| `--coral-muted` (accent text muted) | `#d4908a` | Secondary pink labels |
+> "The system should ask for what you need based on what you're running — not require all inputs upfront when the function doesn't need them."
 
-### Text
-| Token | Hex |
-|---|---|
-| `--ink` (primary) | `#1e1e1e` |
-| `--ink-2` (secondary, derived) | `#5a4a4a` |
-| `--ink-3` (muted) | `#d4908a` |
+**What's added.** A subtle, single-line chip group at the very top of Step 1, above the dataset selector:
 
-### Borders
-| Token | Value |
-|---|---|
-| `--hairline` (subtle) | `rgba(110, 74, 74, 0.12)` |
-| `--hairline-strong` | `rgba(110, 74, 74, 0.24)` |
-| `--hairline-grey` (neutral divider) | `#d9d9d9` |
+```text
+WHAT ARE YOU RUNNING?
+( Full analysis )  ( Prediction only )  ( Subgroup discovery only )  ( Generate labels only )
+```
 
-### Status
-Success `#7aab8a` · Warning `#9a9268` · Danger `#c08880` · Info `#7a9dc4`. Replaces the current `--data-sage/ochre/slate/plum` quad as the status quartet. (Note in §4 below about chart accents.)
+- Caption uses the existing `text-[12px] uppercase tracking-[0.12em] text-ink-3` style — identical to existing section labels.
+- Chips reuse the existing pill style (h-7, rounded-full, hairline border, `bg-surface-hover` on selected, `border-coral/40 text-coral`), single-select, default `Full analysis`.
+- State lives in a single `fnMode` variable (`"full" | "predict" | "discover" | "labels"`) that drives the rest of the workflow.
 
-## 2. Supplemented values (explanation for designer)
+**How inputs adapt** (driven by `fnMode`, no structural rework):
 
-Adrian's export shipped one text style, magenta inset shadows, and no radius/spacing scale. Filling the gaps:
+| Mode | MetS Clinical Criteria | Demographics & Dietary | Step 3 — Method | Run output |
+|---|---|---|---|---|
+| Full analysis *(default)* | required | required | both sections, both enabled | current behavior |
+| Prediction only | "MetS label (if already in data)" select column row appears at top. If mapped → the 5 criteria rows render with `optional · used for verification` muted tag. If unmapped → criteria stay required (system computes label). | required | Prediction section only | predictions + SHAP |
+| Subgroup discovery only | section header gets `optional` tag, rows greyed but available | required | Subgroup section only | clusters + PCA |
+| Generate labels only | required | **section hidden entirely** | **Step skipped** — Continue on Step 2 jumps to Step 4; Method step renders faded with an `n/a` tag in the indicator | labelled dataset |
 
-**Type scale** — only `Montserrat 12/400` existed. Added a full scale that breathes well in Montserrat:
-- Display 32 / 600 / 1.15 / -0.01em
-- H1 24 / 600 / 1.25
-- H2 20 / 600 / 1.3
-- H3 18 / 500 / 1.35
-- Body 15 / 400 / 1.5
-- Small 13 / 400 / 1.45
-- Caption 11 / 500 / 0.04em / uppercase
+**Default behavior is preserved.** A researcher who never touches the chip group sees the canonical pipeline they have today — same fields, same Method defaults, same Run output. The selector is additive opt-in for narrower runs.
 
-**Font families** — Sans = **Montserrat** (Adrian's), Mono = **JetBrains Mono** (for filenames, row counts, column names, percentages). **Fraunces and Inter/Inter Tight are removed entirely** — every `font-serif` usage is rewritten to Montserrat, the Google Fonts `<link>` in `__root.tsx` drops both families.
+**Step indicator behavior.** When `fnMode === "labels"`, the Method dot renders with `opacity-50`, a small `n/a` caption replaces the number, and the connector to Run is dashed. The Continue handler on Step 2 in this mode calls `advanceFrom("cohort", "run")` and adds `"method"` to a `skipped` set so `StepIndicator` styles it accordingly.
 
-**Shadows** — Adrian's exported magenta inset shadows (`rgba(214,56,101,1)`) read as experimental, not production. Replaced with brand-tinted subtle elevations:
-- `--shadow-sm` (card): `0 1px 3px rgba(110,74,74,0.08), 0 1px 2px rgba(110,74,74,0.04)`
-- `--shadow-md` (dropdown / modal): `0 4px 12px rgba(110,74,74,0.10), 0 2px 4px rgba(110,74,74,0.06)`
-- Default to hairline borders over shadow where possible.
+---
 
-**Radii** — Card 14 / Button 10 / Input·chip·pill 8 / Dropdown 10.
+## 2. Addressing Adrian's "more models" concern
 
-**Spacing** — 8px base: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48.
+> "The Method step is too simple — our backend supports more models and configurations than the UI surfaces."
 
-## 3. Tokens dropped as noise
+Step 3 is redesigned from two flat cards into two **independently-toggleable sections** (`A — Prediction`, `B — Subgroup Discovery`) that mirror the backend capability surface. Both checked by default in Full analysis mode; visibility is filtered by `fnMode` per the table above.
 
-- `--paint-mobile_background_shaurya` (#f5fff7 green)
-- `--paint-bg_light1` (#e1ff00 yellow-green)
-- `--paint-bg_dark1/2/3` (purple-blue, unused)
-- `--paint-hiwuebgobgo1/2/3` (nonsense-named pinks)
-- `--paint-primary1` (#db111e — too saturated, conflicts with coral identity)
-- All dark-mode tokens (`--bg-bg-dark`, `--bg-bg-light`, etc.) — app is light-mode only
-- All `--effect-shadow_*` magenta inset shadows
-- `--accent-secondary` `#0077ff` (off-brand blue, no usage)
+### Section A — Prediction (supervised)
+Card with header checkbox + label `Prediction · what predicts MetS in this cohort?`. When checked, expands to:
 
-## 4. One question for you before I touch the code
+- **Model** (label) — single-select radio group:
+  - **XGBoost** *(recommended — handles non-linearities and missing data well)*
+  - **Logistic Regression** *(more interpretable, smaller sample sizes)*
+  - **Compare both** *(runs both side-by-side, comparative metrics)*
+- **Advanced** collapsible (closed by default, chevron + `text-ink-3` caption):
+  - For XGBoost: `max_depth` slider (2–8, default 5), `n_estimators` slider (100–1000, default 300)
+  - For Logistic Regression: regularization strength slider, L1/L2 segmented toggle
+  - For Compare both: shows both groups stacked
+- Output preview *(italic, `text-[12.5px] text-ink-3`)*:
+  > "Produces test-set AUC + sensitivity + specificity, SHAP feature ranking, per-subject predictions."
 
-**Chart / data-series colors.** The current Visualisation + Results dashboard uses four data accents (`--data-sage/ochre/slate/plum`) for chart series, cluster scatter dots, and SHAP bars. Adrian's status quartet (success/warning/danger/info) is semantically wrong for arbitrary chart series — using "danger red" for cluster 3 would read as an alert.
+### Section B — Subgroup Discovery (unsupervised)
+Card with header checkbox + label `Subgroup Discovery · what sub-populations exist?`. When checked, expands to:
 
-Proposed: keep the four chart-accent slots but retint them to live inside Adrian's palette — sage stays (`#7aab8a`), add a warm ochre that harmonises with coral, a slate-blue from his info (`#7a9dc4`), and a deeper plum derived from his accent-highlight family. Status colors stay reserved for actual status (badges, toasts, validation).
+- **Clustering algorithm** — radio group:
+  - **K-Means** *(recommended)*
+  - **Hierarchical clustering** — *coming soon* (greyed card, disabled)
+  - **DBSCAN** — *coming soon* (greyed card, disabled)
+- **Number of clusters (k)** — stepper 2–8 (default 4) with a toggle `Auto-select via silhouette score` (when on, stepper disables)
+- **Dimensionality reduction for visualisation** — radio group:
+  - **PCA** *(recommended)*
+  - **t-SNE** — *coming soon* (greyed)
+  - **UMAP** — *coming soon* (greyed)
+- Output preview *(italic, muted)*:
+  > "Produces cluster profiles, PCA scatter, per-cluster MetS prevalence."
 
-If you'd rather chart series just cycle coral / coral-deep / coral-muted / slate-info, say the word.
+### "Coming soon" cards
+Rendered with `opacity-50`, `cursor-not-allowed`, a small `soon` chip in the corner, and no radio interaction. They communicate what backend v2 will support without lying about today's state. Wiring happens at backend integration.
 
-## 5. "Lotus" mention
+### Run Analysis CTA
+Step 4 footer button gets bumped: larger (`h-11 px-6`), coral filled, primary CTA — `Run Analysis`. Unchanged otherwise.
 
-Adrian's brief mentions the internal project name "Lotus." Currently it appears nowhere in the build. Options:
-- (a) Don't surface it — wordmark stays `eAsia WORKBENCH`, workspace label becomes `UOW eAsia`. Nothing else changes.
-- (b) Add a small `Lotus · v0.1` line in the user menu or a footer.
+### Models/algorithms now surfaced
+- Live today: **XGBoost**, **Logistic Regression**, **K-Means**, **PCA**
+- v2 placeholders: **Hierarchical clustering**, **DBSCAN**, **t-SNE**, **UMAP**
 
-Default to (a) unless you confirm (b).
+---
 
-## 6. Naming change
+## 3. What stayed unchanged
 
-`UOW Capstone` → `UOW eAsia` in `src/routes/__root.tsx` (line 88). Wordmark `eAsia WORKBENCH` unchanged.
+- **Step indicator** at the top — same 4 steps, same sticky placement, same coral/hairline tokens. The only addition is the `n/a` faded state for Method when `fnMode === "labels"`.
+- **Styling pass** — `--canvas`, `--coral`, `--surface`, hairlines, Montserrat + JetBrains Mono, shadow tokens, radii — untouched. No new design tokens introduced.
+- **StepShell** component, completion summaries, "reopen" behavior, breadcrumb + editable run name, Cohort step (Step 2) in its entirety, Run step's progress list, and the results route.
+- **Default flow** — Full analysis + both methods enabled + XGBoost + K-Means(k=4) + PCA reproduces today's run-summary copy: `Association · Subgroup Discovery (k=4)` becomes `XGBoost · K-Means (k=4, PCA)`, fed into the existing `methodSummary` string.
 
-## 7. Confirmed unchanged (structural)
+---
 
-- Home: action toolbar row + Recent-as-hero with TYPE / MetS prevalence columns
-- Datasets: Attributes sidebar, two dataset bars, Pipeline sentence header, chip strip, preview area, Save/Export footer
-- AI Analysis: 4-step workflow (Map → Cohort → Method → Run), all step indicators and copy
-- Results dashboard: 4-panel composition (Run summary + SHAP + Cluster scatter + Prediction table)
-- Visualisation: layout untouched
-- All breadcrumbs, sample data, copy, interactions
+## Technical notes
 
-## 8. File-level scope
-
-- `src/styles.css` — rewrite token block (`:root`), swap `--font-serif`/`--font-sans` for Montserrat, drop Fraunces, retune shadows + radius, update `body` font + `h1/h2/h3` block to use sans.
-- `src/routes/__root.tsx` — swap Google Fonts `<link>` to `Montserrat:400,500,600,700` + `JetBrains Mono:400,500`; update `UOW Capstone` → `UOW eAsia`.
-- `src/routes/index.tsx`, `src/routes/datasets.tsx`, `src/routes/ai-analysis.tsx`, `src/routes/ai-analysis.results.tsx`, `src/routes/visualisation.tsx` — strip `font-serif` classes and ad-hoc `font-serif text-[NN]px` inline blocks, replace with the type-scale classes/utilities. No JSX structure edits.
-
-Tell me: chart-color direction (§4) and Lotus mention (§5), then I'll ship it in one pass.
+- New state in `AiAnalysisPage`:
+  - `fnMode: "full" | "predict" | "discover" | "labels"` (default `"full"`)
+  - `mlsLabelCol: string | null` (used only when `fnMode === "predict"`)
+  - `predictModel: "xgb" | "logreg" | "both"` (default `"xgb"`), `xgbDepth`, `xgbTrees`, `lrReg`, `lrPenalty`
+  - `clusterAlg: "kmeans"`, `kAuto: boolean`, `dimRed: "pca"`
+  - `skipped: Set<StepKey>` (only ever holds `"method"` when `fnMode === "labels"`)
+- `StepIndicator` extended with an optional `skipped` prop; renders `n/a` and reduced opacity for keys in the set.
+- `advanceFrom` on Step 2 branches: `fnMode === "labels"` → jump to `"run"` and mark method skipped + complete.
+- Chip group, section checkboxes, sliders, steppers, and "coming soon" cards all built from existing Tailwind utilities — no new shadcn components needed.
+- Scope: edits confined to `src/routes/ai-analysis.tsx`. No backend, no schema, no route changes.
