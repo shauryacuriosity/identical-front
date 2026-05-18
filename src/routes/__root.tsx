@@ -15,7 +15,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" },
+      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" },
     ],
   }),
   shellComponent: RootShell,
@@ -56,7 +56,7 @@ function AppHeader() {
       <div className="mx-auto max-w-[1280px] h-14 px-6 flex items-center justify-between">
         {/* Wordmark */}
         <Link to="/" className="flex items-baseline gap-2 group">
-          <span className="font-serif text-2xl text-ink leading-none" style={{ letterSpacing: "-0.03em" }}>
+          <span className="text-[22px] font-semibold text-ink leading-none" style={{ letterSpacing: "-0.02em" }}>
             eAsia
           </span>
           <span className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-medium">workbench</span>
@@ -85,7 +85,7 @@ function AppHeader() {
         <div className="flex items-center gap-2">
           <button className="hidden sm:flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[12.5px] text-ink-2 hover:bg-surface-hover hover:text-ink transition">
             <span className="h-4 w-4 rounded-[4px] bg-coral/15 border border-coral/30" />
-            UOW Capstone
+            UOW eAsia
             <ChevronDown className="h-3.5 w-3.5 text-ink-3" />
           </button>
           <div className="h-5 w-px bg-hairline mx-1" />

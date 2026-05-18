@@ -278,7 +278,7 @@ function StepShell({
             {complete ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : index}
           </span>
           <div>
-            <div className="text-[15px] font-medium text-ink font-serif" style={{ letterSpacing: "-0.01em" }}>
+            <div className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
               {title}
             </div>
             {complete && summary && (
@@ -604,7 +604,7 @@ function AiAnalysisPage() {
             {/* Cohort preview */}
             <aside className="rounded-xl border border-hairline bg-canvas/40 p-5 h-fit">
               <div className="text-[11px] uppercase tracking-[0.12em] text-ink-3 font-medium">Cohort preview</div>
-              <div className="mt-3 font-serif text-[26px] text-ink tabular leading-tight" style={{ letterSpacing: "-0.02em" }}>
+              <div className="mt-3 text-[26px] text-ink tabular leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {cohort.included.toLocaleString()}
                 <span className="text-[14px] text-ink-3 font-sans"> of {TOTAL_ROWS.toLocaleString()} rows</span>
               </div>
@@ -727,7 +727,7 @@ function AiAnalysisPage() {
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 )}
               </span>
-              <h2 className="text-[15px] font-medium text-ink font-serif" style={{ letterSpacing: "-0.01em" }}>
+              <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
                 {runComplete ? "Run complete" : "Running analysis…"}
               </h2>
             </div>
@@ -840,7 +840,7 @@ function MethodCard({
           >
             {icon}
           </span>
-          <h3 className="text-[15px] font-medium text-ink font-serif" style={{ letterSpacing: "-0.01em" }}>
+          <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
             {title}
           </h3>
         </div>
