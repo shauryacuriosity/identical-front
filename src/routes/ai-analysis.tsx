@@ -765,9 +765,9 @@ function AiAnalysisPage() {
 
             {runComplete && (
               <div className="mt-5 pl-10">
-                <button className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition inline-flex items-center gap-2">
+                <Link to="/ai-analysis/results" className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition inline-flex items-center gap-2">
                   View Results <ArrowRight className="h-4 w-4" />
-                </button>
+                </Link>
               </div>
             )}
           </section>
