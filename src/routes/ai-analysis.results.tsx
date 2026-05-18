@@ -139,7 +139,7 @@ function ResultsPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:divide-x md:divide-hairline/70">
           <div className="md:pr-6">
             <Caption>Cohort</Caption>
-            <div className="mt-2 font-serif text-[28px] text-ink tabular leading-none" style={{ letterSpacing: "-0.02em" }}>
+            <div className="mt-2 text-[28px] text-ink tabular leading-none" style={{ letterSpacing: "-0.02em" }}>
               <span className="mono text-[26px]">{COHORT.n.toLocaleString()}</span> <span className="text-[14px] text-ink-3 font-sans">rows</span>
             </div>
             <div className="mt-2 text-[13px] text-ink-2 tabular">
@@ -152,7 +152,7 @@ function ResultsPage() {
 
           <div className="md:px-6">
             <Caption>Model performance (test set)</Caption>
-            <div className="mt-2 font-serif text-[28px] tabular leading-none" style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}>
+            <div className="mt-2 text-[28px] tabular leading-none" style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}>
               <span className="text-[14px] text-ink-3 font-sans mr-2">AUC</span>
               <span className="mono">{PERF.auc.toFixed(2)}</span>
             </div>
@@ -398,7 +398,7 @@ function Caption({ children }: { children: React.ReactNode }) {
 function PanelHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
-      <h2 className="font-serif text-[18px] text-ink leading-tight" style={{ letterSpacing: "-0.015em" }}>{title}</h2>
+      <h2 className="text-[18px] text-ink leading-tight" style={{ letterSpacing: "-0.015em" }}>{title}</h2>
       <p className="text-[12.5px] text-ink-3 mt-0.5">{subtitle}</p>
     </div>
   );

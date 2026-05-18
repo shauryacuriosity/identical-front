@@ -133,7 +133,7 @@ function Index() {
 
       {/* Recent files — hero */}
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="font-serif text-[20px] text-ink" style={{ letterSpacing: "-0.015em" }}>
+        <h2 className="text-[20px] text-ink" style={{ letterSpacing: "-0.015em" }}>
           Recent files
         </h2>
         <button className="text-[12.5px] text-ink-2 hover:text-coral transition">View all</button>
