@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/datasets")({
@@ -160,10 +160,13 @@ const addOptions: { kind: StepKind; label: string }[] = [
   { kind: "sort", label: "Sort" },
 ];
 
-function PipelineChip({ step, onRemove }: { step: Step; onRemove: () => void }) {
+const PipelineChip = ({ step, onRemove, pulsing, chipRef }: { step: Step; onRemove: () => void; pulsing?: boolean; chipRef?: (el: HTMLDivElement | null) => void }) => {
   const accent = stepAccent[step.kind];
   return (
-    <div className={`group inline-flex items-center gap-2 h-9 pl-2.5 pr-1 rounded-md border ${accent} text-[12.5px] transition`}>
+    <div
+      ref={chipRef}
+      className={`group inline-flex items-center gap-2 h-9 pl-2.5 pr-1 rounded-md border ${accent} text-[12.5px] transition-shadow duration-300 ${pulsing ? "ring-2 ring-coral/70 ring-offset-1 ring-offset-surface" : ""}`}
+    >
       {step.parts.map((p, i) => (
         <span key={i} className="inline-flex items-center gap-1.5">
           <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">{p.label}</span>
@@ -178,11 +181,107 @@ function PipelineChip({ step, onRemove }: { step: Step; onRemove: () => void }) 
       )}
     </div>
   );
+};
+
+function partsByLabel(step: Step) {
+  return Object.fromEntries(step.parts.map((p) => [p.label, p])) as Record<string, Step["parts"][number] | undefined>;
 }
+
+function SentenceFragment({ step, onClick }: { step: Step; onClick: () => void }) {
+  const Mono = ({ children }: { children: React.ReactNode }) => (
+    <button onClick={onClick} className="font-mono text-[13px] text-ink px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition">{children}</button>
+  );
+  const Plain = ({ children }: { children: React.ReactNode }) => (
+    <button onClick={onClick} className="text-[13px] text-ink px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition">{children}</button>
+  );
+  const Op = ({ children }: { children: React.ReactNode }) => (
+    <span className="text-[12.5px] text-ink-2">{children}</span>
+  );
+
+  const p = partsByLabel(step);
+  switch (step.kind) {
+    case "from":
+      return <Mono>{p.FROM?.value}</Mono>;
+    case "join":
+      return (
+        <>
+          <Op>+</Op>
+          <Mono>{p.JOIN?.value}</Mono>
+          <Op>joined by</Op>
+          <Mono>{p.ON?.value}</Mono>
+          <Plain>{`(${p.USING?.value})`}</Plain>
+        </>
+      );
+    case "aggregate":
+      return (
+        <>
+          <Op>aggregated</Op>
+          <Mono>{p.AGGREGATE?.value}</Mono>
+          <Op>by</Op>
+          <Plain>{p.BY?.value}</Plain>
+        </>
+      );
+    case "sort":
+      return (
+        <>
+          <Op>sorted</Op>
+          <Mono>{p.SORT?.value}</Mono>
+          <Plain>{p["↓"]?.value}</Plain>
+        </>
+      );
+    case "filter": {
+      const col = p.FILTER?.value;
+      const opPart = step.parts[1];
+      return (
+        <>
+          <Op>filtered where</Op>
+          <Mono>{`${col} ${opPart?.label} ${opPart?.value}`}</Mono>
+        </>
+      );
+    }
+  }
+}
+
+function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: (id: string) => void }) {
+  const hasOps = steps.some((s) => s.kind !== "from");
+  return (
+    <div className="px-5 pt-4 pb-3 border-b border-hairline">
+      <div className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3 mb-2">Pipeline</div>
+      {!hasOps ? (
+        <p className="text-[13px] text-ink-3 italic">Configure the controls below to see your transformation summarised here.</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
+          {steps.map((s, i) => {
+            const prev = steps[i - 1];
+            const showArrow = i > 0 && s.kind !== "join" && prev?.kind !== "from" ? true : i > 0 && s.kind !== "join" && prev?.kind === "from" ? false : false;
+            return (
+              <span key={s.id} className="inline-flex items-center gap-1.5">
+                {showArrow && <ArrowRight className="h-3.5 w-3.5 text-coral shrink-0" strokeWidth={2.25} />}
+                <SentenceFragment step={s} onClick={() => onChipClick(s.id)} />
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function PipelineStrip() {
   const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
+  const [pulseId, setPulseId] = useState<string | null>(null);
+  const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const focusChip = (id: string) => {
+    const el = chipRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+    setPulseId(id);
+    window.setTimeout(() => setPulseId((cur) => (cur === id ? null : cur)), 600);
+  };
 
   const addStep = (kind: StepKind) => {
     const id = `s${Date.now()}`;
@@ -197,48 +296,57 @@ function PipelineStrip() {
   };
 
   return (
-    <div className="border-b border-hairline px-5 py-4">
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Pipeline</span>
-        <span className="text-[10.5px] text-ink-3/70 tabular">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {steps.map((s, i) => (
-          <span key={s.id} className="inline-flex items-center gap-2">
-            <PipelineChip step={s} onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))} />
-            {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
-          </span>
-        ))}
+    <>
+      <PipelineSentence steps={steps} onChipClick={focusChip} />
+      <div className="border-b border-hairline px-5 py-4">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Steps</span>
+          <span className="text-[10.5px] text-ink-3/70 tabular">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {steps.map((s, i) => (
+            <span key={s.id} className="inline-flex items-center gap-2">
+              <PipelineChip
+                step={s}
+                pulsing={pulseId === s.id}
+                chipRef={(el) => { chipRefs.current[s.id] = el; }}
+                onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))}
+              />
+              {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
+            </span>
+          ))}
 
-        <div className="relative">
-          {!adding ? (
-            <button
-              onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-dashed border-ink-3/40 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/70 transition"
-            >
-              <Plus className="h-3.5 w-3.5" />Add step
-            </button>
-          ) : (
-            <div className="inline-flex items-center gap-1 h-9 px-1.5 rounded-md border border-hairline bg-surface shadow-[var(--shadow-sm)]">
-              {addOptions.map((o) => (
-                <button
-                  key={o.kind}
-                  onClick={() => addStep(o.kind)}
-                  className="h-7 px-2.5 rounded-[5px] text-[12px] text-ink hover:bg-surface-hover transition"
-                >
-                  {o.label}
-                </button>
-              ))}
-              <button onClick={() => setAdding(false)} className="h-7 w-7 rounded-[5px] flex items-center justify-center text-ink-3 hover:bg-surface-hover transition" aria-label="Cancel">
-                <X className="h-3 w-3" />
+          <div className="relative">
+            {!adding ? (
+              <button
+                onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-dashed border-ink-3/40 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/70 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />Add step
               </button>
-            </div>
-          )}
+            ) : (
+              <div className="inline-flex items-center gap-1 h-9 px-1.5 rounded-md border border-hairline bg-surface shadow-[var(--shadow-sm)]">
+                {addOptions.map((o) => (
+                  <button
+                    key={o.kind}
+                    onClick={() => addStep(o.kind)}
+                    className="h-7 px-2.5 rounded-[5px] text-[12px] text-ink hover:bg-surface-hover transition"
+                  >
+                    {o.label}
+                  </button>
+                ))}
+                <button onClick={() => setAdding(false)} className="h-7 w-7 rounded-[5px] flex items-center justify-center text-ink-3 hover:bg-surface-hover transition" aria-label="Cancel">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
+
 
 function DatasetsPage() {
   return (
