@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/datasets")({
   component: DatasetsPage,
