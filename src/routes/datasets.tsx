@@ -271,6 +271,17 @@ function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: 
 function PipelineStrip() {
   const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
+  const [pulseId, setPulseId] = useState<string | null>(null);
+  const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const focusChip = (id: string) => {
+    const el = chipRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+    setPulseId(id);
+    window.setTimeout(() => setPulseId((cur) => (cur === id ? null : cur)), 600);
+  };
 
   const addStep = (kind: StepKind) => {
     const id = `s${Date.now()}`;
@@ -285,48 +296,57 @@ function PipelineStrip() {
   };
 
   return (
-    <div className="border-b border-hairline px-5 py-4">
-      <div className="flex items-center gap-1.5 mb-2">
-        <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Pipeline</span>
-        <span className="text-[10.5px] text-ink-3/70 tabular">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {steps.map((s, i) => (
-          <span key={s.id} className="inline-flex items-center gap-2">
-            <PipelineChip step={s} onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))} />
-            {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
-          </span>
-        ))}
+    <>
+      <PipelineSentence steps={steps} onChipClick={focusChip} />
+      <div className="border-b border-hairline px-5 py-4">
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Steps</span>
+          <span className="text-[10.5px] text-ink-3/70 tabular">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {steps.map((s, i) => (
+            <span key={s.id} className="inline-flex items-center gap-2">
+              <PipelineChip
+                step={s}
+                pulsing={pulseId === s.id}
+                chipRef={(el) => { chipRefs.current[s.id] = el; }}
+                onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))}
+              />
+              {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
+            </span>
+          ))}
 
-        <div className="relative">
-          {!adding ? (
-            <button
-              onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-dashed border-ink-3/40 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/70 transition"
-            >
-              <Plus className="h-3.5 w-3.5" />Add step
-            </button>
-          ) : (
-            <div className="inline-flex items-center gap-1 h-9 px-1.5 rounded-md border border-hairline bg-surface shadow-[var(--shadow-sm)]">
-              {addOptions.map((o) => (
-                <button
-                  key={o.kind}
-                  onClick={() => addStep(o.kind)}
-                  className="h-7 px-2.5 rounded-[5px] text-[12px] text-ink hover:bg-surface-hover transition"
-                >
-                  {o.label}
-                </button>
-              ))}
-              <button onClick={() => setAdding(false)} className="h-7 w-7 rounded-[5px] flex items-center justify-center text-ink-3 hover:bg-surface-hover transition" aria-label="Cancel">
-                <X className="h-3 w-3" />
+          <div className="relative">
+            {!adding ? (
+              <button
+                onClick={() => setAdding(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-dashed border-ink-3/40 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/70 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />Add step
               </button>
-            </div>
-          )}
+            ) : (
+              <div className="inline-flex items-center gap-1 h-9 px-1.5 rounded-md border border-hairline bg-surface shadow-[var(--shadow-sm)]">
+                {addOptions.map((o) => (
+                  <button
+                    key={o.kind}
+                    onClick={() => addStep(o.kind)}
+                    className="h-7 px-2.5 rounded-[5px] text-[12px] text-ink hover:bg-surface-hover transition"
+                  >
+                    {o.label}
+                  </button>
+                ))}
+                <button onClick={() => setAdding(false)} className="h-7 w-7 rounded-[5px] flex items-center justify-center text-ink-3 hover:bg-surface-hover transition" aria-label="Cancel">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
+
 
 function DatasetsPage() {
   return (
