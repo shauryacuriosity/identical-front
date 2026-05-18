@@ -1148,53 +1148,147 @@ function ToggleRow({
   );
 }
 
-function MethodCard({
+function MethodSection({
   icon,
   title,
-  description,
-  selected,
+  subtitle,
+  enabled,
   onToggle,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
-  description: string;
-  selected: boolean;
+  subtitle: string;
+  enabled: boolean;
   onToggle: () => void;
-  children?: React.ReactNode;
+  children: React.ReactNode;
 }) {
   return (
     <div
-      onClick={onToggle}
-      className={`rounded-2xl border p-5 cursor-pointer transition-all ${
-        selected
-          ? "border-coral/50 bg-coral-tint/40"
-          : "border-hairline bg-surface hover:border-coral/30"
+      className={`rounded-2xl border transition-all ${
+        enabled ? "border-coral/50 bg-coral-tint/30" : "border-hairline bg-surface"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-3 p-5 text-left"
+      >
         <div className="flex items-center gap-3">
           <span
             className={`h-9 w-9 rounded-lg flex items-center justify-center ${
-              selected ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
+              enabled ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
             }`}
           >
             {icon}
           </span>
-          <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
-            {title}
-          </h3>
+          <div>
+            <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+              {title}
+            </h3>
+            <div className="text-[12px] text-ink-3 mt-0.5">{subtitle}</div>
+          </div>
         </div>
         <span
           className={`h-5 w-5 rounded-md border flex items-center justify-center ${
-            selected ? "bg-coral border-coral" : "border-hairline bg-surface"
+            enabled ? "bg-coral border-coral" : "border-hairline bg-surface"
           }`}
         >
-          {selected && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
+          {enabled && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
         </span>
-      </div>
-      <p className="mt-3 text-[13px] text-ink-2 leading-relaxed">{description}</p>
-      {children}
+      </button>
+      {enabled && <div className="px-5 pb-5 pt-1 border-t border-hairline/60">{children}</div>}
     </div>
   );
 }
+
+function RadioRow({
+  checked,
+  onSelect,
+  title,
+  hint,
+  disabled,
+  soon,
+}: {
+  checked?: boolean;
+  onSelect?: () => void;
+  title: string;
+  hint?: string;
+  disabled?: boolean;
+  soon?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onSelect?.();
+      }}
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg border text-left transition-colors ${
+        disabled
+          ? "border-dashed border-hairline bg-surface opacity-50 cursor-not-allowed"
+          : checked
+            ? "border-coral/50 bg-surface"
+            : "border-hairline bg-surface hover:border-coral/40"
+      }`}
+    >
+      <span
+        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+          checked ? "border-coral" : "border-hairline"
+        }`}
+      >
+        {checked && <span className="h-2 w-2 rounded-full bg-coral" />}
+      </span>
+      <span className="text-[13px] text-ink font-medium">{title}</span>
+      {hint && <span className="text-[12px] text-ink-3">· {hint}</span>}
+      {soon && (
+        <span className="ml-auto text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5">
+          coming soon
+        </span>
+      )}
+    </button>
+  );
+}
+
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  step = 1,
+  decimals = 0,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  decimals?: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="mono text-[12px] text-ink-2">{label}</label>
+        <span className="mono text-[12px] text-ink tabular">{value.toFixed(decimals)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full h-1 appearance-none bg-hairline rounded-full accent-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
+      />
+      <div className="flex justify-between text-[10px] text-ink-3 mono tabular">
+        <span>{min}</span>
+        <span>{max}</span>
+      </div>
+    </div>
+  );
+}
+
