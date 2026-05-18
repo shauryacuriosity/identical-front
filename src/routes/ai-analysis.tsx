@@ -126,31 +126,39 @@ function StepIndicator({
   current,
   completed,
   running,
+  skipped,
 }: {
   current: StepKey;
   completed: Set<StepKey>;
   running: boolean;
+  skipped?: Set<StepKey>;
 }) {
   return (
     <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline">
       <ol className="mx-auto max-w-[1280px] flex items-center gap-2">
         {STEPS.map((s, i) => {
-          const isDone = completed.has(s.key);
-          const isActive = current === s.key;
+          const isSkipped = skipped?.has(s.key) ?? false;
+          const isDone = completed.has(s.key) && !isSkipped;
+          const isActive = current === s.key && !isSkipped;
           const isRunStepRunning = s.key === "run" && running;
+          const nextSkipped = skipped?.has(STEPS[i + 1]?.key);
           return (
             <li key={s.key} className="flex items-center gap-2 flex-1 last:flex-none">
-              <div className="flex items-center gap-2">
+              <div className={`flex items-center gap-2 ${isSkipped ? "opacity-50" : ""}`}>
                 <span
                   className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] tabular border transition-colors ${
-                    isDone
-                      ? "bg-coral text-white border-coral"
-                      : isActive
-                        ? "bg-coral-tint text-coral border-coral/40"
-                        : "bg-surface text-ink-3 border-hairline"
+                    isSkipped
+                      ? "bg-surface text-ink-3 border-dashed border-hairline"
+                      : isDone
+                        ? "bg-coral text-white border-coral"
+                        : isActive
+                          ? "bg-coral-tint text-coral border-coral/40"
+                          : "bg-surface text-ink-3 border-hairline"
                   }`}
                 >
-                  {isDone ? (
+                  {isSkipped ? (
+                    <span className="text-[9px]">—</span>
+                  ) : isDone ? (
                     <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
                   ) : isRunStepRunning ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -164,9 +172,16 @@ function StepIndicator({
                   }`}
                 >
                   {s.label}
+                  {isSkipped && (
+                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">n/a</span>
+                  )}
                 </span>
               </div>
-              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-hairline" />}
+              {i < STEPS.length - 1 && (
+                <div
+                  className={`flex-1 h-px ${isSkipped || nextSkipped ? "border-t border-dashed border-hairline" : "bg-hairline"}`}
+                />
+              )}
             </li>
           );
         })}
