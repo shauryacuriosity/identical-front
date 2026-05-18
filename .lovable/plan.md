@@ -1,107 +1,93 @@
-## Goal
 
-Keep your team's warm coral/peach identity (it's actually a strength — nothing else in scientific tooling looks like this), but elevate it from "Figma student project" to "tool a public-health researcher would trust with NHANES data." Same screens, same flows. Surgical visual upgrades.
+## What's changing & why
 
-## Why the current design reads as student work
+Right now `/ai-analysis` is a generic chat prompt — wrong product. The real eAsia workflow is a structured, supervised pipeline a public-health researcher walks through once per analysis run. This plan replaces that screen with the four-step Map → Cohort → Method → Run flow on a single page, reusing the existing warm-cream / coral / Fraunces / Inter / JetBrains Mono tokens already in `src/styles.css`. No new colors. No backend. Visual shell + local state only.
 
-1. **Flat pink wash everywhere** — no surface hierarchy. The eye doesn't know what's primary vs. secondary.
-2. **Tabs sit awkwardly inside the window chrome** — fake macOS frame fights with the actual app.
-3. **Cards float without anchoring** — uniform shadows, no edges, no structure.
-4. **Single weight of pink** — active tab, primary button, and accent dots are all the same coral. No system.
-5. **Inputs look like buttons, buttons look like cards** — components aren't differentiated.
-6. **Typography is one size fits all** — serif heading is nice, but no rhythm in the body.
-7. **Empty states say "preview of resulting table"** — no guidance for a researcher who just opened it.
+## File scope
 
-## The redesign direction
+- **Rewrite** `src/routes/ai-analysis.tsx` — the entire workflow.
+- **New** `src/components/analysis/StepIndicator.tsx` — sticky 4-step rail.
+- **New** `src/components/analysis/MappingRow.tsx` — single field row with confidence pill.
+- **New** `src/components/analysis/ConfidencePill.tsx` — the sage/amber/coral pill (see UX note).
+- **New** `src/components/analysis/CohortPreview.tsx` — live cohort stats card.
+- **New** `src/components/analysis/MethodCard.tsx` — selectable Association / Subgroup card.
+- **New** `src/components/analysis/RunProgress.tsx` — Step 4 progress list (simulated timers).
+- No changes to Home, Datasets, Visualisation, `__root.tsx`, or `styles.css`.
 
-**Concept:** *Warm laboratory.* Think Italian stationery brand meets statistical notebook. Coral stays as the human warmth; everything else gets quieter and more precise so data can breathe.
+## Page structure
 
-### 1. Color system — refine, don't replace
+```text
+┌─────────────────────────────────────────────────────────┐
+│ Breadcrumb: Analysis · [Untitled run]   (editable)      │
+│ ────────────────────────────────────────────────────    │
+│ ● Map ──── ○ Cohort ──── ○ Method ──── ○ Run   (sticky) │
+├─────────────────────────────────────────────────────────┤
+│ STEP 1 — expanded                                       │
+│   Dataset_A_dietary.csv ▾                               │
+│                                                         │
+│   MetS Clinical Criteria                                │
+│     Waist circumference   →  waist_circ   [auto·0.94]   │
+│     Triglycerides         →  trig_mg_dl   [auto·0.89]   │
+│     ...                                                 │
+│                                                         │
+│   Demographics & Dietary Features                       │
+│     Age                   →  age_years    [auto·0.98]   │
+│     Dietary fibre         →  fibre_g      [review·0.71] │
+│     ...                                                 │
+│     + Add field                                         │
+│                                                         │
+│   ⓘ MetS labels are computed using NCEP ATP III...      │
+│                                            [Continue →] │
+├─────────────────────────────────────────────────────────┤
+│ STEP 2 — collapsed until step 1 confirmed               │
+│ STEP 3 — collapsed                                       │
+│ STEP 4 — appears on Run                                  │
+└─────────────────────────────────────────────────────────┘
+```
 
-Move from one pink to a layered system:
+Steps collapse to a single-line summary when complete (e.g. "Cohort · 1,847 of 2,431 rows · age 20–65 · all sexes · pregnant excluded"). Click to re-edit, which marks downstream steps stale.
 
-- **Canvas:** very soft warm off-white (`oklch(0.985 0.008 40)`) — not pink wash, just *warm paper*
-- **Surface ambient:** subtle peach gradient only at top edge (40% → 0%), so the page has warmth without drowning content
-- **Card:** pure warm white with a 1px hairline border (`oklch(0.92 0.015 40)`) — replaces the "everything floats" look
-- **Coral primary:** keep the existing tone, reserve it strictly for: active nav, primary CTA, selection state
-- **Coral muted:** 15% tint for hover/secondary surfaces
-- **Ink:** near-black with warm undertone for text; 3 levels (primary / secondary / tertiary)
-- **Data accent palette:** add 4 supporting colors (sage, ochre, slate, plum) for charts and category tags — researchers need this
+## Confidence pill — the UX choice your supervisor will look at
 
-### 2. Typography rhythm
+The pill is doing two jobs at once: showing the AI suggestion *and* the level of human attention required. So color encodes **action**, not just score:
 
-- Keep **Fraunces** for display, but use it more deliberately: only page titles and key numbers
-- **Inter Tight** for UI, **Inter** for body, **JJ Mono** (or JetBrains Mono) for column names, IDs, and code-like values (`SEQN`, `DR1EXMER` etc. should be monospace — that's a researcher signal)
-- Tighter type scale: 32 / 24 / 18 / 15 / 13 / 11 with proper line-heights
-- Numeric tabular figures everywhere data appears
+| Score | Color | Label | Why |
+|---|---|---|---|
+| ≥0.85 | sage (`--data-sage` at ~15% tint) | `auto · 0.94` | Safe to accept — scanning, not deciding |
+| 0.65–0.84 | ochre (`--data-ochre` ~18%) | `review · 0.72` | Should glance — not alarming |
+| <0.65 | coral (`--coral-tint`) | `needs review · 0.48` | Pulls the eye — same family as primary CTA |
+| unmapped | dashed `--hairline` | `select column` | Clearly empty, not styled like a value |
 
-### 3. Remove the fake macOS chrome
+All inline, never modal — clicking the column-name chip opens a small inline dropdown of the dataset's columns; the pill recomputes (re-mapped manually = neutral grey "manual"). This keeps the researcher in flow and makes the "human reviewed AI" story visible at a glance.
 
-The traffic-light dots and "eAsia App" titlebar from the mockups are Figma artifacts. In a real web app they look amateur. Replace with a slim app header:
-- Wordmark "eAsia" (Fraunces) on the left
-- Tabs centered, underline-indicator style instead of tab-into-card
-- Profile + workspace switcher right
-- 1px bottom border, no fake window
+## The lab-values-label-only annotation
 
-### 4. Per-screen refinements
+After Step 1's mapping list, a quiet `--surface-hover` info card with a small `info` icon:
 
-**Home**
-- Drop the three giant card buttons in favor of a tighter quick-actions row + a real *workspace summary* (recent files becomes the hero, not an afterthought)
-- Recent files: add metadata columns (rows, modified, owner), filterable, sortable. Replace the radio dot with a status pill (`active` / `archived`)
-- Add a subtle "Getting started" sidebar card with 3 steps for first-time users
+> MetS labels are computed using NCEP ATP III criteria from the clinical fields above. The model predicts MetS from diet and demographics only — lab values are used to *label*, not to *predict*. This is the eAsia framing.
 
-**Datasets**
-- The current join/aggregate/sort/filter row is the strongest screen — keep its bones
-- Replace the four "Select" dropdowns with a **pipeline builder strip**: chips that read like a sentence ("Join `Dataset_A` to `Dataset_B` on `SEQN` (Inner) → Aggregate `level_sugar` by Mean → Sort Descending → Filter `age > 40`"). Click any chip to edit. This is the single biggest "wow" upgrade.
-- Attribute sidebar: group by data type (numeric / categorical / identifier), show type icons, search box at top, count badge per group
-- Empty preview area: render a real shadcn `<Table>` skeleton with placeholder rows so it doesn't feel hollow
-- Save / Export become a sticky footer bar with row count + last-saved timestamp
+This is annotation chrome, not interactive — same typographic weight as body, italicised "label" / "predict" to mirror the methodological distinction. It sits at the bottom of Step 1 so it's read after the researcher sees both groups (clinical vs dietary), which is when the distinction makes sense. We're not hiding it behind a tooltip because it's the core scientific claim of the product.
 
-**Visualisation & AI Analysis**
-- Currently just title screens. Add a proper empty state: illustration + 3 example prompts ("Distribution of sugar intake by age group", "Correlation of blood pressure and sodium")
-- Keeps scope minimal but signals depth
+## Step details
 
-### 5. Components — the small things that signal quality
+**Step 1 — Map.** Two grouped sections (Clinical Criteria, Demographics & Dietary). Hard-coded suggestion rows from the spec. Each row: target label (Inter semibold) · `→` · column chip (JetBrains Mono) · confidence pill (right-aligned). "+ Add field" ghost row at the bottom of group B. Annotation card. `Continue to Cohort` coral button, right-aligned.
 
-- **Dropdowns:** add 1px border, soft inner shadow, chevron rotates on open, options have hover bg + check on selected
-- **Checkboxes:** custom — coral fill with white check when active, hairline border when inactive
-- **Buttons:** 3 variants (primary coral filled, secondary white with border, ghost) — currently they all look the same
-- **Cards:** hairline border + minimal shadow instead of heavy drop shadow. Subtle on hover.
-- **Focus rings:** coral, 2px offset — currently invisible (accessibility)
-- **Loading states:** skeleton shimmer in warm tone
-- **Empty states:** every screen gets one with icon + message + primary action
+**Step 2 — Cohort.** Two-column layout: controls on the left (dual-handle Radix slider for age, chip group for sex, two toggle rows), CohortPreview card on the right with row count, MetS prevalence, stacked sage/coral bar, mean age + sex split. Numbers update via a small deterministic mock formula from filter inputs (no backend). `Continue to Method`.
 
-### 6. Micro-interactions
+**Step 3 — Method.** Two MethodCards side-by-side, both checkable independently, both default on. Selection state = coral hairline + faint coral-tint surface. Subgroup card reveals a small `k` numeric stepper (2–8) when active. `Run analysis` button, larger, coral filled.
 
-- 150ms ease-out on all hovers, 200ms on tab switches
-- Tabs slide a coral underline between items (not the current "tab pops up")
-- Dropdowns fade+translate-y-1 on open
-- Cards lift 1px on hover with shadow softening
-- Number values tick-animate when filters change
+**Step 4 — Run.** Status list with five rows, each starting as pending dot → spinner → check. Simulated via `setTimeout` chain (rough 600–1200ms each). Sticky indicator updates: first three checks, last one as "Running…". When all done: plain-language line + `Run complete · View Results →` button (links nowhere yet — wired in next prompt).
 
-### 7. Layout & spacing
+## State
 
-- Adopt an 8px base unit, currently spacing is ad-hoc
-- Max content width 1280px centered (currently full-bleed feels chaotic on wide monitors)
-- Sidebar width 280px (currently 256px, feels cramped with monospace column names)
+Single `useState` per step, plus a `currentStep` cursor. No global store, no Cloud, no server fns — visual shell only. All mock data lives at the top of the file as typed constants so it's trivial to wire to real data later.
 
-## Scope
+## Out of scope
 
-- `src/styles.css` — new token system (canvas, surfaces, ink levels, data accents, semantic shadows)
-- `src/routes/__root.tsx` — replace fake macOS chrome with proper app header
-- `src/routes/index.tsx` — restructured Home with real recent-files table
-- `src/routes/datasets.tsx` — pipeline-chip builder, refined sidebar, sticky footer, table skeleton
-- `src/routes/visualisation.tsx` + `ai-analysis.tsx` — proper empty states
-- New shared components in `src/components/`: `AppHeader`, `PipelineChip`, `AttributeTree`, `EmptyState`, `DataTable`
-- Refine shadcn `button`, `dropdown-menu`, `checkbox`, `card` variants to match tokens
+- Results screen (next prompt).
+- Real column parsing from a CSV.
+- Wiring the dataset dropdown to the Datasets screen.
+- Saving / loading runs.
+- Backend, ML, SHAP, K-Means — only the visual progress simulation.
 
-Out of scope: any backend, real data parsing, the Visualisation/AI Analysis feature builds themselves — only their visual shells.
-
-## Suggested rollout
-
-I'd recommend doing this in 2 passes so you can react between them:
-
-1. **Pass 1 — Foundation (1 prompt):** new color tokens, typography, app header, button/card/dropdown refinements. Every screen instantly looks 70% better.
-2. **Pass 2 — Screen polish (1 prompt):** Home recent-files table, Datasets pipeline chips + sidebar + sticky footer, empty states.
-
-Approve this and I'll start with Pass 1.
+Approve and I'll build it in one pass.
