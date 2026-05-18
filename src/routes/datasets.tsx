@@ -127,6 +127,119 @@ function DatasetBar({ name }: { name: string }) {
   );
 }
 
+type StepKind = "from" | "join" | "aggregate" | "filter" | "sort";
+type Step = { id: string; kind: StepKind; parts: { label: string; value: string; mono?: boolean }[] };
+
+const initialPipeline: Step[] = [
+  { id: "s1", kind: "from", parts: [
+    { label: "FROM", value: "Dataset_A.csv", mono: true },
+  ]},
+  { id: "s2", kind: "join", parts: [
+    { label: "JOIN", value: "Dataset_B.csv", mono: true },
+    { label: "ON", value: "id", mono: true },
+    { label: "USING", value: "Inner Join" },
+  ]},
+  { id: "s3", kind: "aggregate", parts: [
+    { label: "AGGREGATE", value: "level_sugar", mono: true },
+    { label: "BY", value: "Mean" },
+  ]},
+];
+
+const stepAccent: Record<StepKind, string> = {
+  from: "border-data-plum/35 bg-data-plum/[0.06]",
+  join: "border-data-slate/35 bg-data-slate/[0.06]",
+  aggregate: "border-data-ochre/40 bg-data-ochre/[0.07]",
+  filter: "border-coral/35 bg-coral-tint",
+  sort: "border-data-sage/40 bg-data-sage/[0.07]",
+};
+
+const addOptions: { kind: StepKind; label: string }[] = [
+  { kind: "join", label: "Join" },
+  { kind: "aggregate", label: "Aggregate" },
+  { kind: "filter", label: "Filter" },
+  { kind: "sort", label: "Sort" },
+];
+
+function PipelineChip({ step, onRemove }: { step: Step; onRemove: () => void }) {
+  const accent = stepAccent[step.kind];
+  return (
+    <div className={`group inline-flex items-center gap-2 h-9 pl-2.5 pr-1 rounded-md border ${accent} text-[12.5px] transition`}>
+      {step.parts.map((p, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">{p.label}</span>
+          <span className={p.mono ? "font-mono text-[12.5px] text-ink" : "text-ink"}>{p.value}</span>
+          {i < step.parts.length - 1 && <span className="text-ink-3/60">·</span>}
+        </span>
+      ))}
+      {step.kind !== "from" && (
+        <button onClick={onRemove} className="ml-1 h-6 w-6 rounded-md flex items-center justify-center text-ink-3 opacity-0 group-hover:opacity-100 hover:bg-surface-hover hover:text-ink transition" aria-label="Remove step">
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PipelineStrip() {
+  const [steps, setSteps] = useState<Step[]>(initialPipeline);
+  const [adding, setAdding] = useState(false);
+
+  const addStep = (kind: StepKind) => {
+    const id = `s${Date.now()}`;
+    const templates: Record<Exclude<StepKind, "from">, Step["parts"]> = {
+      join: [{ label: "JOIN", value: "Dataset_B.csv", mono: true }, { label: "ON", value: "id", mono: true }, { label: "USING", value: "Inner Join" }],
+      aggregate: [{ label: "AGGREGATE", value: "level_sugar", mono: true }, { label: "BY", value: "Mean" }],
+      filter: [{ label: "FILTER", value: "blood_pressureH", mono: true }, { label: ">", value: "120", mono: true }],
+      sort: [{ label: "SORT", value: "heartRate_avg", mono: true }, { label: "↓", value: "Descending" }],
+    };
+    setSteps([...steps, { id, kind, parts: templates[kind as Exclude<StepKind, "from">] }]);
+    setAdding(false);
+  };
+
+  return (
+    <div className="border-b border-hairline px-5 py-4">
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Pipeline</span>
+        <span className="text-[10.5px] text-ink-3/70 tabular">{steps.length} step{steps.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {steps.map((s, i) => (
+          <span key={s.id} className="inline-flex items-center gap-2">
+            <PipelineChip step={s} onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))} />
+            {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
+          </span>
+        ))}
+
+        <div className="relative">
+          {!adding ? (
+            <button
+              onClick={() => setAdding(true)}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-dashed border-ink-3/40 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/70 transition"
+            >
+              <Plus className="h-3.5 w-3.5" />Add step
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-1 h-9 px-1.5 rounded-md border border-hairline bg-surface shadow-[var(--shadow-sm)]">
+              {addOptions.map((o) => (
+                <button
+                  key={o.kind}
+                  onClick={() => addStep(o.kind)}
+                  className="h-7 px-2.5 rounded-[5px] text-[12px] text-ink hover:bg-surface-hover transition"
+                >
+                  {o.label}
+                </button>
+              ))}
+              <button onClick={() => setAdding(false)} className="h-7 w-7 rounded-[5px] flex items-center justify-center text-ink-3 hover:bg-surface-hover transition" aria-label="Cancel">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DatasetsPage() {
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
