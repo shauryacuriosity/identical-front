@@ -500,7 +500,44 @@ function AiAnalysisPage() {
           onExpand={() => reopen("map")}
         >
           <div className="space-y-6 pt-4">
-            <p className="text-[13.5px] text-ink-2 -mt-2">
+            {/* Function-mode selector */}
+            <div>
+              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                What are you running?
+              </h3>
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    ["full", "Full analysis", "predict + discover"],
+                    ["predict", "Prediction only", null],
+                    ["discover", "Subgroup discovery only", null],
+                    ["labels", "Generate labels only", null],
+                  ] as const
+                ).map(([key, label, hint]) => {
+                  const active = fnMode === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setFnMode(key)}
+                      className={`h-7 px-3 rounded-full text-[12.5px] border transition-colors ${
+                        active
+                          ? "bg-coral text-white border-coral"
+                          : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
+                      }`}
+                    >
+                      {label}
+                      {hint && (
+                        <span className={`ml-1.5 text-[11px] ${active ? "text-white/75" : "text-ink-3"}`}>
+                          · {hint}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <p className="text-[13.5px] text-ink-2">
               Confirm how your dataset columns map to the fields we need.
             </p>
 
@@ -512,12 +549,51 @@ function AiAnalysisPage() {
               </button>
             </div>
 
-            {/* Group A */}
+            {/* Group A — MetS Clinical */}
             <div>
-              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                MetS Clinical Criteria
-              </h3>
-              <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
+              <div className="flex items-baseline gap-2 mb-2">
+                <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                  MetS Clinical Criteria
+                </h3>
+                {fnMode === "predict" && metsLabelCol && (
+                  <span className="text-[11px] text-ink-3 italic">optional · used for verification</span>
+                )}
+                {fnMode === "discover" && (
+                  <span className="text-[11px] text-ink-3 italic">optional · clustering doesn't need a label</span>
+                )}
+              </div>
+              <div
+                className={`rounded-xl border border-hairline bg-canvas/40 px-4 ${
+                  fnMode === "discover" || (fnMode === "predict" && metsLabelCol) ? "opacity-70" : ""
+                }`}
+              >
+                {fnMode === "predict" && (
+                  <div className="grid grid-cols-[1fr_16px_1fr_auto] items-center gap-3 py-2.5 border-b border-hairline/60">
+                    <span className="text-[13.5px] text-ink font-medium">
+                      MetS label
+                      <span className="ml-1.5 text-[11px] text-ink-3 font-normal">
+                        (if already in your data)
+                      </span>
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-ink-3" />
+                    <div>
+                      <button
+                        onClick={() =>
+                          setMetsLabelCol((c) => (c ? null : "mets_label"))
+                        }
+                        className={`mono inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] border transition-colors ${
+                          metsLabelCol
+                            ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
+                            : "border-dashed border-hairline text-ink-3 hover:text-ink"
+                        }`}
+                      >
+                        {metsLabelCol ?? "Select column"}
+                        <ChevronDown className="h-3 w-3 text-ink-3" />
+                      </button>
+                    </div>
+                    <span />
+                  </div>
+                )}
                 {clinical.map((r, i) => (
                   <MappingRow
                     key={r.target}
@@ -534,30 +610,32 @@ function AiAnalysisPage() {
               </div>
             </div>
 
-            {/* Group B */}
-            <div>
-              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                Demographics & Dietary Features
-              </h3>
-              <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
-                {dietary.map((r, i) => (
-                  <MappingRow
-                    key={r.target}
-                    row={r}
-                    onChange={(col) =>
-                      setDietary((rows) => {
-                        const next = [...rows];
-                        next[i] = { ...next[i], column: col, score: null };
-                        return next;
-                      })
-                    }
-                  />
-                ))}
-                <button className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-3 hover:text-coral transition-colors border-t border-hairline/60">
-                  <Plus className="h-3.5 w-3.5" /> Add field
-                </button>
+            {/* Group B — Demographics & Dietary (hidden in labels mode) */}
+            {fnMode !== "labels" && (
+              <div>
+                <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
+                  Demographics & Dietary Features
+                </h3>
+                <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
+                  {dietary.map((r, i) => (
+                    <MappingRow
+                      key={r.target}
+                      row={r}
+                      onChange={(col) =>
+                        setDietary((rows) => {
+                          const next = [...rows];
+                          next[i] = { ...next[i], column: col, score: null };
+                          return next;
+                        })
+                      }
+                    />
+                  ))}
+                  <button className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-3 hover:text-coral transition-colors border-t border-hairline/60">
+                    <Plus className="h-3.5 w-3.5" /> Add field
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Annotation */}
             <div className="flex gap-3 rounded-xl bg-surface-hover border border-hairline/70 p-4">
