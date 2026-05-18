@@ -1,73 +1,91 @@
 
-## What's being built
+## What's changing
 
-A new `/ai-analysis/results` route (linked from Step 4's "View Results →" button) showing the deliverable of one MetS run. Same warm-cream / coral / Fraunces / Inter / JetBrains Mono tokens — no new colors, no backend. Recharts for the two plots.
+Two tightly-related polish passes on `src/routes/index.tsx`. No new files, no routes, no styling tokens. Same eAsia palette and typography.
 
 ## File scope
 
-- **New** `src/routes/ai-analysis.results.tsx` — the dashboard.
-- **Edit** `src/routes/ai-analysis.tsx` — wire the "View Results →" button to navigate here.
-- Reuse the existing `--data-sage / --data-ochre / --data-slate / --coral` tokens already in `styles.css` for the four cluster colours — these are perceptually spaced (different hue families: red, green, blue, yellow-brown), which is the strongest defence against colour-vision deficiencies.
+- **Edit only** `src/routes/index.tsx`.
+- Replace the `recent` mock array, the `ActionCard` component, and the table markup.
+- Greeting `h1` font-size 34 → 28.
 
-That's it — no new shared components, no `styles.css` change, no Cloud.
+## Why the hierarchy shift matters
 
-## The four-panel composition
+Today the home page reads top-to-bottom as "three giant launch buttons, then a list" — the visual language of a consumer app like Notion or Linear's empty-state. That's the wrong signal for a research workbench. Public-health researchers don't open the app to *create*; they open it to *resume* — they have an analysis half-done, a dataset that finished ingesting overnight, a colleague's run they need to inspect. Putting "Recent files" as the page hero with rich, scannable metadata (type, rows, MetS prevalence, modified) tells the user "this is a workspace where work lives," not "this is a launcher." It's the same shift that distinguishes a Jupyter project browser or RStudio's file pane from a consumer dashboard. The action cards still exist — researchers do start new work — but they shrink to a toolbar that sits above the workspace, the way "New File / New Folder" sits above the file list in a code editor, not the way "Create Doc / Create Sheet" dominates Google Drive.
+
+The greeting drops from 34 → 28 for the same reason: the page's heaviest element should be the workspace contents, not the welcome line. A smaller greeting also reads as more professional — research tools don't shout.
+
+## Compact action toolbar
 
 ```text
-┌──────────────────────────────────────────────────────────────┐
-│ Breadcrumb · run name                  [New] [Export Report] │
-├──────────────────────────────────────────────────────────────┤
-│ PANEL 1 — Run summary (full width)                           │
-│  Cohort   │   Model performance   │   ROC sparkline          │
-├──────────────────────────────┬───────────────────────────────┤
-│ PANEL 2 — SHAP bars  (55%)   │ PANEL 3 — Cluster scatter +   │
-│                              │   2×2 summary grid    (45%)   │
-├──────────────────────────────┴───────────────────────────────┤
-│ PANEL 4 — Per-subject predictions table (full width)         │
-├──────────────────────────────────────────────────────────────┤
-│ Run manifest (muted mono caption)                            │
-└──────────────────────────────────────────────────────────────┘
+┌────────────────────────────┬────────────────────────────┬────────────────────────────┐
+│  ▢  New Dataset            │  ◇  New Visualisation      │  ⬚  New Analysis           │
+└────────────────────────────┴────────────────────────────┴────────────────────────────┘
 ```
 
-### Why this layout
+- ~80px row, three equal-width tiles in a grid (responsive: stack on mobile).
+- Each tile: 36×36 coral-tint icon square on the left, title in Inter Tight semibold, no description by default. On hover, a one-line description fades in to the right of the title (kept on a single line; truncates if needed). This satisfies "description shown on hover" without changing tile height.
+- Hairline border, no shadow, subtle hover (translate-y-px, coral-tinted border).
+- Copy updates:
+  - "New Dataset" — "Import a CSV or connect a source"
+  - "New Visualisation" — "Chart distributions and correlations"
+  - **"New Analysis"** (dropped "AI") — **"Run MetS prediction, SHAP rankings, and subgroup clustering"**
 
-The reading order mirrors how an epidemiologist defends a finding in a paper:
-**"what we ran" → "did it work" → "what mattered" → "are there subgroups" → "the receipts."** Panel 1 establishes legitimacy (cohort + honest test-set performance) before any conclusion is shown. Panels 2 and 3 are the *finding* — they sit side-by-side because they answer two different but complementary questions about the same model run, and a researcher wants to read across them ("sodium is the top predictor — does it dominate a specific cluster?"). Panel 4 is intentionally last and visually quieter: per-subject predictions are evidence the model is real, not the headline insight.
+## Recent files — the new hero
 
-### Why Panels 2 and 3 are paired side-by-side, not stacked
+Greeting + toolbar collapse into ~180px of header chrome; everything below is the table.
 
-The scatter and the bar chart are doing different jobs at the same level of abstraction: SHAP says *which variables* drive the model globally; clustering says *which groups of people* sit at different points in dietary space. Stacking them would imply a hierarchy — they're peers. Putting them side-by-side at 55/45 gives SHAP slightly more visual weight (it's the primary causal-feeling story) while keeping the scatter at a size where 4 clusters are clearly separated.
+Header row: section title `Recent files` (Fraunces 20px), small `View all` link right-aligned.
 
-### The scatter ↔ cluster-summary-cards relationship
+Table columns (left→right):
 
-The PCA scatter and the 2×2 grid of cluster cards beneath it are the **same data, two encodings** — the scatter shows *separation* (are the groups actually distinct?), the cards show *meaning* (what does each group represent clinically?). The coloured dot on each card matches the cluster colour in the scatter exactly, so the eye binds them without a legend. The four labels — "Low-fibre, high-sodium" / "Balanced traditional" / "High-energy refined-carb" / "Mediterranean-style" — are the human-readable translation of the cluster centroid. MetS prevalence on each card lets the researcher immediately rank-order clusters by risk and verify the clusters are clinically meaningful, not just statistical artefacts. Cards are hoverable (lift + coral hairline) so they read as "drillable" even though the drill-in isn't wired this prompt.
+| col | header | content |
+|---|---|---|
+| 1 | (status dot) | coral dot for active, faded for archived |
+| 2 | NAME | `FileText` icon + monospace filename |
+| 3 | TYPE | pill — Dataset (coral), Analysis (sage), Visualisation (ochre); archived = muted grey regardless of type |
+| 4 | ROWS | monospace tabular, right-aligned |
+| 5 | METS PREVALENCE | monospace `23.4%` or `—` |
+| 6 | MODIFIED | text-ink-2, right-aligned |
+| 7 | (actions) | on row hover, surface `Open · Duplicate · Archive` icon buttons that slide in from the right edge; non-interactive (no handlers wired) |
 
-### Why test-set metrics, honestly
+Row height 64px. Hairline dividers between rows. Subtle `surface-hover` on row hover. Cursor pointer.
 
-This is the methodological backbone of the screen and the bit a peer-reviewer or supervisor will scrutinise hardest. Training-set metrics inflate — a model can memorise its training data and still be useless on a new cohort. Showing **AUC 0.76 / Sensitivity 0.71 / Specificity 0.74 on n=480** (a held-out 20% split) signals three things at once: (1) we evaluated on data the model never saw, (2) we report multiple metrics so a single number can't hide class-imbalance failure modes, (3) we expose `n` so the reader can judge how much to trust the confidence intervals. A small italic caption ("honest test-set metrics") makes the methodological choice explicit rather than buried. For a marketing video this single phrase is the difference between "demo dashboard" and "research tool" — it's the one thing actual epidemiologists will pause and read.
+### Type pill colours
 
-## Panel implementation details
+Built from existing tokens — no new colours:
 
-**Panel 1 — Run summary.** Single card, 3-column CSS grid. Big numbers in Fraunces + tabular. ROC sparkline is a Recharts `<LineChart>` of ~12 hand-tuned `(fpr, tpr)` points with a coral `<Area>` fill underneath and a dashed grey 45° reference line. No axes labels — it's a sparkline. Caption beneath.
+- **Dataset** — `--coral-tint` bg, `--coral` text
+- **Analysis** — `--data-sage` at ~15% bg, sage at ~60% darkened text
+- **Visualisation** — `--data-ochre` at ~18% bg, ochre at ~55% darkened text
+- **Archived** — `--surface-hover` bg, `--ink-3` text (replaces the type colour entirely so archived rows read as one visually quiet group regardless of what they originally were)
 
-**Panel 2 — SHAP.** Recharts `<BarChart layout="vertical">` with the 10 features from the spec, hard-coded in a typed array. Coral bars, hairline `<CartesianGrid>` horizontal only. Y-axis labels = feature name + unit (unit in mono via a custom tick renderer). Value labels at end of each bar in mono. Italic note about fibre below.
+Same `color-mix` pattern already used by the confidence pills on the Analysis screen for consistency.
 
-**Panel 3 — Clusters.** Recharts `<ScatterChart>` with 4 `<Scatter>` series, each a different `--data-*` colour. ~80 jittered points per cluster generated deterministically (seeded `Math.random()` replacement using index) so the layout is stable across reloads but doesn't ship a real CSV. Centroids as larger ring markers (same colour, stroke only, no fill). Axes labelled "PC1 (28% var)" / "PC2 (19% var)" in mono. Below: 2×2 grid of cards, each with a 10×10px coloured dot, label, `n =` and MetS prevalence in mono.
+### Sample data wired in
 
-**Panel 4 — Predictions table.** Plain `<table>` (not shadcn — lighter), 8 hard-coded rows. `predicted_risk` cell renders the number in mono next to a 60px thin coral bar (`<div>` with width = risk × 100%). `mets_flag` is a small pill (coral-tint or sage-tint). `cluster` is a coloured dot + mono number. `key_features` are three subtle chips (`bg-surface-hover`, `border-hairline`, mono text) with `↑` / `↓` arrows. Pagination caption beneath, non-interactive.
+The 7 rows from your spec, typed:
 
-**Run manifest.** Single line at the bottom, `text-[11px] text-ink-3 mono`, separators with `·`. Reads like a footer, not a panel.
+```text
+Dataset_A_dietary.csv     Dataset       2,431  23.4%  2h ago
+nhanes_bp_2023.csv        Dataset       2,060  —      yesterday
+MetS_risk_run_2025-05     Analysis      1,847  23.4%  yesterday
+Fibre intake distribution Visualisation 2,431  —      yesterday
+cohort_baseline.csv       Dataset       2,873  19.1%  3 days ago
+lab_results_q3.csv        Dataset       3,686  —      last week   (archived)
+demographics.csv          Dataset       4,499  —      May 2       (archived)
+```
 
-## Header behaviour
+## Hover action icons (right-edge slide-in)
 
-Breadcrumb shows `Analysis · {editable run name} · {dataset}`. Run name editable on click (same pattern as the existing AI Analysis screen). Right side: `New Analysis` ghost button (navigates back to `/ai-analysis`, resets state), `Export Report` coral filled button (`console.log("export", { runId, ... })` — no PDF yet).
+Three icon-only buttons (`SquareArrowOutUpRight`, `Copy`, `Archive` from lucide), 28×28, ghost style (transparent, hover = `surface-hover` + coral icon). Hidden by default (`opacity-0`), revealed via group-hover (`group-hover:opacity-100`) with a 150ms transition. They sit absolutely-positioned over the rightmost column so they don't disturb layout when hidden. Stop propagation on click so they don't trigger a row "open" (when that gets wired later).
 
 ## Out of scope
 
-- Real PDF export.
-- Drill-into-cluster / drill-into-subject (cards and rows hover but don't navigate).
-- Real model artefacts — all numbers from the spec are hard-coded as typed constants at the top of the file.
-- Saved-runs list.
-- Storing the run server-side.
+- Wiring action icons to real handlers (open / duplicate / archive).
+- Filtering / sorting the table.
+- Real data — still hard-coded mock rows.
+- A "View all" page.
+- Empty-state design for a fresh workspace.
 
-Approve and I'll build it in one pass.
+Approve and I'll ship it in one edit.
