@@ -488,7 +488,7 @@ function AiAnalysisPage() {
         )}
       </div>
 
-      <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} />
+      <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} skipped={skipped} />
 
       <div className="mt-6 flex flex-col gap-4">
         {/* STEP 1 — Map */}
