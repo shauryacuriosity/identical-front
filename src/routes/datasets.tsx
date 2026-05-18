@@ -159,12 +159,7 @@ function DatasetsPage() {
           <DatasetBar name="Dataset_B.csv" />
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
-            <div className="grid grid-cols-4 gap-4 p-5 border-b border-hairline">
-              <Dropdown label="join by" options={joinOptions} />
-              <Dropdown label="aggregate by" options={aggOptions} />
-              <Dropdown label="sort by" options={sortOptions} />
-              <Dropdown label="filter by" options={filterOptions} />
-            </div>
+            <PipelineStrip />
             <div className="flex-1 flex flex-col items-center justify-center min-h-[340px] px-6 py-10">
               <div className="h-12 w-12 rounded-xl bg-coral-tint flex items-center justify-center mb-3">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-coral" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -173,7 +168,7 @@ function DatasetsPage() {
                 </svg>
               </div>
               <p className="text-[14.5px] text-ink font-medium">No preview yet</p>
-              <p className="text-[13px] text-ink-2 mt-1 max-w-sm text-center">Pick attributes from the left and choose a join or aggregation to see your resulting table here.</p>
+              <p className="text-[13px] text-ink-2 mt-1 max-w-sm text-center">Add a step to your pipeline above to see your resulting table here.</p>
             </div>
           </div>
         </section>
