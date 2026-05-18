@@ -56,7 +56,7 @@ function AppHeader() {
       <div className="mx-auto max-w-[1280px] h-14 px-6 flex items-center justify-between">
         {/* Wordmark */}
         <Link to="/" className="flex items-baseline gap-2 group">
-          <span className="font-serif text-2xl text-ink leading-none" style={{ letterSpacing: "-0.03em" }}>
+          <span className="text-[22px] font-semibold text-ink leading-none" style={{ letterSpacing: "-0.02em" }}>
             eAsia
           </span>
           <span className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-medium">workbench</span>
