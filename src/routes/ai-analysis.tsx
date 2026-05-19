@@ -523,25 +523,25 @@ function AiAnalysisPage() {
       {/* Breadcrumb */}
       <div className="pt-6 pb-3 flex items-center gap-2 text-[13px] text-ink-2">
         <span>Analysis</span>
-        <span className="text-ink-3">·</span>
-        {editingName ? (
-          <input
-            autoFocus
-            value={runName}
-            onChange={(e) => setRunName(e.target.value)}
-            onBlur={() => setEditingName(false)}
-            onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
-            className="bg-transparent border-b border-coral/50 text-ink focus:outline-none px-0.5"
-          />
-        ) : (
-          <button
-            onClick={() => setEditingName(true)}
-            className="text-ink hover:text-coral transition-colors"
-          >
-            {runName}
-          </button>
-        )}
       </div>
+
+      {/* Run name */}
+      <div className="mb-5">
+        <label htmlFor="run-name" className="block text-[11px] uppercase tracking-[0.12em] text-ink-2 font-medium mb-1.5">
+          Run name
+        </label>
+        <input
+          id="run-name"
+          value={runName}
+          onChange={(e) => setRunName(e.target.value)}
+          onFocus={() => setEditingName(true)}
+          onBlur={() => setEditingName(false)}
+          className={`w-full max-w-xl h-11 px-3 rounded-lg border bg-surface text-ink text-[15px] font-medium focus:outline-none focus:border-coral/70 transition-colors ${
+            editingName ? "border-coral/60" : "border-hairline"
+          }`}
+        />
+      </div>
+
 
       <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} skipped={skipped} />
 
