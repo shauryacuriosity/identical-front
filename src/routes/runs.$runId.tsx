@@ -321,7 +321,7 @@ function ShapPanel({ runId }: { runId: string }) {
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
-      return (data?.shap_top_features ?? null) as ShapMap | null;
+      return ((data as { shap_top_features: ShapMap | null } | null)?.shap_top_features ?? null) as ShapMap | null;
     },
   });
 
@@ -390,7 +390,7 @@ function ClustersPanel({ runId }: { runId: string }) {
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
-      return (data?.cluster_summaries ?? null) as ClusterSummary[] | null;
+      return ((data as { cluster_summaries: ClusterSummary[] | null } | null)?.cluster_summaries ?? null) as ClusterSummary[] | null;
     },
   });
 
