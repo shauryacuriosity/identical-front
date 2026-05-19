@@ -71,34 +71,31 @@ function AppHeader() {
             {tabs.map((t) => {
               const active = t.to === "/" ? pathname === "/" : pathname.startsWith(t.to);
               const Icon = t.icon;
-              if (active) {
-                return (
-                  <Link
-                    key={t.to}
-                    to={t.to}
-                    className="relative h-12 w-16 flex items-start justify-center"
-                    aria-label={t.label}
-                  >
-                    <span
-                      className="absolute left-0 right-0 top-0 -bottom-3.5 flex items-start justify-center pt-[11px]"
-                      style={{
-                        backgroundColor: "var(--accent-primary)",
-                        borderRadius: "2px 2px 16px 16px",
-                        boxShadow: "0 2px 4px rgba(0,0,0,0.25)",
-                      }}
-                    >
-                      <Icon className="h-[18px] w-[18px] text-white" strokeWidth={2} />
-                    </span>
-                  </Link>
-                );
-              }
+              const isHome = t.to === "/";
               return (
                 <Link
                   key={t.to}
                   to={t.to}
-                  className="h-12 px-4 flex items-center text-[15px] font-medium text-ink hover:opacity-70 transition-opacity"
+                  aria-label={t.label}
+                  className={
+                    "relative h-9 px-4 my-auto flex items-center justify-center text-[15px] font-medium rounded-2xl transition-colors " +
+                    (active
+                      ? "text-ink"
+                      : "text-ink hover:opacity-70")
+                  }
+                  style={
+                    active
+                      ? { backgroundColor: "color-mix(in oklab, var(--accent-primary) 18%, transparent)" }
+                      : undefined
+                  }
                 >
-                  {t.label}
+                  {isHome ? <Icon className="h-[18px] w-[18px]" strokeWidth={2} /> : t.label}
+                  {active && (
+                    <span
+                      className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full"
+                      style={{ backgroundColor: "var(--accent-primary)" }}
+                    />
+                  )}
                 </Link>
               );
             })}
