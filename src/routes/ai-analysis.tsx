@@ -399,29 +399,31 @@ function AiAnalysisPage() {
   const runMutation = useMutation({
     mutationFn: async () => {
       if (!selectedDatasetId) throw new Error("Select a dataset first.");
+      const payload = {
+        dataset_id: selectedDatasetId,
+        name: runName,
+        function_mode: fnModeEnum(fnMode),
+        cohort_filter: {
+          age_min: ageMin,
+          age_max: ageMax,
+          sex: sex.toLowerCase(),
+          exclude_pregnant: excludePregnant,
+          require_complete: requireComplete,
+        },
+        method_config: {
+          prediction:
+            showPredict && predictOn ? { model: predictModel } : null,
+          subgroup:
+            showSubgroup && subgroupOn
+              ? { algorithm: clusterAlg, k: 4, projection: dimRed }
+              : null,
+        },
+        status: "pending",
+      };
       const { data, error } = await supabase
         .from("analysis_runs")
-        .insert({
-          dataset_id: selectedDatasetId,
-          name: runName,
-          function_mode: fnModeEnum(fnMode),
-          cohort_filter: {
-            age_min: ageMin,
-            age_max: ageMax,
-            sex: sex.toLowerCase(),
-            exclude_pregnant: excludePregnant,
-            require_complete: requireComplete,
-          },
-          method_config: {
-            prediction:
-              showPredict && predictOn ? { model: predictModel } : null,
-            subgroup:
-              showSubgroup && subgroupOn
-                ? { algorithm: clusterAlg, k: 4, projection: dimRed }
-                : null,
-          },
-          status: "pending",
-        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert(payload as any)
         .select("id")
         .single();
       if (error) throw error;
