@@ -646,7 +646,7 @@ function AiAnalysisPage() {
                         }`}
                       >
                         {metsLabelCol ?? "Select column"}
-                        <ChevronDown className="h-3 w-3 text-ink-3" />
+                        <ChevronDown className={`h-3 w-3 text-ink-2 transition-transform ${metsLabelCol ? "rotate-180" : ""}`} />
                       </button>
                     </div>
                     <span />
