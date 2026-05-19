@@ -386,15 +386,53 @@ function AiAnalysisPage() {
     return steps;
   }, [methodSkipped, showPredict, predictOn, predictModel, showSubgroup, subgroupOn]);
 
-  const [runProgress, setRunProgress] = useState(-1); // -1 = not started, n = currently on step n
+  const [runProgress, setRunProgress] = useState(-1); // -1 = not started, 0 = submitting (then navigation occurs)
   const runStarted = runProgress >= 0;
-  const runComplete = runProgress >= RUN_STEPS.length;
 
-  useEffect(() => {
-    if (!runStarted || runComplete) return;
-    const t = setTimeout(() => setRunProgress((p) => p + 1), 800 + Math.random() * 600);
-    return () => clearTimeout(t);
-  }, [runStarted, runComplete, runProgress]);
+  // Map UI fnMode -> canonical function_mode enum
+  const fnModeEnum = (m: FnMode): "full" | "prediction_only" | "subgroup_only" | "labels_only" =>
+    m === "full" ? "full"
+      : m === "predict" ? "prediction_only"
+        : m === "discover" ? "subgroup_only"
+          : "labels_only";
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDatasetId) throw new Error("Select a dataset first.");
+      const { data, error } = await supabase
+        .from("analysis_runs")
+        .insert({
+          dataset_id: selectedDatasetId,
+          name: runName,
+          function_mode: fnModeEnum(fnMode),
+          cohort_filter: {
+            age_min: ageMin,
+            age_max: ageMax,
+            sex: sex.toLowerCase(),
+            exclude_pregnant: excludePregnant,
+            require_complete: requireComplete,
+          },
+          method_config: {
+            prediction:
+              showPredict && predictOn ? { model: predictModel } : null,
+            subgroup:
+              showSubgroup && subgroupOn
+                ? { algorithm: clusterAlg, k: 4, projection: dimRed }
+                : null,
+          },
+          status: "pending",
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: (data) => {
+      navigate({ to: "/runs/$runId", params: { runId: data.id } });
+    },
+  });
+  const runComplete = false; // navigation occurs on success; panel only shows submitting state
+
 
   // Derived cohort numbers
   const cohort = useMemo(() => {
