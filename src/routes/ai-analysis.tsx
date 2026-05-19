@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Check,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   Boxes,
   ArrowRight,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/ai-analysis")({
   component: AiAnalysisPage,
@@ -313,6 +315,7 @@ function StepShell({
 // ---------- Page ----------
 
 function AiAnalysisPage() {
+  const navigate = useNavigate();
   const [runName, setRunName] = useState("Untitled run");
   const [editingName, setEditingName] = useState(false);
 
@@ -320,6 +323,24 @@ function AiAnalysisPage() {
   type FnMode = "full" | "predict" | "discover" | "labels";
   const [fnMode, setFnMode] = useState<FnMode>("full");
   const [metsLabelCol, setMetsLabelCol] = useState<string | null>(null);
+
+  // Live dataset selection (Step 1)
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  type DatasetOption = { id: string; name: string; row_count: number | null };
+  const datasetsQ = useQuery({
+    queryKey: ["datasets", "ready"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id,name,row_count,status,archived,uploaded_at")
+        .eq("archived", false)
+        .eq("status", "ready")
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as DatasetOption[];
+    },
+  });
+  const selectedDataset = datasetsQ.data?.find((d) => d.id === selectedDatasetId) ?? null;
 
   const [clinical, setClinical] = useState(CLINICAL);
   const [dietary, setDietary] = useState(DIETARY);
@@ -365,15 +386,55 @@ function AiAnalysisPage() {
     return steps;
   }, [methodSkipped, showPredict, predictOn, predictModel, showSubgroup, subgroupOn]);
 
-  const [runProgress, setRunProgress] = useState(-1); // -1 = not started, n = currently on step n
+  const [runProgress, setRunProgress] = useState(-1); // -1 = not started, 0 = submitting (then navigation occurs)
   const runStarted = runProgress >= 0;
-  const runComplete = runProgress >= RUN_STEPS.length;
 
-  useEffect(() => {
-    if (!runStarted || runComplete) return;
-    const t = setTimeout(() => setRunProgress((p) => p + 1), 800 + Math.random() * 600);
-    return () => clearTimeout(t);
-  }, [runStarted, runComplete, runProgress]);
+  // Map UI fnMode -> canonical function_mode enum
+  const fnModeEnum = (m: FnMode): "full" | "prediction_only" | "subgroup_only" | "labels_only" =>
+    m === "full" ? "full"
+      : m === "predict" ? "prediction_only"
+        : m === "discover" ? "subgroup_only"
+          : "labels_only";
+
+  const runMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedDatasetId) throw new Error("Select a dataset first.");
+      const payload = {
+        dataset_id: selectedDatasetId,
+        name: runName,
+        function_mode: fnModeEnum(fnMode),
+        cohort_filter: {
+          age_min: ageMin,
+          age_max: ageMax,
+          sex: sex.toLowerCase(),
+          exclude_pregnant: excludePregnant,
+          require_complete: requireComplete,
+        },
+        method_config: {
+          prediction:
+            showPredict && predictOn ? { model: predictModel } : null,
+          subgroup:
+            showSubgroup && subgroupOn
+              ? { algorithm: clusterAlg, k: 4, projection: dimRed }
+              : null,
+        },
+        status: "pending",
+      };
+      const { data, error } = await supabase
+        .from("analysis_runs")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert(payload as any)
+        .select("id")
+        .single();
+      if (error) throw error;
+      return data as { id: string };
+    },
+    onSuccess: (data) => {
+      navigate({ to: "/runs/$runId", params: { runId: data.id } });
+    },
+  });
+  const runComplete = false; // navigation occurs on success; panel only shows submitting state
+
 
   // Derived cohort numbers
   const cohort = useMemo(() => {
@@ -535,10 +596,13 @@ function AiAnalysisPage() {
 
             {/* Dataset selector */}
             <div className="max-w-md">
-              <button className="w-full h-10 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px]">
-                <span className="mono text-ink">Dataset_A_dietary.csv</span>
-                <ChevronDown className="h-4 w-4 text-ink-3" />
-              </button>
+              <DatasetSelector
+                datasets={datasetsQ.data ?? []}
+                isLoading={datasetsQ.isLoading}
+                error={datasetsQ.error as Error | null}
+                value={selectedDatasetId}
+                onChange={setSelectedDatasetId}
+              />
             </div>
 
             {/* Group A — MetS Clinical */}
@@ -922,17 +986,28 @@ function AiAnalysisPage() {
               )}
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex flex-col items-end gap-2 mt-6">
               <button
                 onClick={() => {
                   advanceFrom("method", "run");
                   setRunProgress(0);
+                  runMutation.mutate();
                 }}
-                disabled={(!predictOn || !showPredict) && (!subgroupOn || !showSubgroup)}
+                disabled={
+                  !selectedDatasetId ||
+                  runMutation.isPending ||
+                  ((!predictOn || !showPredict) && (!subgroupOn || !showSubgroup))
+                }
                 className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Run Analysis
+                {runMutation.isPending ? "Submitting…" : "Run Analysis"}
               </button>
+              {!selectedDatasetId && (
+                <span className="text-[12px] text-ink-3">Select a dataset in Step 1 to run.</span>
+              )}
+              {runMutation.error && (
+                <span className="text-[12px] text-ink-3">Failed to start — {(runMutation.error as Error).message}</span>
+              )}
             </div>
           </StepShell>
         )}
@@ -1137,5 +1212,70 @@ function RadioRow({
     </button>
   );
 }
+
+function DatasetSelector({
+  datasets,
+  isLoading,
+  error,
+  value,
+  onChange,
+}: {
+  datasets: { id: string; name: string; row_count: number | null }[];
+  isLoading: boolean;
+  error: Error | null;
+  value: string | null;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = datasets.find((d) => d.id === value) ?? null;
+  const label = isLoading
+    ? "Loading datasets…"
+    : error
+      ? "Failed to load datasets"
+      : selected
+        ? selected.name
+        : datasets.length === 0
+          ? "No ready datasets"
+          : "Select a dataset";
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={isLoading || !!error || datasets.length === 0}
+        className="w-full h-10 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px] disabled:opacity-60"
+      >
+        <span className={`mono ${selected ? "text-ink" : "text-ink-3"}`}>{label}</span>
+        <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && !isLoading && !error && datasets.length > 0 && (
+        <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-hairline bg-surface shadow-[var(--shadow-md)] p-1">
+          {datasets.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              onClick={() => {
+                onChange(d.id);
+                setOpen(false);
+              }}
+              className={`w-full flex items-center justify-between gap-3 text-left text-[12.5px] px-2 py-2 rounded hover:bg-surface-hover ${
+                d.id === value ? "text-coral" : "text-ink"
+              }`}
+            >
+              <span className="mono truncate">{d.name}</span>
+              <span className="text-[11px] text-ink-3 tabular shrink-0">
+                {d.row_count != null ? `${d.row_count.toLocaleString()} rows` : "—"}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {error && (
+        <p className="mt-1 text-[12px] text-ink-3">Failed to load — {error.message}</p>
+      )}
+    </div>
+  );
+}
+
 
 

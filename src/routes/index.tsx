@@ -249,7 +249,7 @@ function Index() {
             </span>
 
             <span className="tabular text-[12.5px] text-ink-2 text-right">
-              {f.prevalence != null ? `${f.prevalence.toFixed(1)}%` : <Em />}
+              {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
             </span>
 
             <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>

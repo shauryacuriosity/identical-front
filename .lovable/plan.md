@@ -1,155 +1,194 @@
-## Combined plan — Supabase scaffold + UI data wiring
+# Plan — prevalence fix + Step-1/4 wiring + /runs/$id dashboard
 
-Two phases in one pass. Phase A creates the integration files (no UI change). Phase B replaces mock data with real queries (structure + data only, no styling, tokens, layout, or component shapes touched).
+## A. Prevalence display fix (1 line per site)
 
----
+`mets_prevalence` is stored as a 0–1 decimal. Multiply by 100 before formatting.
 
-## Phase A — Manual Supabase scaffold
+- `src/routes/index.tsx` — Recent Files row:
+`f.prevalence != null ? \`${(f.prevalence * 100).toFixed(1)}% : &nbsp;`
+- Same rule applied in the new Run summary card (eda_results.mets_prevalence).
 
-### A0. Secrets (blocker — needs your input)
+No other display semantics change.
 
-No Supabase secrets exist in the project yet. After you approve this plan I will call `add_secret` to request:
+## B. Step-1 Map — real dataset selector
 
-- `VITE_SUPABASE_URL` — project URL, e.g. `https://xxxx.supabase.co` (safe in client bundle)
-- `VITE_SUPABASE_ANON_KEY` — publishable/anon key (safe in client bundle)
-
-Both are `VITE_*` so the browser client can read them via `import.meta.env`. We are intentionally **not** storing the service-role key (no server-side admin path this pass, no auth middleware).
-
-### A1. Install client
-
-`bun add @supabase/supabase-js` (only dep needed).
-
-### A2. New files
-
-**`src/integrations/supabase/types.ts`** — hand-written `Database` type matching the six tables exactly as you posted. Shape:
+Replace the hardcoded "Dataset_A_dietary.csv" button in `ai-analysis.tsx` (around line 537–542) with a live dropdown driven by:
 
 ```ts
-export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
-
-export interface Database {
-  public: {
-    Tables: {
-      datasets: { Row: {...}; Insert: {...}; Update: {...} };
-      analysis_runs: { Row: {...}; Insert: {...}; Update: {...} };
-      eda_results: { Row: {...}; Insert: {...}; Update: {...} };
-      model_results: { Row: {...}; Insert: {...}; Update: {...} };
-      cluster_results: { Row: {...}; Insert: {...}; Update: {...} };
-      analysis_predictions: { Row: {...}; Insert: {...}; Update: {...} };
-    };
-  };
-}
+supabase.from("datasets")
+  .select("id,name,row_count,status,archived")
+  .eq("archived", false)
+  .eq("status", "ready")
+  .order("uploaded_at", { ascending: false })
 ```
 
-Every column from your DDL is included with correct nullability (e.g. `archived: boolean | null`, jsonb → `Json | null`, numeric → `number | null`, timestamptz → `string | null`). `Insert` makes server-defaulted columns optional (`id`, `uploaded_at`, `created_at`, `status`, `archived`).
+- Option label: `name` + small muted  `· {row_count.toLocaleString()} rows` (or `—` if null).
+- Component state: `selectedDatasetId: string | null` (default null).
+- Visual: same `h-10 px-3 rounded-lg border …` button as today; menu uses the existing `ChevronDown` and styling pattern from the MappingRow dropdown — no new tokens, no new classes.
+- Loading: shows current button with text "Loading datasets…". Empty: "No ready datasets". Error: inline `text-ink-3` line below.
+- Persists across step transitions (lifted into `AiAnalysisPage`).
 
-**`src/integrations/supabase/client.ts`**:
+## C. Step-4 Run — real mutation
+
+Add a `useMutation` driven by the live form state. On click of the existing primary Run button (no visual change):
 
 ```ts
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "./types";
-
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-export const supabase = createClient<Database>(url, anon, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
-```
-
-`persistSession: false` because there's no auth flow yet — avoids spurious localStorage writes during SSR.
-
-**Skip**: `client.server.ts`, `auth-middleware.ts`, `auth-attacher.ts`. Per your instruction.
-
-### A3. Smoke test
-
-A tiny `useQuery` on Home that does `supabase.from("datasets").select("id").limit(1)` — already implicit in Phase B's Recent Files query, so no separate ping needed. If credentials are wrong you'll see the error in the Recent Files row instead of a silent failure.
-
----
-
-## Phase B — UI data wiring (no styling changes)
-
-All edits are inside existing components. Tokens, classNames, spacing, shadows, ActionTile, AppHeader, AI Analysis step indicator, Recent Files row styling — **all untouched**. Only data sources and conditional render branches (loading skeleton / empty / error / "—") change.
-
-### B1. Home — Recent Files table (`src/routes/index.tsx`)
-
-- Remove the `RECENT` mock array.
-- `useQuery(["datasets", "recent"], ...)`:
-  ```ts
-  supabase.from("datasets")
-    .select("id,name,uploaded_at,row_count,mets_prevalence,archived,status")
-    .eq("archived", false)
-    .order("uploaded_at", { ascending: false })
-    .limit(10)
-  ```
-- Map row → existing `Recent` shape. `type` is hard-coded `"Dataset"` for now (no analyses/visualisations table in scope). `modified` = relative time from `uploaded_at` via a small `formatRelative()` helper.
-- Loading: 5 skeleton rows reusing the existing row container shell (same grid, same shadow, just `<Skeleton/>` placeholders inside cells). No new tokens.
-- Empty (0 rows): single muted line "No datasets yet" inside the same container.
-- Null `mets_prevalence` / `row_count` already renders as "—" per existing code path.
-
-### B2. Datasets workspace (`src/routes/datasets.tsx`)
-
-Need to view this file first to confirm the current selector/list shape, but plan: replace whatever mock list drives the dataset list with the same `datasets` query (without the `limit(10)`, still excluding archived). Selecting a dataset stores `dataset_id` in route search params or local state — depending on what the current UI does (I'll preserve whatever it does today, only swapping the data source).
-
-### B3. AI Analysis — Step 4 Run (`src/routes/ai-analysis.tsx`)
-
-- "Run" button → `useMutation` that inserts into `analysis_runs`:
-  ```ts
-  supabase.from("analysis_runs").insert({
-    dataset_id,            // from step 1 selection
-    name,                  // from step 2 input, or auto
-    function_mode,         // from step 2 selection
-    cohort_filter,         // jsonb from step 3
-    method_config,         // jsonb from step 3
+const { data, error } = await supabase
+  .from("analysis_runs")
+  .insert({
+    dataset_id: selectedDatasetId!,
+    name: runName,
+    function_mode: fnMode === "full" ? "full"
+                 : fnMode === "predict" ? "prediction_only"
+                 : fnMode === "discover" ? "subgroup_only"
+                 : "labels_only",
+    cohort_filter: {
+      age_min: ageMin, age_max: ageMax,
+      sex: sex.toLowerCase(),                 // "all" | "female" | "male"
+      exclude_pregnant: excludePregnant,
+      require_complete: requireComplete,
+    },
+    method_config: {
+      prediction: showPredict && predictOn
+        ? { model: predictModel }             // "xgb" | "logreg" | "both"
+        : null,
+      subgroup: showSubgroup && subgroupOn
+        ? { algorithm: clusterAlg, k: 4, projection: dimRed }  // "pca" | "tsne"
+        : null,
+    },
     status: "pending",
-  }).select("id").single()
-  ```
-- On success: `router.navigate({ to: "/ai-analysis/results", search: { run_id } })` (current results route is `ai-analysis.results.tsx` — will confirm exact param convention when reading it).
-- Button shows pending state during mutation; surface `error.message` inline below the button on failure. No new components.
+  })
+  .select("id")
+  .single();
+```
 
-### B4. Results dashboard (`src/routes/ai-analysis.results.tsx`)
+On success: `navigate({ to: "/runs/$runId", params: { runId: data.id } })`.
+Disable Run button when `!selectedDatasetId`. Mutation error shown inline under the button via `text-ink-3` (no toast).
+The existing local "fake progress" simulator is removed so the button does real work; the step-indicator "running" state is wired to `mutation.isPending` until navigation completes.
 
-Reads `run_id` from search params. Four parallel `useQuery` calls keyed on `run_id`:
+## D. New route `src/routes/runs.$runId.tsx`
 
-1. **Run header** — `analysis_runs` row (status, progress, started/finished, error_message).
-2. **EDA panel** — `eda_results` (n, mets_prevalence, mets_prevalence_by_sex, n_dietary_columns, figure_paths).
-3. **Model metrics panel** — `model_results`; render **only** `logistic_metrics_test` and `xgboost_metrics_test` (`weighted_auc`, `precision`, `recall`, `f1`). `_train` fields are never displayed.
-4. **SHAP panel** — `model_results.shap_top_features` (jsonb array of {feature, value}).
-5. **Cluster scatter + cards** — `cluster_results.cluster_summaries` + `figure_paths`.
-6. **Per-subject table** — `analysis_predictions` filtered by `run_id`, paginated 50/page. Uses Supabase `.range(from, to)` with a `count: "exact"` head query for total. Page state in local component state; no URL change. Existing table styling preserved.
+Pattern: `/runs/:id`. This replaces the static `/ai-analysis/results` mock for the live flow (the old route is left in place — not deleted, just unused; safe to remove later).
 
-Every field that is null renders `"—"`. Each panel shows a skeleton (existing skeleton component) while its query is loading. Errors render inline within the panel as `"Failed to load — {message}"` in `text-ink-2`, no toast, no new styling.
+### Polling
 
----
+```ts
+useQuery({
+  queryKey: ["analysis_runs", runId],
+  queryFn: () => supabase.from("analysis_runs")
+    .select("id,status,progress,error_message,started_at,finished_at,name,dataset_id")
+    .eq("id", runId).single(),
+  refetchInterval: (q) => {
+    const s = q.state.data?.data?.status;
+    return s === "complete" || s === "failed" ? false : 2000;
+  },
+})
+```
 
-## Files
+### While `status !== "complete"`
+
+Renders a centered card: run name, current status pill, progress bar (`progress ?? 0`), `error_message` if `status === "failed"`. Same surface/hairline tokens — no new styling.
+
+### When `status === "complete"`, fire four parallel queries
+
+All keyed on `["…", runId]`, all `enabled: status === "complete"`:
+
+1. `eda_results` — `select("n,mets_prevalence,mets_prevalence_by_sex,n_dietary_columns,figure_paths").eq("run_id", runId).maybeSingle()`
+2. `model_results` — `select("xgboost_metrics_test,shap_top_features,figure_paths").eq("run_id", runId).maybeSingle()` (note: `_train` fields never selected, never displayed)
+3. `cluster_results` — `select("cluster_summaries,figure_paths").eq("run_id", runId).maybeSingle()`
+4. `analysis_predictions` (paginated) — `select("subject_id,predicted_prob,predicted_label,actual_label,cluster_label", { count: "exact" }).eq("run_id", runId).order("subject_id").range(from, to)`. Page in local state (default 0, page size 50).
+
+### Panels (reuse the look of `ai-analysis.results.tsx`)
+
+- **Run summary card** — `Cohort: eda_results.n` rows; `(eda_results.mets_prevalence * 100).toFixed(1)%` MetS prevalence; sex breakdown from `mets_prevalence_by_sex` jsonb if present. Right column: `xgboost_metrics_test.weighted_auc / precision / recall / f1` — each as `.toFixed(2)`. Any missing field → `—`.
+- **SHAP panel** — bar list from `shap_top_features` jsonb. Expects shape like `[{feature, value, unit?}]` — render whatever shape comes back; fall back to `JSON.stringify` of the entry if it's not an array of objects with `feature`+`value` (defensive, since shape isn't pinned in the schema).
+- **Cluster scatter + cards** — `cluster_summaries` jsonb drives the cards (id, label, n, mets prevalence × 100, center if present). Scatter uses `figure_paths` if it points to an image URL; otherwise omitted with `—`.
+- **Per-subject table** — columns: `subject_id`, `predicted_prob` (× 100, 1 dp, %), `predicted_label`/`actual_label` (✓ / – / —), `cluster_label`. Footer: `Showing {from+1}–{min(to+1,count)} of {count}` + Prev / Next buttons. Same table styling as the existing results page.
+
+Every null cell → `<Em>` (the muted dash). Each panel independently shows a skeleton (`animate-pulse` placeholder block matching its container's geometry) while loading and an inline `text-ink-3` "Failed to load — {message}" on error.
+
+### Errors / not-found
+
+- `errorComponent` and `notFoundComponent` on the route, matching the existing root style.
+- If the initial run query returns no row, render notFound.
+
+## E. Files
 
 **New**
-- `src/integrations/supabase/client.ts`
-- `src/integrations/supabase/types.ts`
 
-**Edited (data wiring only, zero style changes)**
-- `src/routes/index.tsx` — replace `RECENT` mock with query
-- `src/routes/datasets.tsx` — replace mock with query
-- `src/routes/ai-analysis.tsx` — wire Run mutation
-- `src/routes/ai-analysis.results.tsx` — wire all panels
+- `src/routes/runs.$runId.tsx`
 
-**Dependency**
-- `@supabase/supabase-js` (via `bun add`)
+**Edited (data + small fixes only — no token/layout/component-shape changes)**
+
+- `src/routes/index.tsx` — `× 100` in prevalence formatter
+- `src/routes/ai-analysis.tsx` — dataset selector wired in Step 1; Run mutation + navigate in Step 4; remove fake-progress loop; disable Run when no dataset
 
 **Untouched**
-- `src/styles.css` (no tokens added)
-- `src/routes/__root.tsx` (AppHeader)
-- `ActionTile`, `TypePill`, `StatusDot`, `RowAction`, welcome heading, all spacing/shadow/font tokens
-- AI Analysis 4-step indicator visuals
-- `src/routes/visualisation.tsx` (no data spec given for it this pass)
 
----
+- All design tokens, AppHeader, ActionTile, TypePill, StatusDot, RowAction, AI-Analysis step indicator visuals, MappingRow, StepShell, datasets.tsx, visualisation.tsx, ai-analysis.results.tsx (the mock results page stays as-is for now; the live flow goes to `/runs/$runId`)
 
-## What I need from you to proceed after approval
+## F. Assumptions you should sanity-check before I apply
 
-1. **Approve the plan.**
-2. When `add_secret` prompts appear, paste:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+1. `function_mode` enum values: I'll write `full | prediction_only | subgroup_only | labels_only`. If your backend expects different strings, say so.
+2. `analysis_runs.name` accepts the run name text from Step 1 (defaulted to "Untitled run").
+3. The route shape `/runs/:id` is acceptable — alternative would be `/ai-analysis/results?run_id=…` if you want to keep the existing URL convention. Speak up if you prefer the latter; otherwise `/runs/$runId` it is.
+4. SHAP and cluster_summaries jsonb shapes aren't pinned in the schema you posted. I'll render defensively (best-guess shape with `JSON.stringify` fallback). If you have the producer schema, paste it and I'll render exactly.
 
-Once both are stored I'll execute Phase A then Phase B in one pass and verify the Home query returns at least the smoke-test response.
+Approve and I'll apply A → B → C → D in one pass.
+
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+> Approve. Answers to your sanity checks:
+>
+> **1. function_mode enum:** approved as written — `full | prediction_only | subgroup_only | labels_only`. These are canonical, the backend will conform to these strings.
+>
+> **2. analysis_[runs.name](http://runs.name) default:** "Untitled run" is fine. User can rename later.
+>
+> **3. Route shape:** go with `/runs/$runId`. Cleaner, RESTful, and runs are first-class objects worth bookmarking/sharing — leave `/ai-analysis/results` mock untouched as you proposed.
+>
+> **4. JSONB shapes — pin these, no defensive stringify fallback needed:**
+>
+> `shap_top_features` is a flat dict, feature → SHAP importance value (raw, not %):
+>
+> json
+>
+> ```json
+> {
+>   "DR1IFIBE": 0.234,
+>   "DR1IKCAL": 0.187,
+>   "age": 0.156,
+>   ...
+> }
+> ```
+>
+> Render as horizontal bars: feature name on left, value scaled to widest bar. Sort descending by value. Top 10.
+>
+> `cluster_summaries` is an array of cluster objects:
+>
+> json
+>
+> ```json
+> [
+>   {
+>     "cluster_id": 0,
+>     "label": "High fibre, low sugar",
+>     "n": 412,
+>     "mets_prevalence": 0.18,
+>     "top_features": [
+>       {"feature": "DR1IFIBE", "mean": 28.4},
+>       {"feature": "DR1ISUGR", "mean": 42.1}
+>     ]
+>   },
+>   ...
+> ]
+> ```
+>
+> Render as cards: `label` (or `Cluster {cluster_id}` if label is null) as header, `n` rows + `mets_prevalence × 100` % as stats, `top_features` as a small list. `mets_prevalence` follows the same × 100 rule as elsewhere.
+>
+> Apply A → B → C → D.
+
+&nbsp;

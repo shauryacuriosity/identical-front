@@ -13,6 +13,7 @@ import { Route as VisualisationRouteImport } from './routes/visualisation'
 import { Route as DatasetsRouteImport } from './routes/datasets'
 import { Route as AiAnalysisRouteImport } from './routes/ai-analysis'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as AiAnalysisResultsRouteImport } from './routes/ai-analysis.results'
 
 const VisualisationRoute = VisualisationRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RunsRunIdRoute = RunsRunIdRouteImport.update({
+  id: '/runs/$runId',
+  path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiAnalysisResultsRoute = AiAnalysisResultsRouteImport.update({
   id: '/results',
   path: '/results',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
+  '/runs/$runId': typeof RunsRunIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
+  '/runs/$runId': typeof RunsRunIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,6 +70,7 @@ export interface FileRoutesById {
   '/datasets': typeof DatasetsRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
+  '/runs/$runId': typeof RunsRunIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,6 +80,7 @@ export interface FileRouteTypes {
     | '/datasets'
     | '/visualisation'
     | '/ai-analysis/results'
+    | '/runs/$runId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -78,6 +88,7 @@ export interface FileRouteTypes {
     | '/datasets'
     | '/visualisation'
     | '/ai-analysis/results'
+    | '/runs/$runId'
   id:
     | '__root__'
     | '/'
@@ -85,6 +96,7 @@ export interface FileRouteTypes {
     | '/datasets'
     | '/visualisation'
     | '/ai-analysis/results'
+    | '/runs/$runId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -92,6 +104,7 @@ export interface RootRouteChildren {
   AiAnalysisRoute: typeof AiAnalysisRouteWithChildren
   DatasetsRoute: typeof DatasetsRoute
   VisualisationRoute: typeof VisualisationRoute
+  RunsRunIdRoute: typeof RunsRunIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -124,6 +137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/runs/$runId': {
+      id: '/runs/$runId'
+      path: '/runs/$runId'
+      fullPath: '/runs/$runId'
+      preLoaderRoute: typeof RunsRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ai-analysis/results': {
       id: '/ai-analysis/results'
       path: '/results'
@@ -151,6 +171,7 @@ const rootRouteChildren: RootRouteChildren = {
   AiAnalysisRoute: AiAnalysisRouteWithChildren,
   DatasetsRoute: DatasetsRoute,
   VisualisationRoute: VisualisationRoute,
+  RunsRunIdRoute: RunsRunIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
