@@ -139,6 +139,16 @@ function SkeletonRow() {
 }
 
 function Index() {
+  type DatasetRow = {
+    id: string;
+    name: string;
+    uploaded_at: string | null;
+    row_count: number | null;
+    mets_prevalence: number | null;
+    archived: boolean | null;
+    status: string | null;
+  };
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["datasets", "recent"],
     queryFn: async () => {
@@ -149,7 +159,7 @@ function Index() {
         .order("uploaded_at", { ascending: false })
         .limit(10);
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as DatasetRow[];
     },
   });
 
