@@ -64,66 +64,78 @@
 :root {
   --radius: 0.875rem; /* 14px card */
 
-  /* Surfaces — Adrian's palette */
-  --canvas: #fff5f5;
-  --surface: #ffffff;
-  --surface-hover: #f9d7d7;
+  /* Adrian's light-mode tokens (Figma Variables panel) */
+  --bg-page:      #FFF5F5;
+  --bg-surface:   #FFF5F5;
+  --bg-elevated:  #F2D0CF;
+  --bg-emphasis:  #CAA8A7;
 
-  /* Borders */
-  --hairline: rgba(110, 74, 74, 0.12);
-  --hairline-strong: rgba(110, 74, 74, 0.24);
-  --hairline-grey: #d9d9d9;
+  --accent-primary:   #E8928E;
+  --accent-secondary: #0077FF;
+  --accent-highlight: #FFFFFF;
 
-  /* Ink */
-  --ink: #1e1e1e;
-  --ink-2: #5a4a4a;
-  --ink-3: #d4908a;
+  --text-primary: #1A0003;
+  --text-muted:   #673D3D;
 
-  /* Coral (Adrian) */
-  --coral: #e8928e;
-  --coral-hover: #e46576;
-  --coral-deep: #6e4a4a;
-  --coral-muted: #d4908a;
+  --border-default: #A06B6B;
+  --border-muted:   #C49090;
 
-  /* Status (Adrian) */
-  --status-success: #7aab8a;
-  --status-warning: #9a9268;
-  --status-danger: #c08880;
-  --status-info: #7a9dc4;
+  --status-success: #7AAB8A;
+  --status-warning: #9A9268;
+  --status-danger:  #C08880;
+  --status-info:    #7A9DC4;
 
-  /* Chart series — retinted to live inside Adrian's palette */
+  --shadow-card:     0 2px 8px rgba(26, 0, 3, 0.06);
+  --shadow-elevated: 0 8px 24px rgba(26, 0, 3, 0.10);
+
+  /* Chart series — unchanged */
   --data-sage:  #7aab8a;
   --data-ochre: #c79a5a;
   --data-slate: #7a9dc4;
   --data-plum:  #8a5a6e;
 
+  /* Back-compat aliases — keep existing class names resolving to new values */
+  --canvas: var(--bg-page);
+  --surface: var(--bg-surface);
+  --surface-hover: var(--bg-elevated);
+  --ink: var(--text-primary);
+  --ink-2: var(--text-muted);
+  --ink-3: var(--text-muted);
+  --coral: var(--accent-primary);
+  --coral-hover: var(--bg-emphasis);
+  --coral-deep: var(--text-primary);
+  --coral-muted: var(--text-muted);
+  --hairline: var(--border-muted);
+  --hairline-strong: var(--border-default);
+  --hairline-grey: var(--border-muted);
+
   /* Shadcn semantic mapping */
-  --background: var(--canvas);
-  --foreground: var(--ink);
-  --card: var(--surface);
-  --card-foreground: var(--ink);
-  --popover: var(--surface);
-  --popover-foreground: var(--ink);
-  --primary: var(--coral);
+  --background: var(--bg-page);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-primary);
   --primary-foreground: #ffffff;
-  --secondary: var(--surface-hover);
-  --secondary-foreground: var(--ink);
-  --muted: var(--surface-hover);
-  --muted-foreground: var(--ink-2);
-  --accent: var(--surface-hover);
-  --accent-foreground: var(--coral-deep);
+  --secondary: var(--bg-elevated);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-elevated);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--bg-elevated);
+  --accent-foreground: var(--text-primary);
   --destructive: var(--status-danger);
   --destructive-foreground: #ffffff;
-  --border: var(--hairline);
-  --input: var(--hairline);
-  --ring: var(--coral);
+  --border: var(--border-muted);
+  --input: var(--border-muted);
+  --ring: var(--accent-primary);
 
   --ambient: none;
 
-  --shadow-xs: 0 1px 0 0 rgba(110, 74, 74, 0.04);
-  --shadow-sm: 0 1px 3px rgba(110, 74, 74, 0.08), 0 1px 2px rgba(110, 74, 74, 0.04);
-  --shadow-md: 0 4px 12px rgba(110, 74, 74, 0.10), 0 2px 4px rgba(110, 74, 74, 0.06);
-  --shadow-lg: 0 12px 32px rgba(110, 74, 74, 0.14), 0 2px 6px rgba(110, 74, 74, 0.06);
+  --shadow-xs: 0 1px 0 0 rgba(26, 0, 3, 0.04);
+  --shadow-sm: var(--shadow-card);
+  --shadow-md: var(--shadow-elevated);
+  --shadow-lg: var(--shadow-elevated);
 }
 
 .dark {

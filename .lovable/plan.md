@@ -1,104 +1,128 @@
-# AI Analysis: input-adaptivity + richer Method step
+## Corrective styling pass — light-mode tokens from Adrian's Figma Variables
 
-Two refinements applied to `src/routes/ai-analysis.tsx` (and a small touch to `src/routes/ai-analysis.results.tsx` only if Method summary copy changes). All styling from the previous pass — coral, Montserrat, hairlines, shadows, radii — is preserved verbatim. The 4-step indicator (Map → Cohort → Method → Run) stays.
+> **Why this pass exists.** The previous pass used the wrong hex values — Adrian's Variables panel has separate light and dark mode columns, and we accidentally pulled from the dark-mode column. The result is bleached secondary text (`#d4908a`), grey borders that don't belong in this palette, and an underline-only active tab. This plan replaces tokens only. **No structure, layout, copy, or component changes.**
+
+There is no `tailwind.config.ts` in this project — Tailwind v4 reads tokens from `src/styles.css` via `@theme inline`. All token work happens in that one file. Component-level fixes are limited to (a) the active-tab nav indicator and (b) the body heading weight bump, both single-line tweaks.
 
 ---
 
-## 1. Addressing Zhuojin's input-adaptivity concern
+### 1. Token rewrite in `src/styles.css`
 
-> "The system should ask for what you need based on what you're running — not require all inputs upfront when the function doesn't need them."
-
-**What's added.** A subtle, single-line chip group at the very top of Step 1, above the dataset selector:
+Replace the current `:root` block with Adrian's **light-mode column** values. New names match Adrian's panel; old names are aliased to the new ones so existing class usages (`bg-canvas`, `bg-surface-hover`, `text-ink-2`, `text-ink-3`, `border-hairline`, `bg-coral`, etc.) keep working without touching any component file.
 
 ```text
-WHAT ARE YOU RUNNING?
-( Full analysis )  ( Prediction only )  ( Subgroup discovery only )  ( Generate labels only )
+/* Backgrounds */
+--bg-page:      #FFF5F5      (was --canvas)
+--bg-surface:   #FFF5F5      (was --surface #FFFFFF — surface now equals page; depth via borders + bg-elevated, not contrast)
+--bg-elevated:  #F2D0CF      (was --surface-hover #F9D7D7 — used for hover, dropdown rows, active tab pill, selected pill)
+--bg-emphasis:  #CAA8A7      (new — pressed/selected emphasis)
+
+/* Brand */
+--accent-primary:   #E8928E  (was --coral — unchanged hex, renamed)
+--accent-secondary: #0077FF  (new — defined, currently unused)
+--accent-highlight: #FFFFFF  (new — white highlight token)
+
+/* Text — biggest visible fix */
+--text-primary: #1A0003      (was --ink #1E1E1E — near-black with red undertone)
+--text-muted:   #673D3D      (was --ink-2 #5A4A4A AND --ink-3 #D4908A — collapses to one dark muted brown-red)
+
+/* Borders — switch from grey to muted pink */
+--border-default: #A06B6B    (was --hairline rgba(110,74,74,0.12))
+--border-muted:   #C49090    (was --hairline-strong)
+/* drop --hairline-grey #D9D9D9 entirely */
+
+/* Status — unchanged hexes, confirmed correct */
+--status-success: #7AAB8A
+--status-warning: #9A9268
+--status-danger:  #C08880
+--status-info:    #7A9DC4
+
+/* Shadows — Adrian's drop_shadow at 25% black, retinted to red-black */
+--shadow-card:     0 2px 8px rgba(26, 0, 3, 0.06)
+--shadow-elevated: 0 8px 24px rgba(26, 0, 3, 0.10)
+
+/* Type — unchanged */
+--font-base: 'Montserrat', system-ui, sans-serif
 ```
 
-- Caption uses the existing `text-[12px] uppercase tracking-[0.12em] text-ink-3` style — identical to existing section labels.
-- Chips reuse the existing pill style (h-7, rounded-full, hairline border, `bg-surface-hover` on selected, `border-coral/40 text-coral`), single-select, default `Full analysis`.
-- State lives in a single `fnMode` variable (`"full" | "predict" | "discover" | "labels"`) that drives the rest of the workflow.
+**Backwards-compat aliases (added at end of `:root`)** so no component file needs renaming:
 
-**How inputs adapt** (driven by `fnMode`, no structural rework):
+```text
+--canvas         → var(--bg-page)
+--surface        → var(--bg-surface)
+--surface-hover  → var(--bg-elevated)
+--ink            → var(--text-primary)
+--ink-2          → var(--text-muted)
+--ink-3          → var(--text-muted)        /* collapsed — was the wrong bleached pink */
+--coral          → var(--accent-primary)
+--coral-hover    → var(--bg-emphasis)
+--coral-deep     → var(--text-primary)
+--coral-muted    → var(--text-muted)
+--hairline       → var(--border-default)
+--hairline-strong→ var(--border-default)
+--hairline-grey  → var(--border-muted)      /* anywhere this was used switches to pink-toned */
+--shadow-sm      → var(--shadow-card)
+--shadow-md      → var(--shadow-elevated)
+--shadow-lg      → var(--shadow-elevated)
+```
 
-| Mode | MetS Clinical Criteria | Demographics & Dietary | Step 3 — Method | Run output |
-|---|---|---|---|---|
-| Full analysis *(default)* | required | required | both sections, both enabled | current behavior |
-| Prediction only | "MetS label (if already in data)" select column row appears at top. If mapped → the 5 criteria rows render with `optional · used for verification` muted tag. If unmapped → criteria stay required (system computes label). | required | Prediction section only | predictions + SHAP |
-| Subgroup discovery only | section header gets `optional` tag, rows greyed but available | required | Subgroup section only | clusters + PCA |
-| Generate labels only | required | **section hidden entirely** | **Step skipped** — Continue on Step 2 jumps to Step 4; Method step renders faded with an `n/a` tag in the indicator | labelled dataset |
-
-**Default behavior is preserved.** A researcher who never touches the chip group sees the canonical pipeline they have today — same fields, same Method defaults, same Run output. The selector is additive opt-in for narrower runs.
-
-**Step indicator behavior.** When `fnMode === "labels"`, the Method dot renders with `opacity-50`, a small `n/a` caption replaces the number, and the connector to Run is dashed. The Continue handler on Step 2 in this mode calls `advanceFrom("cohort", "run")` and adds `"method"` to a `skipped` set so `StepIndicator` styles it accordingly.
-
----
-
-## 2. Addressing Adrian's "more models" concern
-
-> "The Method step is too simple — our backend supports more models and configurations than the UI surfaces."
-
-Step 3 is redesigned from two flat cards into two **independently-toggleable sections** (`A — Prediction`, `B — Subgroup Discovery`) that mirror the backend capability surface. Both checked by default in Full analysis mode; visibility is filtered by `fnMode` per the table above.
-
-### Section A — Prediction (supervised)
-Card with header checkbox + label `Prediction · what predicts MetS in this cohort?`. When checked, expands to:
-
-- **Model** (label) — single-select radio group:
-  - **XGBoost** *(recommended — handles non-linearities and missing data well)*
-  - **Logistic Regression** *(more interpretable, smaller sample sizes)*
-  - **Compare both** *(runs both side-by-side, comparative metrics)*
-- **Advanced** collapsible (closed by default, chevron + `text-ink-3` caption):
-  - For XGBoost: `max_depth` slider (2–8, default 5), `n_estimators` slider (100–1000, default 300)
-  - For Logistic Regression: regularization strength slider, L1/L2 segmented toggle
-  - For Compare both: shows both groups stacked
-- Output preview *(italic, `text-[12.5px] text-ink-3`)*:
-  > "Produces test-set AUC + sensitivity + specificity, SHAP feature ranking, per-subject predictions."
-
-### Section B — Subgroup Discovery (unsupervised)
-Card with header checkbox + label `Subgroup Discovery · what sub-populations exist?`. When checked, expands to:
-
-- **Clustering algorithm** — radio group:
-  - **K-Means** *(recommended)*
-  - **Hierarchical clustering** — *coming soon* (greyed card, disabled)
-  - **DBSCAN** — *coming soon* (greyed card, disabled)
-- **Number of clusters (k)** — stepper 2–8 (default 4) with a toggle `Auto-select via silhouette score` (when on, stepper disables)
-- **Dimensionality reduction for visualisation** — radio group:
-  - **PCA** *(recommended)*
-  - **t-SNE** — *coming soon* (greyed)
-  - **UMAP** — *coming soon* (greyed)
-- Output preview *(italic, muted)*:
-  > "Produces cluster profiles, PCA scatter, per-cluster MetS prevalence."
-
-### "Coming soon" cards
-Rendered with `opacity-50`, `cursor-not-allowed`, a small `soon` chip in the corner, and no radio interaction. They communicate what backend v2 will support without lying about today's state. Wiring happens at backend integration.
-
-### Run Analysis CTA
-Step 4 footer button gets bumped: larger (`h-11 px-6`), coral filled, primary CTA — `Run Analysis`. Unchanged otherwise.
-
-### Models/algorithms now surfaced
-- Live today: **XGBoost**, **Logistic Regression**, **K-Means**, **PCA**
-- v2 placeholders: **Hierarchical clustering**, **DBSCAN**, **t-SNE**, **UMAP**
+This is the only file edited for tokens. Chart data tokens (`--data-sage/ochre/slate/plum`) stay as-is.
 
 ---
 
-## 3. What stayed unchanged
+### 2. Two component-level touch-ups
 
-- **Step indicator** at the top — same 4 steps, same sticky placement, same coral/hairline tokens. The only addition is the `n/a` faded state for Method when `fnMode === "labels"`.
-- **Styling pass** — `--canvas`, `--coral`, `--surface`, hairlines, Montserrat + JetBrains Mono, shadow tokens, radii — untouched. No new design tokens introduced.
-- **StepShell** component, completion summaries, "reopen" behavior, breadcrumb + editable run name, Cohort step (Step 2) in its entirety, Run step's progress list, and the results route.
-- **Default flow** — Full analysis + both methods enabled + XGBoost + K-Means(k=4) + PCA reproduces today's run-summary copy: `Association · Subgroup Discovery (k=4)` becomes `XGBoost · K-Means (k=4, PCA)`, fed into the existing `methodSummary` string.
+**a. Active tab indicator — `src/routes/__root.tsx` lines 73–78.** Today the active tab is an underline-only:
+
+```text
+<span className="absolute left-3 right-3 bottom-0 h-[2px] bg-coral rounded-full" />
+```
+
+Replace with a pink pill background using `--bg-elevated` behind the label, label in `--text-primary`:
+
+```text
+className="relative h-14 px-1 flex items-center text-[13.5px] font-medium"
+<span className={active
+  ? "px-3 py-1.5 rounded-full bg-surface-hover text-ink"   /* surface-hover now resolves to #F2D0CF */
+  : "px-3 py-1.5 text-ink-2 hover:text-ink"}>
+  {t.label}
+</span>
+/* underline removed */
+```
+
+**b. Heading weight bump — `src/styles.css` lines 148–156.** Bump h1/h2 from `font-weight: 600` to `700` with `letter-spacing: -0.01em` to give display titles the heft Adrian gets from a serif. h3 stays at 500.
 
 ---
 
-## Technical notes
+### 3. The 5 critical visual fixes, confirmed
 
-- New state in `AiAnalysisPage`:
-  - `fnMode: "full" | "predict" | "discover" | "labels"` (default `"full"`)
-  - `mlsLabelCol: string | null` (used only when `fnMode === "predict"`)
-  - `predictModel: "xgb" | "logreg" | "both"` (default `"xgb"`), `xgbDepth`, `xgbTrees`, `lrReg`, `lrPenalty`
-  - `clusterAlg: "kmeans"`, `kAuto: boolean`, `dimRed: "pca"`
-  - `skipped: Set<StepKey>` (only ever holds `"method"` when `fnMode === "labels"`)
-- `StepIndicator` extended with an optional `skipped` prop; renders `n/a` and reduced opacity for keys in the set.
-- `advanceFrom` on Step 2 branches: `fnMode === "labels"` → jump to `"run"` and mark method skipped + complete.
-- Chip group, section checkboxes, sliders, steppers, and "coming soon" cards all built from existing Tailwind utilities — no new shadcn components needed.
-- Scope: edits confined to `src/routes/ai-analysis.tsx`. No backend, no schema, no route changes.
+| # | Fix | How it lands |
+|---|---|---|
+| 1 | **Active tab = pink pill, not underline** | `__root.tsx` swap above; `--bg-elevated` #F2D0CF behind active label |
+| 2 | **Muted text = dark brown-red, not bleached pink** | `--ink-2` and `--ink-3` both alias to `--text-muted` #673D3D. Every `text-ink-2` / `text-ink-3` usage across all routes flips automatically |
+| 3 | **Borders = pink-toned, not grey** | `--hairline` aliases to #A06B6B, `--hairline-grey` aliases to #C49090. All `border-hairline` / `border-hairline-grey` / `border-hairline-strong` classes get pink tone with zero component edits |
+| 4 | **Card surfaces = more pink presence** | `--surface-hover` resolves to #F2D0CF (was #F9D7D7), strengthening hover states, icon-container chips, selected pills, dropdown row highlights, action card chip backgrounds |
+| 5 | **Heading weight up** | h1/h2 → 700 with -0.01em tracking |
+
+---
+
+### 4. What stays unchanged
+
+- All page layouts, component hierarchies, route files (except the 6-line active-tab tweak)
+- 4-step AI Analysis workflow (Map / Cohort / Method / Run), function-mode chip group, Method sections, NCEP annotation
+- Results dashboard 4-panel composition
+- Datasets pipeline sentence header
+- Home Recent-as-hero with TYPE / MetS prevalence columns
+- All copy, all data, all interactions, all chart series colors
+- Font choices (Montserrat + JetBrains Mono) — already correct from previous pass
+
+---
+
+### Scope summary
+
+- **Files edited: 2**
+  - `src/styles.css` — token rewrite + alias layer + h1/h2 weight bump
+  - `src/routes/__root.tsx` — active-tab pill (6 lines)
+- **Files NOT edited:** every other route, every component, every chart, every icon. The alias layer means `bg-canvas`, `text-ink-2`, `border-hairline`, `bg-coral`, etc. resolve to the new correct values without renaming a single class.
+
+This is purely a corrective pass — no other changes.
