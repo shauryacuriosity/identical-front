@@ -2,6 +2,7 @@ import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadC
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Home, Database, BarChart3, Sparkles, User } from "lucide-react";
 import appCss from "../styles.css?url";
+import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
