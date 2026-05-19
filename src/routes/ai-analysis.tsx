@@ -333,18 +333,11 @@ function AiAnalysisPage() {
   // Prediction section
   const [predictOn, setPredictOn] = useState(true);
   const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("xgb");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [xgbDepth, setXgbDepth] = useState(5);
-  const [xgbTrees, setXgbTrees] = useState(300);
-  const [lrReg, setLrReg] = useState(1.0);
-  const [lrPenalty, setLrPenalty] = useState<"l1" | "l2">("l2");
 
   // Subgroup discovery section
   const [subgroupOn, setSubgroupOn] = useState(true);
   const [clusterAlg, setClusterAlg] = useState<"kmeans">("kmeans");
-  const [k, setK] = useState(4);
-  const [kAuto, setKAuto] = useState(false);
-  const [dimRed, setDimRed] = useState<"pca">("pca");
+  const [dimRed, setDimRed] = useState<"pca" | "tsne">("pca");
 
   const [currentStep, setCurrentStep] = useState<StepKey>("map");
   const [completed, setCompleted] = useState<Set<StepKey>>(new Set());
