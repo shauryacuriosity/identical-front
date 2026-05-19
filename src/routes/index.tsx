@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   FilePlus,
   Shapes,
@@ -8,6 +9,7 @@ import {
   Copy,
   Archive,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -16,23 +18,31 @@ export const Route = createFileRoute("/")({
 type FileType = "Dataset" | "Analysis" | "Visualisation";
 
 type Recent = {
+  id: string;
   name: string;
   type: FileType;
-  rows: number;
+  rows: number | null;
   prevalence: number | null;
   modified: string;
   archived?: boolean;
 };
 
-const RECENT: Recent[] = [
-  { name: "Dataset_A_dietary.csv",     type: "Dataset",       rows: 2431, prevalence: 23.4, modified: "2h ago" },
-  { name: "nhanes_bp_2023.csv",        type: "Dataset",       rows: 2060, prevalence: null, modified: "yesterday" },
-  { name: "MetS_risk_run_2025-05",     type: "Analysis",      rows: 1847, prevalence: 23.4, modified: "yesterday" },
-  { name: "Fibre intake distribution", type: "Visualisation", rows: 2431, prevalence: null, modified: "yesterday" },
-  { name: "cohort_baseline.csv",       type: "Dataset",       rows: 2873, prevalence: 19.1, modified: "3 days ago" },
-  { name: "lab_results_q3.csv",        type: "Dataset",       rows: 3686, prevalence: null, modified: "last week", archived: true },
-  { name: "demographics.csv",          type: "Dataset",       rows: 4499, prevalence: null, modified: "May 2",     archived: true },
-];
+function formatRelative(iso: string | null): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const s = Math.max(0, Math.floor((now - then) / 1000));
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "yesterday";
+  if (d < 7) return `${d} days ago`;
+  if (d < 30) return `last week`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 function ActionTile({
   icon: Icon,
@@ -108,7 +118,51 @@ function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: stri
   );
 }
 
+function Em() {
+  return <span className="text-ink-2 opacity-50">—</span>;
+}
+
+function SkeletonRow() {
+  return (
+    <div
+      className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-4 rounded-xl bg-surface"
+      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+    >
+      <span className="inline-block h-2 w-2 rounded-full bg-hairline-grey opacity-40" />
+      <div className="h-3.5 rounded bg-surface-hover/70 animate-pulse" />
+      <div className="h-4 w-16 rounded-full bg-surface-hover/70 animate-pulse" />
+      <div className="h-3 w-12 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
+      <div className="h-3 w-16 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
+      <div className="h-3 w-14 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
+    </div>
+  );
+}
+
 function Index() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["datasets", "recent"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id,name,uploaded_at,row_count,mets_prevalence,archived,status")
+        .eq("archived", false)
+        .order("uploaded_at", { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const rows: Recent[] = (data ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    type: "Dataset",
+    rows: d.row_count,
+    prevalence: d.mets_prevalence,
+    modified: formatRelative(d.uploaded_at),
+    archived: d.archived ?? false,
+  }));
+
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-16">
       {/* Greeting */}
@@ -141,9 +195,29 @@ function Index() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {RECENT.map((f) => (
+        {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
+
+        {!isLoading && error && (
           <div
-            key={f.name}
+            className="px-5 py-4 rounded-xl bg-surface text-[13px] text-ink-2"
+            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+          >
+            Failed to load — {error.message}
+          </div>
+        )}
+
+        {!isLoading && !error && rows.length === 0 && (
+          <div
+            className="px-5 py-4 rounded-xl bg-surface text-[13px] text-ink-2"
+            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+          >
+            No datasets yet
+          </div>
+        )}
+
+        {!isLoading && !error && rows.map((f) => (
+          <div
+            key={f.id}
             className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-4 rounded-xl bg-surface cursor-pointer hover:-translate-y-px transition-transform duration-150 ${
               f.archived ? "opacity-75" : ""
             }`}
@@ -161,14 +235,14 @@ function Index() {
             </div>
 
             <span className="tabular text-[12.5px] text-ink-2 text-right">
-              {f.rows.toLocaleString()}
+              {f.rows != null ? f.rows.toLocaleString() : <Em />}
             </span>
 
             <span className="tabular text-[12.5px] text-ink-2 text-right">
-              {f.prevalence != null ? `${f.prevalence.toFixed(1)}%` : <span className="text-ink-2 opacity-50">—</span>}
+              {f.prevalence != null ? `${f.prevalence.toFixed(1)}%` : <Em />}
             </span>
 
-            <span className="text-[12.5px] text-ink-2 text-right">{f.modified}</span>
+            <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
 
             <div
               className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
