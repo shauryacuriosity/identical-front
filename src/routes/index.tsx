@@ -342,15 +342,15 @@ function Index() {
                 <TypePill type={f.type} archived={f.archived} />
               </div>
 
-              <span className="tabular text-[12.5px] text-ink text-right">
+              <span className="tabular text-[12.5px] text-ink-2 text-right">
                 {f.rows != null ? f.rows.toLocaleString() : <Em />}
               </span>
 
-              <span className="tabular text-[12.5px] text-ink text-right">
+              <span className="tabular text-[12.5px] text-ink-2 text-right">
                 {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
               </span>
 
-              <span className="text-[12.5px] text-ink text-right">{f.modified || <Em />}</span>
+              <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
 
               <div
                 className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
