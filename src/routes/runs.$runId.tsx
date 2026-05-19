@@ -231,7 +231,7 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("model_results")
-        .select("xgboost_metrics_test,shap_top_features,figure_paths")
+        .select("xgboost_metrics_test,shap_top_features,artifact_paths")
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
