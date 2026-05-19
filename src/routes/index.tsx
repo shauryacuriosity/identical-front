@@ -11,6 +11,7 @@ import {
   Archive,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createFileRoute("/")({
   component: Index,
