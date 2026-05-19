@@ -308,6 +308,7 @@ function PipelineStrip() {
   const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
   const [pulseId, setPulseId] = useState<string | null>(null);
+  const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const focusChip = (id: string) => {
