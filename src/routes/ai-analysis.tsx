@@ -893,72 +893,37 @@ function AiAnalysisPage() {
                           checked={clusterAlg === "kmeans"}
                           onSelect={() => setClusterAlg("kmeans")}
                           title="K-Means"
-                          hint="recommended"
+                          hint="default k=4 with elbow search over [2, 3, 4, 5]"
                         />
-                        <RadioRow disabled title="Hierarchical clustering" soon />
-                        <RadioRow disabled title="DBSCAN" soon />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
-                          Number of clusters (k)
-                        </label>
-                        <label className="flex items-center gap-2 text-[12px] text-ink-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={kAuto}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setKAuto(e.target.checked);
-                            }}
-                            className="accent-coral"
-                          />
-                          Auto-select via silhouette score
-                        </label>
-                      </div>
-                      <div className={`flex items-center gap-1 ${kAuto ? "opacity-40 pointer-events-none" : ""}`}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setK((v) => Math.max(2, v - 1));
-                          }}
-                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                        >
-                          −
-                        </button>
-                        <span className="mono w-10 text-center text-[13px] text-ink tabular">{k}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setK((v) => Math.min(8, v + 1));
-                          }}
-                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                        >
-                          +
-                        </button>
+                        <RadioRow disabled title="Hierarchical clustering — coming in v2" soon />
+                        <RadioRow disabled title="DBSCAN — coming in v2" soon />
                       </div>
                     </div>
 
                     <div>
                       <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                        Dimensionality reduction for visualisation
+                        Visualisation projection
                       </div>
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={dimRed === "pca"}
                           onSelect={() => setDimRed("pca")}
                           title="PCA"
-                          hint="recommended"
+                          hint="variance curve + 2D plot"
                         />
-                        <RadioRow disabled title="t-SNE" soon />
-                        <RadioRow disabled title="UMAP" soon />
+                        <RadioRow
+                          checked={dimRed === "tsne"}
+                          onSelect={() => setDimRed("tsne")}
+                          title="t-SNE"
+                          hint="2D visualisation"
+                        />
+                        <RadioRow disabled title="UMAP — coming in v2" soon />
                       </div>
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces cluster profiles, PCA scatter, per-cluster MetS prevalence.
+                      Produces cluster profiles, 2D scatter (PCA or t-SNE), per-cluster MetS
+                      prevalence.
                     </p>
                   </div>
                 </MethodSection>
