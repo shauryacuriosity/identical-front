@@ -1,5 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useRef, useEffect, useState } from "react";
 import {
   FilePlus,
   Shapes,
@@ -14,6 +15,44 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/")({
   component: Index,
 });
+
+function RowCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = !!indeterminate;
+  }, [indeterminate]);
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={ariaLabel}
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(); }}
+      className={`h-[14px] w-[14px] rounded-[3px] border flex items-center justify-center transition ${
+        checked || indeterminate ? "bg-coral border-coral" : "border-ink-2 hover:border-ink"
+      }`}
+    >
+      {indeterminate ? (
+        <span className="h-[2px] w-[8px] bg-white rounded-sm" />
+      ) : checked ? (
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white">
+          <path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : null}
+      <input ref={ref} type="checkbox" className="sr-only" readOnly checked={checked} />
+    </button>
+  );
+}
 
 type FileType = "Dataset" | "Analysis" | "Visualisation";
 
