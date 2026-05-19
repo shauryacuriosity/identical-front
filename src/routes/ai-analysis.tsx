@@ -1138,44 +1138,4 @@ function RadioRow({
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  decimals = 0,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  decimals?: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className="mono text-[12px] text-ink-2">{label}</label>
-        <span className="mono text-[12px] text-ink tabular">{value.toFixed(decimals)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1 appearance-none bg-hairline rounded-full accent-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
-      />
-      <div className="flex justify-between text-[10px] text-ink-3 mono tabular">
-        <span>{min}</span>
-        <span>{max}</span>
-      </div>
-    </div>
-  );
-}
 
