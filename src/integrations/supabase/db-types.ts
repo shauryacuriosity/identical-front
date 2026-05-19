@@ -136,5 +136,10 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["analysis_predictions"]["Insert"]>;
       };
     };
+    Views: { [k: string]: never };
+    Functions: { [k: string]: never };
+    Enums: { [k: string]: never };
+    CompositeTypes: { [k: string]: never };
   };
 }
+
