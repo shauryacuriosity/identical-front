@@ -315,6 +315,7 @@ function StepShell({
 // ---------- Page ----------
 
 function AiAnalysisPage() {
+  const navigate = useNavigate();
   const [runName, setRunName] = useState("Untitled run");
   const [editingName, setEditingName] = useState(false);
 
@@ -322,6 +323,24 @@ function AiAnalysisPage() {
   type FnMode = "full" | "predict" | "discover" | "labels";
   const [fnMode, setFnMode] = useState<FnMode>("full");
   const [metsLabelCol, setMetsLabelCol] = useState<string | null>(null);
+
+  // Live dataset selection (Step 1)
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  type DatasetOption = { id: string; name: string; row_count: number | null };
+  const datasetsQ = useQuery({
+    queryKey: ["datasets", "ready"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id,name,row_count,status,archived,uploaded_at")
+        .eq("archived", false)
+        .eq("status", "ready")
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as DatasetOption[];
+    },
+  });
+  const selectedDataset = datasetsQ.data?.find((d) => d.id === selectedDatasetId) ?? null;
 
   const [clinical, setClinical] = useState(CLINICAL);
   const [dietary, setDietary] = useState(DIETARY);
