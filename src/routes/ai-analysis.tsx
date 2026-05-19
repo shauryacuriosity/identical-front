@@ -556,10 +556,13 @@ function AiAnalysisPage() {
 
             {/* Dataset selector */}
             <div className="max-w-md">
-              <button className="w-full h-10 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px]">
-                <span className="mono text-ink">Dataset_A_dietary.csv</span>
-                <ChevronDown className="h-4 w-4 text-ink-3" />
-              </button>
+              <DatasetSelector
+                datasets={datasetsQ.data ?? []}
+                isLoading={datasetsQ.isLoading}
+                error={datasetsQ.error as Error | null}
+                value={selectedDatasetId}
+                onChange={setSelectedDatasetId}
+              />
             </div>
 
             {/* Group A — MetS Clinical */}
