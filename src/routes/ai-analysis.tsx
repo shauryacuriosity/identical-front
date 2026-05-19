@@ -409,8 +409,7 @@ function AiAnalysisPage() {
   })();
   const subgroupSummary = (() => {
     if (!showSubgroup || !subgroupOn) return null;
-    const kPart = kAuto ? "k=auto" : `k=${k}`;
-    return `K-Means (${kPart}, PCA)`;
+    return `K-Means (k=4 elbow, ${dimRed.toUpperCase()})`;
   })();
   const methodSummary = [predictSummary, subgroupSummary].filter(Boolean).join(" · ");
 
