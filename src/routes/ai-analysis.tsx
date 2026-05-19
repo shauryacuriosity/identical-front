@@ -854,92 +854,21 @@ function AiAnalysisPage() {
                       </div>
                     </div>
 
-                    {/* Advanced */}
-                    <div className="rounded-lg border border-hairline/70 bg-canvas/40">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAdvancedOpen((o) => !o);
-                        }}
-                        className="w-full flex items-center justify-between px-3 h-9 text-[12.5px] text-ink-2 hover:text-ink"
-                      >
-                        <span>Advanced</span>
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 text-ink-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                      {advancedOpen && (
-                        <div className="px-3 pb-4 pt-1 space-y-4 border-t border-hairline/60">
-                          {(predictModel === "xgb" || predictModel === "both") && (
-                            <div className="space-y-3">
-                              {predictModel === "both" && (
-                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
-                                  XGBoost
-                                </div>
-                              )}
-                              <SliderRow
-                                label="max_depth"
-                                value={xgbDepth}
-                                min={2}
-                                max={8}
-                                onChange={setXgbDepth}
-                              />
-                              <SliderRow
-                                label="n_estimators"
-                                value={xgbTrees}
-                                min={100}
-                                max={1000}
-                                step={50}
-                                onChange={setXgbTrees}
-                              />
-                            </div>
-                          )}
-                          {(predictModel === "logreg" || predictModel === "both") && (
-                            <div className="space-y-3">
-                              {predictModel === "both" && (
-                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
-                                  Logistic Regression
-                                </div>
-                              )}
-                              <SliderRow
-                                label="regularization (C)"
-                                value={lrReg}
-                                min={0.01}
-                                max={10}
-                                step={0.01}
-                                decimals={2}
-                                onChange={setLrReg}
-                              />
-                              <div className="flex items-center justify-between gap-3">
-                                <label className="text-[12.5px] text-ink-2">Penalty</label>
-                                <div className="flex gap-1">
-                                  {(["l1", "l2"] as const).map((p) => (
-                                    <button
-                                      key={p}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setLrPenalty(p);
-                                      }}
-                                      className={`h-7 px-3 rounded-md text-[12px] border ${
-                                        lrPenalty === p
-                                          ? "bg-coral text-white border-coral"
-                                          : "bg-surface border-hairline text-ink-2 hover:border-coral/40"
-                                      }`}
-                                    >
-                                      {p.toUpperCase()}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    {/* Defaults (informational — backend does not accept overrides for v1) */}
+                    <div className="rounded-lg border border-hairline/70 bg-canvas/40 px-3 py-2.5">
+                      <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1">
+                        Defaults
+                      </div>
+                      <p className="mono text-[11.5px] text-ink-2 leading-relaxed">
+                        XGBoost (n_estimators=400, max_depth=4, learning_rate=0.05). Logistic (L2
+                        regularised, max_iter=4000). Decision threshold 0.5.
+                      </p>
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking,
-                      per-subject predictions.
+                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking
+                      (XGBoost), gain importance + permutation importance + coefficient odds ratios
+                      depending on model, per-subject predictions.
                     </p>
                   </div>
                 </MethodSection>
