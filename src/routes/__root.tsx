@@ -2,6 +2,7 @@ import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadC
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Home, Database, BarChart3, Sparkles, User } from "lucide-react";
 import appCss from "../styles.css?url";
+import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -53,17 +54,19 @@ function AppHeader() {
   ];
   return (
     <header className="sticky top-0 z-30 pt-4 pb-2 px-6">
-      <div className="mx-auto max-w-[1280px] flex items-start gap-4">
-        {/* Wordmark */}
-        <div className="hidden md:block pt-2.5 pr-2">
-          <span className="text-[14px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
-        </div>
-
+      <div className="mx-auto max-w-[1280px]">
         {/* Floating pill nav */}
         <nav
-          className="relative flex-1 h-12 rounded-full bg-surface flex items-center pl-2 pr-3"
+          className="relative h-12 rounded-full bg-surface flex items-center pl-4 pr-3"
           style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.25)" }}
         >
+          {/* Brand cluster */}
+          <div className="flex items-center gap-2 pr-5">
+            <img src={lotusMark} alt="" className="h-[18px] w-auto" />
+            <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
+          </div>
+
+          {/* Tabs */}
           <div className="flex items-center gap-1 h-full">
             {tabs.map((t) => {
               const active = t.to === "/" ? pathname === "/" : pathname.startsWith(t.to);
@@ -73,17 +76,18 @@ function AppHeader() {
                   <Link
                     key={t.to}
                     to={t.to}
-                    className="relative h-12 w-12 flex items-center justify-center"
+                    className="relative h-12 w-16 flex items-start justify-center"
                     aria-label={t.label}
                   >
                     <span
-                      className="absolute left-1/2 -translate-x-1/2 -bottom-3 h-14 w-14 rounded-2xl flex items-start justify-center pt-2.5"
+                      className="absolute left-0 right-0 top-0 -bottom-3.5 flex items-start justify-center pt-[11px]"
                       style={{
                         backgroundColor: "var(--accent-primary)",
+                        borderRadius: "2px 2px 16px 16px",
                         boxShadow: "0 2px 4px rgba(0,0,0,0.25)",
                       }}
                     >
-                      <Icon className="h-5 w-5 text-white" strokeWidth={2} />
+                      <Icon className="h-[18px] w-[18px] text-white" strokeWidth={2} />
                     </span>
                   </Link>
                 );
