@@ -158,7 +158,7 @@ function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: stri
 }
 
 function Em() {
-  return <span className="text-ink-2 opacity-50">—</span>;
+  return <span className="text-ink-2">—</span>;
 }
 
 function SkeletonRow() {
