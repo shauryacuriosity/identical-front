@@ -334,7 +334,7 @@ function PipelineStrip() {
 
   return (
     <>
-      <PipelineSentence steps={steps} onChipClick={focusChip} />
+      <PipelineSentence steps={steps} onChipClick={focusChip} view={view} onViewChange={setView} />
       <div className="border-b border-hairline px-5 py-4">
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Steps</span>
