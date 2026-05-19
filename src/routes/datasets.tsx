@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/datasets")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    datasetId: typeof s.datasetId === "string" ? s.datasetId : undefined,
+  }),
   component: DatasetsPage,
 });
 
@@ -242,14 +247,29 @@ function SentenceFragment({ step, onClick }: { step: Step; onClick: () => void }
   }
 }
 
-function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: (id: string) => void }) {
+function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: Step[]; onChipClick: (id: string) => void; view: "compact" | "list"; onViewChange: (v: "compact" | "list") => void }) {
   const hasOps = steps.some((s) => s.kind !== "from");
   return (
     <div className="px-5 pt-4 pb-3 border-b border-hairline">
-      <div className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3 mb-2">Pipeline</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">Pipeline</div>
+        <div className="inline-flex items-center rounded-md border border-hairline bg-canvas p-0.5 text-[11px]">
+          {(["compact", "list"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => onViewChange(v)}
+              className={`h-6 px-2.5 rounded-[5px] capitalize transition ${
+                view === v ? "bg-surface text-ink shadow-[var(--shadow-xs)]" : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              {v === "compact" ? "Compact" : "List"}
+            </button>
+          ))}
+        </div>
+      </div>
       {!hasOps ? (
-        <p className="text-[13px] text-ink-3 italic">Configure the controls below to see your transformation summarised here.</p>
-      ) : (
+        <p className="text-[13px] text-ink-2 italic">Configure the controls below to see your transformation summarised here.</p>
+      ) : view === "compact" ? (
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
           {steps.map((s, i) => {
             const prev = steps[i - 1];
@@ -262,6 +282,22 @@ function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: 
             );
           })}
         </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {steps.map((s) => (
+            <div key={s.id} className="grid grid-cols-[80px_1fr] items-center gap-3 px-2 py-1.5 rounded-md hover:bg-canvas/60">
+              <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{s.kind}</span>
+              <button onClick={() => onChipClick(s.id)} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-left">
+                {s.parts.map((p, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5">
+                    <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{p.label}</span>
+                    <span className={p.mono ? "font-mono text-[12.5px] text-ink" : "text-[12.5px] text-ink"}>{p.value}</span>
+                  </span>
+                ))}
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -272,6 +308,7 @@ function PipelineStrip() {
   const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
   const [pulseId, setPulseId] = useState<string | null>(null);
+  const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const focusChip = (id: string) => {
@@ -297,7 +334,7 @@ function PipelineStrip() {
 
   return (
     <>
-      <PipelineSentence steps={steps} onChipClick={focusChip} />
+      <PipelineSentence steps={steps} onChipClick={focusChip} view={view} onViewChange={setView} />
       <div className="border-b border-hairline px-5 py-4">
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Steps</span>
@@ -349,25 +386,64 @@ function PipelineStrip() {
 
 
 function DatasetsPage() {
+  const { datasetId } = Route.useSearch();
+  const [attrFilter, setAttrFilter] = useState("");
+  const [datasetSlots, setDatasetSlots] = useState<string[]>(["Dataset_A.csv"]);
+
+  const datasetQ = useQuery({
+    queryKey: ["datasets", "single", datasetId],
+    enabled: !!datasetId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id,name")
+        .eq("id", datasetId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; name: string } | null;
+    },
+  });
+
+  const q = attrFilter.trim().toLowerCase();
+  const filteredA = q ? datasetA.filter((a) => a.name.toLowerCase().includes(q)) : datasetA;
+  const filteredB = q ? datasetB.filter((a) => a.name.toLowerCase().includes(q)) : datasetB;
+
+  const addSlot = () => {
+    const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
+    setDatasetSlots([...datasetSlots, `Dataset_${nextLetter}.csv`]);
+  };
+
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
+      <div className="mb-4">
+        <h1 className="text-[22px] leading-tight text-ink">
+          {datasetId ? (datasetQ.data?.name ?? (datasetQ.isLoading ? "Loading…" : "Datasets")) : "Datasets"}
+        </h1>
+        {datasetId && (
+          <p className="text-[12.5px] text-ink-2 mt-1">
+            Selected from Recent files
+          </p>
+        )}
+      </div>
       <div className="flex gap-5">
         {/* Sidebar */}
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
-            <span className="text-[10.5px] text-ink-3 tabular">{datasetA.length + datasetB.length}</span>
+            <span className="text-[10.5px] text-ink-2 tabular">{filteredA.length + filteredB.length}</span>
           </div>
           <div className="relative mb-4">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-3" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-2" />
             <input
+              value={attrFilter}
+              onChange={(e) => setAttrFilter(e.target.value)}
               placeholder="Filter attributes…"
-              className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] placeholder:text-ink-3 focus:outline-none focus:border-coral/50"
+              className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] text-ink placeholder:text-ink-2 focus:outline-none focus:border-coral/50"
             />
           </div>
-          <AttrGroup name="Dataset_A.csv" items={datasetA} />
-          <AttrGroup name="Dataset_B.csv" items={datasetB} />
-          <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-3">
+          <AttrGroup name="Dataset_A.csv" items={filteredA} />
+          <AttrGroup name="Dataset_B.csv" items={filteredB} />
+          <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
             <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-data-plum" strokeWidth={2.5} />ID</span>
             <span className="flex items-center gap-1"><Hash className="h-2.5 w-2.5 text-data-slate" strokeWidth={2.5} />Numeric</span>
             <span className="flex items-center gap-1"><Type className="h-2.5 w-2.5 text-data-sage" strokeWidth={2.5} />Category</span>
@@ -376,8 +452,16 @@ function DatasetsPage() {
 
         {/* Main */}
         <section className="flex-1 flex flex-col min-w-0">
-          <DatasetBar name="Dataset_A.csv" />
-          <DatasetBar name="Dataset_B.csv" />
+          {datasetSlots.map((name) => (
+            <DatasetBar key={name} name={name} />
+          ))}
+          <button
+            onClick={addSlot}
+            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add dataset
+          </button>
+
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
             <PipelineStrip />

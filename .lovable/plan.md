@@ -1,194 +1,72 @@
-# Plan — prevalence fix + Step-1/4 wiring + /runs/$id dashboard
+# Plan — Functional fixes + light visual corrections
 
-## A. Prevalence display fix (1 line per site)
+Scope guardrails (do NOT touch): design tokens in `src/styles.css`, Supabase schema, any existing queries/mutations, the 4-step AI Analysis workflow structure, Recent Files table columns, existing routes.
 
-`mets_prevalence` is stored as a 0–1 decimal. Multiply by 100 before formatting.
+---
 
-- `src/routes/index.tsx` — Recent Files row:
-`f.prevalence != null ? \`${(f.prevalence * 100).toFixed(1)}% : &nbsp;`
-- Same rule applied in the new Run summary card (eda_results.mets_prevalence).
+## File 1 — `src/routes/__root.tsx` (TOP NAV: items 3, 4, 5)
 
-No other display semantics change.
+- **Remove the standalone Home tab** from the `tabs` array. Remove the `Home` icon import and the `isHome` branch.
+- **Make the Lotus wordmark + lotus mark the Home link**: wrap the brand cluster in `<Link to="/">`. When `pathname === "/"`, render the wordmark with the same active treatment used on other tabs (coral 18% bg pill + 2px coral underline). Per spec: if the coral background hurts legibility of the lotus icon, hide the icon when active and show text-only "Lotus" — leave icon visible when inactive.
+- **Avatar dropdown** (item 4): convert the avatar button into a Radix `DropdownMenu` (already in repo at `src/components/ui/dropdown-menu.tsx`) with items: Profile, Settings, Dark mode (toggle visual only — local `useState` boolean with a checkmark/switch glyph, no theme wiring), Sign out. All items no-op except Settings.
+- **Settings modal** (item 5): clicking Settings opens a `Dialog` (`src/components/ui/dialog.tsx`) with title "Settings" and placeholder body ("Settings coming soon."). Closes via X / overlay / Esc. State lifted into `AppHeader`.
 
-## B. Step-1 Map — real dataset selector
+---
 
-Replace the hardcoded "Dataset_A_dietary.csv" button in `ai-analysis.tsx` (around line 537–542) with a live dropdown driven by:
+## File 2 — `src/routes/index.tsx` (HOME: items 1, 2)
 
-```ts
-supabase.from("datasets")
-  .select("id,name,row_count,status,archived")
-  .eq("archived", false)
-  .eq("status", "ready")
-  .order("uploaded_at", { ascending: false })
-```
+- **Row checkboxes + Select all** (item 1): repurpose the leftmost 16px column (currently `StatusDot`) to also hold a hover-revealed checkbox; add a header checkbox in the column header row. State: `selected: Set<string>` in `Index`.
+  - Header checkbox `checked` when `selected.size === rows.length && rows.length > 0`, `indeterminate` when partial. Click toggles select-all/deselect-all.
+  - Row checkbox toggles membership; when a row is unchecked while header is checked, header auto-uncomputes (derived state, no extra wiring).
+  - Checkbox visual = same inline SVG checkbox pattern used in `datasets.tsx::Checkbox` (coral fill when checked), kept compact in 16px column. StatusDot stays — checkbox replaces it only on row hover OR when any row is selected (so the resting visual stays unchanged).
+- **Row click → /datasets with preselect** (item 2): make each row a `Link to="/datasets" search={{ datasetId: f.id }}`. Row-action buttons keep their existing `e.stopPropagation()`; checkbox click also calls `stopPropagation` so it doesn't navigate.
 
-- Option label: `name` + small muted  `· {row_count.toLocaleString()} rows` (or `—` if null).
-- Component state: `selectedDatasetId: string | null` (default null).
-- Visual: same `h-10 px-3 rounded-lg border …` button as today; menu uses the existing `ChevronDown` and styling pattern from the MappingRow dropdown — no new tokens, no new classes.
-- Loading: shows current button with text "Loading datasets…". Empty: "No ready datasets". Error: inline `text-ink-3` line below.
-- Persists across step transitions (lifted into `AiAnalysisPage`).
+---
 
-## C. Step-4 Run — real mutation
+## File 3 — `src/routes/datasets.tsx` (DATASETS: items 2 carry-through, 6, 7, 8, 9)
 
-Add a `useMutation` driven by the live form state. On click of the existing primary Run button (no visual change):
+- **Validate search params** (item 2 receiver): add `validateSearch: (s) => ({ datasetId: typeof s.datasetId === "string" ? s.datasetId : undefined })` to `createFileRoute`. Read with `Route.useSearch()`. The hardcoded `datasetA`/`datasetB` data stays; we just expose the carry-through.
+- **Page header with dataset name** (item 2): add an `<h1>` at the top of `DatasetsPage` showing the resolved dataset name. Since the datasets list isn't loaded here yet, fetch the single row by id via `useQuery` against `supabase.from("datasets").select("id,name").eq("id", datasetId).maybeSingle()` (read-only, additive — not a modification to an existing query). If no `datasetId`, render a neutral "Datasets" title.
+- **Search filter** (item 6): wire the existing sidebar `<input placeholder="Filter attributes…">` to a `useState` and filter both `datasetA` and `datasetB` arrays (case-insensitive `.includes` on `name`) before passing into `<AttrGroup>`. Filter on every keystroke (`onChange`).
+- **Pipeline List/Compact toggle** (item 7): add a small segmented toggle in the top-right of the "Pipeline" header inside `PipelineSentence` (or as a sibling header above `PipelineStrip`). Default = Compact (current `PipelineSentence` view). List = render each step on its own labeled row (label + parts on a separate line per step). State local to `PipelineStrip`; no data changes.
+- **Minimum 1 dataset slot + "+" appender** (item 8): replace the two hardcoded `<DatasetBar name="Dataset_A.csv" />` / `<DatasetBar name="Dataset_B.csv" />` with `useState<string[]>(["Dataset_A.csv"])` and map. Add a dashed `+` button below the last `DatasetBar` that appends `"Dataset_${nextLetter}.csv"`. No maximum cap. The sidebar attribute groups continue to use the existing hardcoded `datasetA`/`datasetB` arrays (only the bars are dynamic — no query changes).
+- **Dropdowns open on click + consistent chevron** (item 9): the `Dropdown` component already opens on click and already rotates `ChevronDown` 180° on open — confirm all four JOIN/AGGREGATE/SORT/FILTER instances use this same component. If any custom inline dropdown is found, swap it to `Dropdown`. Standardize on the **rotate-180 on open** convention (already present). Apply same convention to `DatasetBar`'s chevron (already does this — verify only).
 
-```ts
-const { data, error } = await supabase
-  .from("analysis_runs")
-  .insert({
-    dataset_id: selectedDatasetId!,
-    name: runName,
-    function_mode: fnMode === "full" ? "full"
-                 : fnMode === "predict" ? "prediction_only"
-                 : fnMode === "discover" ? "subgroup_only"
-                 : "labels_only",
-    cohort_filter: {
-      age_min: ageMin, age_max: ageMax,
-      sex: sex.toLowerCase(),                 // "all" | "female" | "male"
-      exclude_pregnant: excludePregnant,
-      require_complete: requireComplete,
-    },
-    method_config: {
-      prediction: showPredict && predictOn
-        ? { model: predictModel }             // "xgb" | "logreg" | "both"
-        : null,
-      subgroup: showSubgroup && subgroupOn
-        ? { algorithm: clusterAlg, k: 4, projection: dimRed }  // "pca" | "tsne"
-        : null,
-    },
-    status: "pending",
-  })
-  .select("id")
-  .single();
-```
+---
 
-On success: `navigate({ to: "/runs/$runId", params: { runId: data.id } })`.
-Disable Run button when `!selectedDatasetId`. Mutation error shown inline under the button via `text-ink-3` (no toast).
-The existing local "fake progress" simulator is removed so the button does real work; the step-indicator "running" state is wired to `mutation.isPending` until navigation completes.
+## File 4 — `src/routes/ai-analysis.tsx` (AI ANALYSIS: items 10, 11, 12)
 
-## D. New route `src/routes/runs.$runId.tsx`
+- **"Add field" appends a blank row** (item 10): locate the `Add field` button near line 690 and any siblings. Wire each to push a blank entry into its mapping array's `useState`. No structural change to the 4-step workflow — only the underlying list grows.
+- **Step 1 & Step 3 dropdowns** (item 11): audit the inline dropdown near line 647 (uses `ChevronDown` without rotation). Swap to the same open-on-click + rotate-180 chevron pattern used in `datasets.tsx::Dropdown`. Apply consistently across every Step 1 and Step 3 dropdown.
+- **Run name field** (item 12): around lines 319/528 — add a visible `<label>Run name</label>` above the input; bump input height to `h-11` and font to `text-[15px]`; change default state from `"Untitled run"` to `\`Untitled run · ${new Date().toISOString().slice(0,16)}\`` (computed once at mount via `useState(() => …)`).
 
-Pattern: `/runs/:id`. This replaces the static `/ai-analysis/results` mock for the live flow (the old route is left in place — not deleted, just unused; safe to remove later).
+---
 
-### Polling
+## File 5 — Readability audit (item 13) — surgical only
 
-```ts
-useQuery({
-  queryKey: ["analysis_runs", runId],
-  queryFn: () => supabase.from("analysis_runs")
-    .select("id,status,progress,error_message,started_at,finished_at,name,dataset_id")
-    .eq("id", runId).single(),
-  refetchInterval: (q) => {
-    const s = q.state.data?.data?.status;
-    return s === "complete" || s === "failed" ? false : 2000;
-  },
-})
-```
+Audit pass across `src/routes/index.tsx`, `src/routes/datasets.tsx`, `src/routes/ai-analysis.tsx`, `src/routes/__root.tsx`. **No token edits.** For every text/icon that resolves to `text-ink-3` or `opacity-50/60` while sitting on `bg-surface` (pink #FFF5F5) or `bg-canvas` (cream #F2D0CF):
+- Body text → `text-ink` (token = `--text-primary` #1A0003).
+- Muted/secondary labels → `text-ink-2` (token = `--text-muted` #673D3D).
+- Remove `opacity-50/60` on the `Em` dash and on any washed-out chevron/icon so they read as `text-ink-2` solid.
 
-### While `status !== "complete"`
+This is a className-only sweep — no new tokens, no token value changes.
 
-Renders a centered card: run name, current status pill, progress bar (`progress ?? 0`), `error_message` if `status === "failed"`. Same surface/hairline tokens — no new styling.
+---
 
-### When `status === "complete"`, fire four parallel queries
+## Files I will NOT modify
 
-All keyed on `["…", runId]`, all `enabled: status === "complete"`:
+- `src/routes/runs.$runId.tsx`, `src/routes/ai-analysis.results.tsx`, `src/routes/visualisation.tsx`
+- `src/styles.css` (tokens locked)
+- `src/integrations/supabase/*` (queries/mutations locked)
+- `src/routeTree.gen.ts` (auto-generated)
 
-1. `eda_results` — `select("n,mets_prevalence,mets_prevalence_by_sex,n_dietary_columns,figure_paths").eq("run_id", runId).maybeSingle()`
-2. `model_results` — `select("xgboost_metrics_test,shap_top_features,figure_paths").eq("run_id", runId).maybeSingle()` (note: `_train` fields never selected, never displayed)
-3. `cluster_results` — `select("cluster_summaries,figure_paths").eq("run_id", runId).maybeSingle()`
-4. `analysis_predictions` (paginated) — `select("subject_id,predicted_prob,predicted_label,actual_label,cluster_label", { count: "exact" }).eq("run_id", runId).order("subject_id").range(from, to)`. Page in local state (default 0, page size 50).
+---
 
-### Panels (reuse the look of `ai-analysis.results.tsx`)
+## Sanity checks before applying
 
-- **Run summary card** — `Cohort: eda_results.n` rows; `(eda_results.mets_prevalence * 100).toFixed(1)%` MetS prevalence; sex breakdown from `mets_prevalence_by_sex` jsonb if present. Right column: `xgboost_metrics_test.weighted_auc / precision / recall / f1` — each as `.toFixed(2)`. Any missing field → `—`.
-- **SHAP panel** — bar list from `shap_top_features` jsonb. Expects shape like `[{feature, value, unit?}]` — render whatever shape comes back; fall back to `JSON.stringify` of the entry if it's not an array of objects with `feature`+`value` (defensive, since shape isn't pinned in the schema).
-- **Cluster scatter + cards** — `cluster_summaries` jsonb drives the cards (id, label, n, mets prevalence × 100, center if present). Scatter uses `figure_paths` if it points to an image URL; otherwise omitted with `—`.
-- **Per-subject table** — columns: `subject_id`, `predicted_prob` (× 100, 1 dp, %), `predicted_label`/`actual_label` (✓ / – / —), `cluster_label`. Footer: `Showing {from+1}–{min(to+1,count)} of {count}` + Prev / Next buttons. Same table styling as the existing results page.
+1. **Home item 1 — "Select all" checkbox**: there's no checkbox column on Home today. I'm planning to add one inside the existing 16px leftmost column (sharing space with `StatusDot`, revealing on hover / when any row is selected). Confirm that's what you meant, or say "add a dedicated checkbox column" and I'll widen the grid (this would touch the Recent Files column structure — which you said preserve, so I'm keeping it inside the existing 16px slot).
+2. **Item 2 carry-through**: I'll read the dataset name via a new `useQuery` on `/datasets` keyed by `datasetId` — additive, doesn't modify existing queries. OK?
+3. **Item 3 active state**: when Home is active, hide the lotus PNG and show text-only "Lotus" inside the coral pill. Inactive = icon + wordmark as today. Confirm.
+4. **Item 9 / 11 chevron convention**: standardizing on **rotate-180° on open** (already the dominant pattern). Confirm over "keep pointing down permanently".
 
-Every null cell → `<Em>` (the muted dash). Each panel independently shows a skeleton (`animate-pulse` placeholder block matching its container's geometry) while loading and an inline `text-ink-3` "Failed to load — {message}" on error.
-
-### Errors / not-found
-
-- `errorComponent` and `notFoundComponent` on the route, matching the existing root style.
-- If the initial run query returns no row, render notFound.
-
-## E. Files
-
-**New**
-
-- `src/routes/runs.$runId.tsx`
-
-**Edited (data + small fixes only — no token/layout/component-shape changes)**
-
-- `src/routes/index.tsx` — `× 100` in prevalence formatter
-- `src/routes/ai-analysis.tsx` — dataset selector wired in Step 1; Run mutation + navigate in Step 4; remove fake-progress loop; disable Run when no dataset
-
-**Untouched**
-
-- All design tokens, AppHeader, ActionTile, TypePill, StatusDot, RowAction, AI-Analysis step indicator visuals, MappingRow, StepShell, datasets.tsx, visualisation.tsx, ai-analysis.results.tsx (the mock results page stays as-is for now; the live flow goes to `/runs/$runId`)
-
-## F. Assumptions you should sanity-check before I apply
-
-1. `function_mode` enum values: I'll write `full | prediction_only | subgroup_only | labels_only`. If your backend expects different strings, say so.
-2. `analysis_runs.name` accepts the run name text from Step 1 (defaulted to "Untitled run").
-3. The route shape `/runs/:id` is acceptable — alternative would be `/ai-analysis/results?run_id=…` if you want to keep the existing URL convention. Speak up if you prefer the latter; otherwise `/runs/$runId` it is.
-4. SHAP and cluster_summaries jsonb shapes aren't pinned in the schema you posted. I'll render defensively (best-guess shape with `JSON.stringify` fallback). If you have the producer schema, paste it and I'll render exactly.
-
-Approve and I'll apply A → B → C → D in one pass.
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-> Approve. Answers to your sanity checks:
->
-> **1. function_mode enum:** approved as written — `full | prediction_only | subgroup_only | labels_only`. These are canonical, the backend will conform to these strings.
->
-> **2. analysis_[runs.name](http://runs.name) default:** "Untitled run" is fine. User can rename later.
->
-> **3. Route shape:** go with `/runs/$runId`. Cleaner, RESTful, and runs are first-class objects worth bookmarking/sharing — leave `/ai-analysis/results` mock untouched as you proposed.
->
-> **4. JSONB shapes — pin these, no defensive stringify fallback needed:**
->
-> `shap_top_features` is a flat dict, feature → SHAP importance value (raw, not %):
->
-> json
->
-> ```json
-> {
->   "DR1IFIBE": 0.234,
->   "DR1IKCAL": 0.187,
->   "age": 0.156,
->   ...
-> }
-> ```
->
-> Render as horizontal bars: feature name on left, value scaled to widest bar. Sort descending by value. Top 10.
->
-> `cluster_summaries` is an array of cluster objects:
->
-> json
->
-> ```json
-> [
->   {
->     "cluster_id": 0,
->     "label": "High fibre, low sugar",
->     "n": 412,
->     "mets_prevalence": 0.18,
->     "top_features": [
->       {"feature": "DR1IFIBE", "mean": 28.4},
->       {"feature": "DR1ISUGR", "mean": 42.1}
->     ]
->   },
->   ...
-> ]
-> ```
->
-> Render as cards: `label` (or `Cluster {cluster_id}` if label is null) as header, `n` rows + `mets_prevalence × 100` % as stats, `top_features` as a small list. `mets_prevalence` follows the same × 100 rule as elsewhere.
->
-> Apply A → B → C → D.
-
-&nbsp;
+Approve and I'll apply files 1 → 5 in one pass.
