@@ -83,7 +83,7 @@ function AppHeader() {
             to="/"
             aria-label="Home"
             className={
-              "relative flex items-center gap-2 pr-4 pl-2 h-9 my-auto rounded-2xl transition-colors " +
+              "relative flex items-center gap-2 px-4 h-9 my-auto rounded-2xl transition-colors " +
               (homeActive ? "text-ink" : "text-ink hover:opacity-80")
             }
             style={
