@@ -333,18 +333,11 @@ function AiAnalysisPage() {
   // Prediction section
   const [predictOn, setPredictOn] = useState(true);
   const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("xgb");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [xgbDepth, setXgbDepth] = useState(5);
-  const [xgbTrees, setXgbTrees] = useState(300);
-  const [lrReg, setLrReg] = useState(1.0);
-  const [lrPenalty, setLrPenalty] = useState<"l1" | "l2">("l2");
 
   // Subgroup discovery section
   const [subgroupOn, setSubgroupOn] = useState(true);
   const [clusterAlg, setClusterAlg] = useState<"kmeans">("kmeans");
-  const [k, setK] = useState(4);
-  const [kAuto, setKAuto] = useState(false);
-  const [dimRed, setDimRed] = useState<"pca">("pca");
+  const [dimRed, setDimRed] = useState<"pca" | "tsne">("pca");
 
   const [currentStep, setCurrentStep] = useState<StepKey>("map");
   const [completed, setCompleted] = useState<Set<StepKey>>(new Set());
@@ -416,8 +409,7 @@ function AiAnalysisPage() {
   })();
   const subgroupSummary = (() => {
     if (!showSubgroup || !subgroupOn) return null;
-    const kPart = kAuto ? "k=auto" : `k=${k}`;
-    return `K-Means (${kPart}, PCA)`;
+    return `K-Means (k=4 elbow, ${dimRed.toUpperCase()})`;
   })();
   const methodSummary = [predictSummary, subgroupSummary].filter(Boolean).join(" · ");
 
@@ -641,8 +633,9 @@ function AiAnalysisPage() {
             <div className="flex gap-3 rounded-xl bg-surface-hover border border-hairline/70 p-4">
               <Info className="h-4 w-4 text-ink-3 mt-0.5 shrink-0" />
               <p className="text-[13px] text-ink-2 leading-relaxed">
-                MetS labels are computed using NCEP ATP III criteria from the clinical fields above.
-                The model predicts MetS from diet and demographics only — lab values are used to{" "}
+                MetS labels are computed using NCEP ATP III criteria (5-component rule: waist,
+                triglycerides, HDL, blood pressure, fasting glucose; ≥3 abnormal). The model
+                predicts MetS from diet and demographics only — clinical lab values are used to{" "}
                 <em className="text-ink">label</em>, not to{" "}
                 <em className="text-ink">predict</em>. This is the eAsia framing.
               </p>
@@ -853,92 +846,21 @@ function AiAnalysisPage() {
                       </div>
                     </div>
 
-                    {/* Advanced */}
-                    <div className="rounded-lg border border-hairline/70 bg-canvas/40">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAdvancedOpen((o) => !o);
-                        }}
-                        className="w-full flex items-center justify-between px-3 h-9 text-[12.5px] text-ink-2 hover:text-ink"
-                      >
-                        <span>Advanced</span>
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 text-ink-3 transition-transform ${advancedOpen ? "rotate-180" : ""}`}
-                        />
-                      </button>
-                      {advancedOpen && (
-                        <div className="px-3 pb-4 pt-1 space-y-4 border-t border-hairline/60">
-                          {(predictModel === "xgb" || predictModel === "both") && (
-                            <div className="space-y-3">
-                              {predictModel === "both" && (
-                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
-                                  XGBoost
-                                </div>
-                              )}
-                              <SliderRow
-                                label="max_depth"
-                                value={xgbDepth}
-                                min={2}
-                                max={8}
-                                onChange={setXgbDepth}
-                              />
-                              <SliderRow
-                                label="n_estimators"
-                                value={xgbTrees}
-                                min={100}
-                                max={1000}
-                                step={50}
-                                onChange={setXgbTrees}
-                              />
-                            </div>
-                          )}
-                          {(predictModel === "logreg" || predictModel === "both") && (
-                            <div className="space-y-3">
-                              {predictModel === "both" && (
-                                <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium pt-1">
-                                  Logistic Regression
-                                </div>
-                              )}
-                              <SliderRow
-                                label="regularization (C)"
-                                value={lrReg}
-                                min={0.01}
-                                max={10}
-                                step={0.01}
-                                decimals={2}
-                                onChange={setLrReg}
-                              />
-                              <div className="flex items-center justify-between gap-3">
-                                <label className="text-[12.5px] text-ink-2">Penalty</label>
-                                <div className="flex gap-1">
-                                  {(["l1", "l2"] as const).map((p) => (
-                                    <button
-                                      key={p}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setLrPenalty(p);
-                                      }}
-                                      className={`h-7 px-3 rounded-md text-[12px] border ${
-                                        lrPenalty === p
-                                          ? "bg-coral text-white border-coral"
-                                          : "bg-surface border-hairline text-ink-2 hover:border-coral/40"
-                                      }`}
-                                    >
-                                      {p.toUpperCase()}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    {/* Defaults (informational — backend does not accept overrides for v1) */}
+                    <div className="rounded-lg border border-hairline/70 bg-canvas/40 px-3 py-2.5">
+                      <div className="text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1">
+                        Defaults
+                      </div>
+                      <p className="mono text-[11.5px] text-ink-2 leading-relaxed">
+                        XGBoost (n_estimators=400, max_depth=4, learning_rate=0.05). Logistic (L2
+                        regularised, max_iter=4000). Decision threshold 0.5.
+                      </p>
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking,
-                      per-subject predictions.
+                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking
+                      (XGBoost), gain importance + permutation importance + coefficient odds ratios
+                      depending on model, per-subject predictions.
                     </p>
                   </div>
                 </MethodSection>
@@ -963,72 +885,37 @@ function AiAnalysisPage() {
                           checked={clusterAlg === "kmeans"}
                           onSelect={() => setClusterAlg("kmeans")}
                           title="K-Means"
-                          hint="recommended"
+                          hint="default k=4 with elbow search over [2, 3, 4, 5]"
                         />
-                        <RadioRow disabled title="Hierarchical clustering" soon />
-                        <RadioRow disabled title="DBSCAN" soon />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
-                          Number of clusters (k)
-                        </label>
-                        <label className="flex items-center gap-2 text-[12px] text-ink-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={kAuto}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setKAuto(e.target.checked);
-                            }}
-                            className="accent-coral"
-                          />
-                          Auto-select via silhouette score
-                        </label>
-                      </div>
-                      <div className={`flex items-center gap-1 ${kAuto ? "opacity-40 pointer-events-none" : ""}`}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setK((v) => Math.max(2, v - 1));
-                          }}
-                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                        >
-                          −
-                        </button>
-                        <span className="mono w-10 text-center text-[13px] text-ink tabular">{k}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setK((v) => Math.min(8, v + 1));
-                          }}
-                          className="h-8 w-8 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                        >
-                          +
-                        </button>
+                        <RadioRow disabled title="Hierarchical clustering — coming in v2" soon />
+                        <RadioRow disabled title="DBSCAN — coming in v2" soon />
                       </div>
                     </div>
 
                     <div>
                       <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                        Dimensionality reduction for visualisation
+                        Visualisation projection
                       </div>
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={dimRed === "pca"}
                           onSelect={() => setDimRed("pca")}
                           title="PCA"
-                          hint="recommended"
+                          hint="variance curve + 2D plot"
                         />
-                        <RadioRow disabled title="t-SNE" soon />
-                        <RadioRow disabled title="UMAP" soon />
+                        <RadioRow
+                          checked={dimRed === "tsne"}
+                          onSelect={() => setDimRed("tsne")}
+                          title="t-SNE"
+                          hint="2D visualisation"
+                        />
+                        <RadioRow disabled title="UMAP — coming in v2" soon />
                       </div>
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces cluster profiles, PCA scatter, per-cluster MetS prevalence.
+                      Produces cluster profiles, 2D scatter (PCA or t-SNE), per-cluster MetS
+                      prevalence.
                     </p>
                   </div>
                 </MethodSection>
@@ -1251,44 +1138,4 @@ function RadioRow({
   );
 }
 
-function SliderRow({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  decimals = 0,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  decimals?: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <label className="mono text-[12px] text-ink-2">{label}</label>
-        <span className="mono text-[12px] text-ink tabular">{value.toFixed(decimals)}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onClick={(e) => e.stopPropagation()}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1 appearance-none bg-hairline rounded-full accent-coral [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
-      />
-      <div className="flex justify-between text-[10px] text-ink-3 mono tabular">
-        <span>{min}</span>
-        <span>{max}</span>
-      </div>
-    </div>
-  );
-}
 
