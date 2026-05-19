@@ -386,25 +386,64 @@ function PipelineStrip() {
 
 
 function DatasetsPage() {
+  const { datasetId } = Route.useSearch();
+  const [attrFilter, setAttrFilter] = useState("");
+  const [datasetSlots, setDatasetSlots] = useState<string[]>(["Dataset_A.csv"]);
+
+  const datasetQ = useQuery({
+    queryKey: ["datasets", "single", datasetId],
+    enabled: !!datasetId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("datasets")
+        .select("id,name")
+        .eq("id", datasetId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; name: string } | null;
+    },
+  });
+
+  const q = attrFilter.trim().toLowerCase();
+  const filteredA = q ? datasetA.filter((a) => a.name.toLowerCase().includes(q)) : datasetA;
+  const filteredB = q ? datasetB.filter((a) => a.name.toLowerCase().includes(q)) : datasetB;
+
+  const addSlot = () => {
+    const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
+    setDatasetSlots([...datasetSlots, `Dataset_${nextLetter}.csv`]);
+  };
+
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
+      <div className="mb-4">
+        <h1 className="text-[22px] leading-tight text-ink">
+          {datasetId ? (datasetQ.data?.name ?? (datasetQ.isLoading ? "Loading…" : "Datasets")) : "Datasets"}
+        </h1>
+        {datasetId && (
+          <p className="text-[12.5px] text-ink-2 mt-1">
+            Selected from Recent files
+          </p>
+        )}
+      </div>
       <div className="flex gap-5">
         {/* Sidebar */}
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
-            <span className="text-[10.5px] text-ink-3 tabular">{datasetA.length + datasetB.length}</span>
+            <span className="text-[10.5px] text-ink-2 tabular">{filteredA.length + filteredB.length}</span>
           </div>
           <div className="relative mb-4">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-3" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-2" />
             <input
+              value={attrFilter}
+              onChange={(e) => setAttrFilter(e.target.value)}
               placeholder="Filter attributes…"
-              className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] placeholder:text-ink-3 focus:outline-none focus:border-coral/50"
+              className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] text-ink placeholder:text-ink-2 focus:outline-none focus:border-coral/50"
             />
           </div>
-          <AttrGroup name="Dataset_A.csv" items={datasetA} />
-          <AttrGroup name="Dataset_B.csv" items={datasetB} />
-          <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-3">
+          <AttrGroup name="Dataset_A.csv" items={filteredA} />
+          <AttrGroup name="Dataset_B.csv" items={filteredB} />
+          <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
             <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-data-plum" strokeWidth={2.5} />ID</span>
             <span className="flex items-center gap-1"><Hash className="h-2.5 w-2.5 text-data-slate" strokeWidth={2.5} />Numeric</span>
             <span className="flex items-center gap-1"><Type className="h-2.5 w-2.5 text-data-sage" strokeWidth={2.5} />Category</span>
@@ -413,8 +452,16 @@ function DatasetsPage() {
 
         {/* Main */}
         <section className="flex-1 flex flex-col min-w-0">
-          <DatasetBar name="Dataset_A.csv" />
-          <DatasetBar name="Dataset_B.csv" />
+          {datasetSlots.map((name) => (
+            <DatasetBar key={name} name={name} />
+          ))}
+          <button
+            onClick={addSlot}
+            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add dataset
+          </button>
+
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
             <PipelineStrip />
