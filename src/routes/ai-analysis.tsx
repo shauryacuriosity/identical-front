@@ -986,17 +986,28 @@ function AiAnalysisPage() {
               )}
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex flex-col items-end gap-2 mt-6">
               <button
                 onClick={() => {
                   advanceFrom("method", "run");
                   setRunProgress(0);
+                  runMutation.mutate();
                 }}
-                disabled={(!predictOn || !showPredict) && (!subgroupOn || !showSubgroup)}
+                disabled={
+                  !selectedDatasetId ||
+                  runMutation.isPending ||
+                  ((!predictOn || !showPredict) && (!subgroupOn || !showSubgroup))
+                }
                 className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Run Analysis
+                {runMutation.isPending ? "Submitting…" : "Run Analysis"}
               </button>
+              {!selectedDatasetId && (
+                <span className="text-[12px] text-ink-3">Select a dataset in Step 1 to run.</span>
+              )}
+              {runMutation.error && (
+                <span className="text-[12px] text-ink-3">Failed to start — {(runMutation.error as Error).message}</span>
+              )}
             </div>
           </StepShell>
         )}
