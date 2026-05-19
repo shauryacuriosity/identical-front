@@ -1,8 +1,23 @@
 import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home, Database, BarChart3, Sparkles, User } from "lucide-react";
+import { Database, BarChart3, Sparkles, User, Check } from "lucide-react";
+import { useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -46,12 +61,15 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function AppHeader() {
   const { pathname } = useLocation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const tabs = [
-    { to: "/", label: "Home", icon: Home },
     { to: "/datasets", label: "Datasets", icon: Database },
     { to: "/visualisation", label: "Visualisation", icon: BarChart3 },
     { to: "/ai-analysis", label: "AI Analysis", icon: Sparkles },
   ];
+  const homeActive = pathname === "/";
+
   return (
     <header className="sticky top-0 z-30 pt-4 pb-2 px-6">
       <div className="mx-auto max-w-[1280px]">
@@ -60,18 +78,35 @@ function AppHeader() {
           className="relative h-12 rounded-full bg-surface flex items-center pl-4 pr-3"
           style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.25)" }}
         >
-          {/* Brand cluster */}
-          <div className="flex items-center gap-2 pr-5">
-            <img src={lotusMark} alt="" className="h-[18px] w-auto" />
+          {/* Brand cluster — acts as Home link */}
+          <Link
+            to="/"
+            aria-label="Home"
+            className={
+              "relative flex items-center gap-2 pr-4 pl-2 h-9 my-auto rounded-2xl transition-colors " +
+              (homeActive ? "text-ink" : "text-ink hover:opacity-80")
+            }
+            style={
+              homeActive
+                ? { backgroundColor: "color-mix(in oklab, var(--accent-primary) 18%, transparent)" }
+                : undefined
+            }
+          >
+            {/* Hide the lotus icon when active (coral background can wash it out) */}
+            {!homeActive && <img src={lotusMark} alt="" className="h-[18px] w-auto" />}
             <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
-          </div>
+            {homeActive && (
+              <span
+                className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full"
+                style={{ backgroundColor: "var(--accent-primary)" }}
+              />
+            )}
+          </Link>
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 h-full">
+          <div className="flex items-center gap-1 h-full ml-2">
             {tabs.map((t) => {
-              const active = t.to === "/" ? pathname === "/" : pathname.startsWith(t.to);
-              const Icon = t.icon;
-              const isHome = t.to === "/";
+              const active = pathname.startsWith(t.to);
               return (
                 <Link
                   key={t.to}
@@ -79,9 +114,7 @@ function AppHeader() {
                   aria-label={t.label}
                   className={
                     "relative h-9 px-4 my-auto flex items-center justify-center text-[15px] font-medium rounded-2xl transition-colors " +
-                    (active
-                      ? "text-ink"
-                      : "text-ink hover:opacity-70")
+                    (active ? "text-ink" : "text-ink hover:opacity-70")
                   }
                   style={
                     active
@@ -89,7 +122,7 @@ function AppHeader() {
                       : undefined
                   }
                 >
-                  {isHome ? <Icon className="h-[18px] w-[18px]" strokeWidth={2} /> : t.label}
+                  {t.label}
                   {active && (
                     <span
                       className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full"
@@ -106,16 +139,56 @@ function AppHeader() {
             <button className="hidden sm:flex items-center text-[13px] text-ink font-medium hover:opacity-70 transition">
               UOW eAsia
             </button>
-            <button
-              className="h-9 w-9 rounded-full bg-surface flex items-center justify-center text-ink"
-              style={{ border: "2px solid var(--accent-primary)" }}
-              aria-label="Profile"
-            >
-              <User className="h-4 w-4" strokeWidth={1.75} />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-9 w-9 rounded-full bg-surface flex items-center justify-center text-ink cursor-pointer"
+                  style={{ border: "2px solid var(--accent-primary)" }}
+                  aria-label="Account menu"
+                >
+                  <User className="h-4 w-4" strokeWidth={1.75} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-surface border-hairline">
+                <DropdownMenuItem className="text-ink cursor-pointer" onSelect={() => {}}>
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-ink cursor-pointer"
+                  onSelect={(e) => { e.preventDefault(); setSettingsOpen(true); }}
+                >
+                  Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-ink cursor-pointer flex items-center justify-between"
+                  onSelect={(e) => { e.preventDefault(); setDarkMode((d) => !d); }}
+                >
+                  <span>Dark mode</span>
+                  {darkMode && <Check className="h-3.5 w-3.5 text-coral" />}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-hairline" />
+                <DropdownMenuItem className="text-ink cursor-pointer" onSelect={() => {}}>
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </nav>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="bg-surface border-hairline">
+          <DialogHeader>
+            <DialogTitle className="text-ink">Settings</DialogTitle>
+            <DialogDescription className="text-ink-2">
+              Settings coming soon. Account, preferences, and workspace options will live here.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-[13px] text-ink-2 pt-2">
+            Nothing to configure yet.
+          </div>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }
