@@ -641,8 +641,9 @@ function AiAnalysisPage() {
             <div className="flex gap-3 rounded-xl bg-surface-hover border border-hairline/70 p-4">
               <Info className="h-4 w-4 text-ink-3 mt-0.5 shrink-0" />
               <p className="text-[13px] text-ink-2 leading-relaxed">
-                MetS labels are computed using NCEP ATP III criteria from the clinical fields above.
-                The model predicts MetS from diet and demographics only — lab values are used to{" "}
+                MetS labels are computed using NCEP ATP III criteria (5-component rule: waist,
+                triglycerides, HDL, blood pressure, fasting glucose; ≥3 abnormal). The model
+                predicts MetS from diet and demographics only — clinical lab values are used to{" "}
                 <em className="text-ink">label</em>, not to{" "}
                 <em className="text-ink">predict</em>. This is the eAsia framing.
               </p>
