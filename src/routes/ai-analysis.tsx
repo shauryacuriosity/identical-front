@@ -688,7 +688,15 @@ function AiAnalysisPage() {
                       }
                     />
                   ))}
-                  <button className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-3 hover:text-coral transition-colors border-t border-hairline/60">
+                  <button
+                    onClick={() =>
+                      setDietary((rows) => [
+                        ...rows,
+                        { field: "New field", target: `new_${Date.now()}_${rows.length}`, column: null, score: null },
+                      ])
+                    }
+                    className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-2 hover:text-coral transition-colors border-t border-hairline/60"
+                  >
                     <Plus className="h-3.5 w-3.5" /> Add field
                   </button>
                 </div>
