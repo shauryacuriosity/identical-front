@@ -11,6 +11,7 @@ import {
   Archive,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -233,8 +234,9 @@ function Index() {
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-16">
       {/* Greeting */}
       <div className="mb-6">
+        <img src={lotusMark} alt="" className="h-8 w-auto mb-3" />
         <h1 className="text-[28px] leading-tight text-ink">Welcome back</h1>
-        <p className="text-[13.5px] text-ink mt-1">Pick up where you left off, or start something new.</p>
+        <p className="text-[13.5px] text-ink-2 mt-1">Pick up where you left off, or start something new.</p>
       </div>
 
       {/* Action tiles */}
@@ -340,15 +342,15 @@ function Index() {
                 <TypePill type={f.type} archived={f.archived} />
               </div>
 
-              <span className="tabular text-[12.5px] text-ink text-right">
+              <span className="tabular text-[12.5px] text-ink-2 text-right">
                 {f.rows != null ? f.rows.toLocaleString() : <Em />}
               </span>
 
-              <span className="tabular text-[12.5px] text-ink text-right">
+              <span className="tabular text-[12.5px] text-ink-2 text-right">
                 {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
               </span>
 
-              <span className="text-[12.5px] text-ink text-right">{f.modified || <Em />}</span>
+              <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
 
               <div
                 className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
