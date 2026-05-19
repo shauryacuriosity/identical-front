@@ -70,12 +70,13 @@ function AppHeader() {
               <Link
                 key={t.to}
                 to={t.to}
-                className="relative h-14 px-4 flex items-center text-[13.5px] font-medium transition-colors"
+                className="relative h-14 px-1 flex items-center text-[13.5px] font-medium"
               >
-                <span className={active ? "text-ink" : "text-ink-2 hover:text-ink"}>{t.label}</span>
-                {active && (
-                  <span className="absolute left-3 right-3 bottom-0 h-[2px] bg-coral rounded-full" />
-                )}
+                <span className={active
+                  ? "px-3 py-1.5 rounded-full bg-surface-hover text-ink"
+                  : "px-3 py-1.5 text-ink-2 hover:text-ink transition-colors"}>
+                  {t.label}
+                </span>
               </Link>
             );
           })}
