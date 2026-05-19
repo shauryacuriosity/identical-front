@@ -1,41 +1,155 @@
-## Top nav polish — two corrections
+## Combined plan — Supabase scaffold + UI data wiring
 
-Single file edited: `src/routes/__root.tsx` (`AppHeader` only). One new asset copied in: `src/assets/logo_lotus.png` (already on disk from the upload). No token changes. No edits to page background, action cards, recent files, welcome heading, or any data wiring.
+Two phases in one pass. Phase A creates the integration files (no UI change). Phase B replaces mock data with real queries (structure + data only, no styling, tokens, layout, or component shapes touched).
 
 ---
 
-### 1. Active tab indicator — shrink + tuck under
+## Phase A — Manual Supabase scaffold
 
-Current: a 56×56 rounded-2xl coral square positioned at `-bottom-3` and starting `pt-2.5`, which makes it overhang both above and below the 48px bar and read as a giant detached badge.
+### A0. Secrets (blocker — needs your input)
 
-New shape:
-- Width ≈ 64px, height ≈ 40px (matches the visual rhythm of inactive tabs).
-- Top edge aligned with the top of the 48px nav bar (`top: 0`), bottom edge protrudes ~14px below the bar (`-bottom-3.5`).
-- `border-radius: 2px 2px 16px 16px` — square top corners that tuck into the bar, rounded bottom corners that hang below.
-- Fill `var(--accent-primary)` (#E8928E), drop shadow `0 2px 4px rgba(0,0,0,0.25)`.
-- Icon: 18px white, `strokeWidth={2}`, centered vertically within the bar's height (not pushed to the bottom hanging area). Use `flex items-center justify-center` on the inner element and offset the icon up so it sits inside the bar portion, not the hanging lip.
+No Supabase secrets exist in the project yet. After you approve this plan I will call `add_secret` to request:
 
-### 2. Bring Lotus wordmark and UOW eAsia inside the pill
+- `VITE_SUPABASE_URL` — project URL, e.g. `https://xxxx.supabase.co` (safe in client bundle)
+- `VITE_SUPABASE_ANON_KEY` — publishable/anon key (safe in client bundle)
 
-Today the wordmark sits in its own div to the left of the pill, and the workspace+avatar live inside the pill on the right. Result: wordmark floats loose on pink.
+Both are `VITE_*` so the browser client can read them via `import.meta.env`. We are intentionally **not** storing the service-role key (no server-side admin path this pass, no auth middleware).
 
-Restructure `AppHeader` so the outer container is a single pill bar containing, left → right:
+### A1. Install client
 
-```text
-[Lotus mark + word]  [Home tab][Datasets][Visualisation][AI Analysis]   …spacer…   [UOW eAsia]  [avatar]
+`bun add @supabase/supabase-js` (only dep needed).
+
+### A2. New files
+
+**`src/integrations/supabase/types.ts`** — hand-written `Database` type matching the six tables exactly as you posted. Shape:
+
+```ts
+export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
+
+export interface Database {
+  public: {
+    Tables: {
+      datasets: { Row: {...}; Insert: {...}; Update: {...} };
+      analysis_runs: { Row: {...}; Insert: {...}; Update: {...} };
+      eda_results: { Row: {...}; Insert: {...}; Update: {...} };
+      model_results: { Row: {...}; Insert: {...}; Update: {...} };
+      cluster_results: { Row: {...}; Insert: {...}; Update: {...} };
+      analysis_predictions: { Row: {...}; Insert: {...}; Update: {...} };
+    };
+  };
+}
 ```
 
-- Remove the separate wordmark div outside the `<nav>`.
-- Inside the nav, first child becomes a small brand cluster: 18px lotus icon (`src/assets/logo_lotus.png`, `h-[18px] w-auto`) + "Lotus" label (Montserrat 600, 16px, `text-ink`, `tracking-tight`). Left padding `pl-4`, right padding before the first tab `pr-5`. Vertically centered.
-- Tabs group stays as today (gap-1), now sitting immediately after the brand cluster instead of at the pill's left edge.
-- Right side stays as today: "UOW eAsia" button (13px, `text-ink`, `font-medium`) + avatar circle (`h-9 w-9`, coral 2px ring). Right padding `pr-3`. `ml-auto` keeps it pinned right.
-- The pill keeps: `h-12`, `bg-surface`, `rounded-full`, `shadow: 0 2px 4px rgba(0,0,0,0.25)`, max container width 1280px.
+Every column from your DDL is included with correct nullability (e.g. `archived: boolean | null`, jsonb → `Json | null`, numeric → `number | null`, timestamptz → `string | null`). `Insert` makes server-defaulted columns optional (`id`, `uploaded_at`, `created_at`, `status`, `archived`).
 
-### Files
+**`src/integrations/supabase/client.ts`**:
 
-- `src/routes/__root.tsx` — `AppHeader` only; restructure children, replace active-tab span styling per above, add `import lotusMark from "@/assets/logo_lotus.png"`.
-- `src/assets/logo_lotus.png` — already copied from the upload.
+```ts
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
-### Untouched
+const url = import.meta.env.VITE_SUPABASE_URL as string;
+const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-Page background, ActionTile cards, Recent Files table + columns, welcome heading, AI Analysis 4-step internals, Datasets workspace, all hooks/queries/state, all tokens in `src/styles.css`, all chart series.
+export const supabase = createClient<Database>(url, anon, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+```
+
+`persistSession: false` because there's no auth flow yet — avoids spurious localStorage writes during SSR.
+
+**Skip**: `client.server.ts`, `auth-middleware.ts`, `auth-attacher.ts`. Per your instruction.
+
+### A3. Smoke test
+
+A tiny `useQuery` on Home that does `supabase.from("datasets").select("id").limit(1)` — already implicit in Phase B's Recent Files query, so no separate ping needed. If credentials are wrong you'll see the error in the Recent Files row instead of a silent failure.
+
+---
+
+## Phase B — UI data wiring (no styling changes)
+
+All edits are inside existing components. Tokens, classNames, spacing, shadows, ActionTile, AppHeader, AI Analysis step indicator, Recent Files row styling — **all untouched**. Only data sources and conditional render branches (loading skeleton / empty / error / "—") change.
+
+### B1. Home — Recent Files table (`src/routes/index.tsx`)
+
+- Remove the `RECENT` mock array.
+- `useQuery(["datasets", "recent"], ...)`:
+  ```ts
+  supabase.from("datasets")
+    .select("id,name,uploaded_at,row_count,mets_prevalence,archived,status")
+    .eq("archived", false)
+    .order("uploaded_at", { ascending: false })
+    .limit(10)
+  ```
+- Map row → existing `Recent` shape. `type` is hard-coded `"Dataset"` for now (no analyses/visualisations table in scope). `modified` = relative time from `uploaded_at` via a small `formatRelative()` helper.
+- Loading: 5 skeleton rows reusing the existing row container shell (same grid, same shadow, just `<Skeleton/>` placeholders inside cells). No new tokens.
+- Empty (0 rows): single muted line "No datasets yet" inside the same container.
+- Null `mets_prevalence` / `row_count` already renders as "—" per existing code path.
+
+### B2. Datasets workspace (`src/routes/datasets.tsx`)
+
+Need to view this file first to confirm the current selector/list shape, but plan: replace whatever mock list drives the dataset list with the same `datasets` query (without the `limit(10)`, still excluding archived). Selecting a dataset stores `dataset_id` in route search params or local state — depending on what the current UI does (I'll preserve whatever it does today, only swapping the data source).
+
+### B3. AI Analysis — Step 4 Run (`src/routes/ai-analysis.tsx`)
+
+- "Run" button → `useMutation` that inserts into `analysis_runs`:
+  ```ts
+  supabase.from("analysis_runs").insert({
+    dataset_id,            // from step 1 selection
+    name,                  // from step 2 input, or auto
+    function_mode,         // from step 2 selection
+    cohort_filter,         // jsonb from step 3
+    method_config,         // jsonb from step 3
+    status: "pending",
+  }).select("id").single()
+  ```
+- On success: `router.navigate({ to: "/ai-analysis/results", search: { run_id } })` (current results route is `ai-analysis.results.tsx` — will confirm exact param convention when reading it).
+- Button shows pending state during mutation; surface `error.message` inline below the button on failure. No new components.
+
+### B4. Results dashboard (`src/routes/ai-analysis.results.tsx`)
+
+Reads `run_id` from search params. Four parallel `useQuery` calls keyed on `run_id`:
+
+1. **Run header** — `analysis_runs` row (status, progress, started/finished, error_message).
+2. **EDA panel** — `eda_results` (n, mets_prevalence, mets_prevalence_by_sex, n_dietary_columns, figure_paths).
+3. **Model metrics panel** — `model_results`; render **only** `logistic_metrics_test` and `xgboost_metrics_test` (`weighted_auc`, `precision`, `recall`, `f1`). `_train` fields are never displayed.
+4. **SHAP panel** — `model_results.shap_top_features` (jsonb array of {feature, value}).
+5. **Cluster scatter + cards** — `cluster_results.cluster_summaries` + `figure_paths`.
+6. **Per-subject table** — `analysis_predictions` filtered by `run_id`, paginated 50/page. Uses Supabase `.range(from, to)` with a `count: "exact"` head query for total. Page state in local component state; no URL change. Existing table styling preserved.
+
+Every field that is null renders `"—"`. Each panel shows a skeleton (existing skeleton component) while its query is loading. Errors render inline within the panel as `"Failed to load — {message}"` in `text-ink-2`, no toast, no new styling.
+
+---
+
+## Files
+
+**New**
+- `src/integrations/supabase/client.ts`
+- `src/integrations/supabase/types.ts`
+
+**Edited (data wiring only, zero style changes)**
+- `src/routes/index.tsx` — replace `RECENT` mock with query
+- `src/routes/datasets.tsx` — replace mock with query
+- `src/routes/ai-analysis.tsx` — wire Run mutation
+- `src/routes/ai-analysis.results.tsx` — wire all panels
+
+**Dependency**
+- `@supabase/supabase-js` (via `bun add`)
+
+**Untouched**
+- `src/styles.css` (no tokens added)
+- `src/routes/__root.tsx` (AppHeader)
+- `ActionTile`, `TypePill`, `StatusDot`, `RowAction`, welcome heading, all spacing/shadow/font tokens
+- AI Analysis 4-step indicator visuals
+- `src/routes/visualisation.tsx` (no data spec given for it this pass)
+
+---
+
+## What I need from you to proceed after approval
+
+1. **Approve the plan.**
+2. When `add_secret` prompts appear, paste:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+
+Once both are stored I'll execute Phase A then Phase B in one pass and verify the Home query returns at least the smoke-test response.
