@@ -316,7 +316,9 @@ function StepShell({
 
 function AiAnalysisPage() {
   const navigate = useNavigate();
-  const [runName, setRunName] = useState("Untitled run");
+  const [runName, setRunName] = useState(
+    () => `Untitled run · ${new Date().toISOString().slice(0, 16)}`,
+  );
   const [editingName, setEditingName] = useState(false);
 
   // Function mode — what are you running?
