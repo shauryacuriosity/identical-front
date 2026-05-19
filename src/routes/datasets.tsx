@@ -247,14 +247,29 @@ function SentenceFragment({ step, onClick }: { step: Step; onClick: () => void }
   }
 }
 
-function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: (id: string) => void }) {
+function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: Step[]; onChipClick: (id: string) => void; view: "compact" | "list"; onViewChange: (v: "compact" | "list") => void }) {
   const hasOps = steps.some((s) => s.kind !== "from");
   return (
     <div className="px-5 pt-4 pb-3 border-b border-hairline">
-      <div className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3 mb-2">Pipeline</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">Pipeline</div>
+        <div className="inline-flex items-center rounded-md border border-hairline bg-canvas p-0.5 text-[11px]">
+          {(["compact", "list"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => onViewChange(v)}
+              className={`h-6 px-2.5 rounded-[5px] capitalize transition ${
+                view === v ? "bg-surface text-ink shadow-[var(--shadow-xs)]" : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              {v === "compact" ? "Compact" : "List"}
+            </button>
+          ))}
+        </div>
+      </div>
       {!hasOps ? (
-        <p className="text-[13px] text-ink-3 italic">Configure the controls below to see your transformation summarised here.</p>
-      ) : (
+        <p className="text-[13px] text-ink-2 italic">Configure the controls below to see your transformation summarised here.</p>
+      ) : view === "compact" ? (
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
           {steps.map((s, i) => {
             const prev = steps[i - 1];
@@ -266,6 +281,22 @@ function PipelineSentence({ steps, onChipClick }: { steps: Step[]; onChipClick: 
               </span>
             );
           })}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {steps.map((s) => (
+            <div key={s.id} className="grid grid-cols-[80px_1fr] items-center gap-3 px-2 py-1.5 rounded-md hover:bg-canvas/60">
+              <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{s.kind}</span>
+              <button onClick={() => onChipClick(s.id)} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-left">
+                {s.parts.map((p, i) => (
+                  <span key={i} className="inline-flex items-center gap-1.5">
+                    <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{p.label}</span>
+                    <span className={p.mono ? "font-mono text-[12.5px] text-ink" : "text-[12.5px] text-ink"}>{p.value}</span>
+                  </span>
+                ))}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
