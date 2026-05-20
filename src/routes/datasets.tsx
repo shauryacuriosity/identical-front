@@ -1233,7 +1233,7 @@ function DatasetsPage() {
     () => runPipeline(steps, tables, selectedCols, { limit: 200 }),
     [steps, tables, selectedCols],
   );
-  const exportResult = useMemo(
+  const fullResult = useMemo(
     () => runPipeline(steps, tables, selectedCols, { limit: Number.POSITIVE_INFINITY }),
     [steps, tables, selectedCols],
   );
