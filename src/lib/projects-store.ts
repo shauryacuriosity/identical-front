@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from "react";
+import type { Step } from "@/lib/pipeline-exec";
 
 export type Project = {
   id: string;
   name: string;
   datasets: string[];
   modifiedAt: string;
+  pipelineSteps?: Step[];
+  selectedAttrs?: Record<string, string[]>;
 };
 
 const listeners = new Set<() => void>();
@@ -92,6 +95,20 @@ export function touchProject(id: string) {
   update(
     projects.map((p) =>
       p.id === id ? { ...p, modifiedAt: new Date().toISOString() } : p,
+    ),
+  );
+}
+
+export function setProjectPipeline(
+  id: string,
+  pipelineSteps: Step[],
+  selectedAttrs: Record<string, string[]>,
+) {
+  update(
+    projects.map((p) =>
+      p.id === id
+        ? { ...p, pipelineSteps, selectedAttrs, modifiedAt: new Date().toISOString() }
+        : p,
     ),
   );
 }

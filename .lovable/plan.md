@@ -1,88 +1,106 @@
 ## Goal
 
-Introduce a session-local "Projects" concept. A project owns a set of dataset files. The home page lists Recent Projects (not files). The Datasets page reflects which project (if any) the user is working in, supports inline rename, and lets the user re-associate to another project.
+Three tightly related changes to the Datasets / AI Analysis flow:
 
-## Model (session-local, no DB)
+1. Pipeline step dropdowns must list only datasets that are actually loaded into the current view (not the legacy hard-coded `ALL_DATASETS`).
+2. AI Analysis "Select a dataset" becomes "Select a project", pre-filled with the most-recently-modified project, and downstream steps operate on the project's pipeline output.
+3. Datasets page gets a live preview table driven by a real in-browser pipeline executor; preview reacts to attribute selections and to every pipeline edit. The Export button writes one combined file in a user-chosen format.
 
-New module `src/lib/projects-store.ts` — tiny in-memory store with `useSyncExternalStore` subscription:
+## 1. Capture real row data on import
 
-```ts
-type Project = {
-  id: string;
-  name: string;            // editable; "" means untitled (auto-fills from first dataset)
-  datasets: string[];      // slot names belonging to this project, e.g. ["Dataset_A.csv"]
-  modifiedAt: string;      // ISO
-};
-```
+`src/lib/dataset-import.ts` currently returns only `{ attrs, rowCount }`. Extend it to also return `rows: Record<string, unknown>[]`:
 
-API:
-- `useProjects()` → `Project[]` sorted by `modifiedAt desc`
-- `useProject(id)` → `Project | null`
-- `createProject(seed?: Partial<Project>) → id`
-- `renameProject(id, name)`
-- `setProjectDatasets(id, names[])`
-- `touchProject(id)` — bumps `modifiedAt`
+- `parseSheetLike` / `parseJson`: already produce row arrays — return them.
+- `parseXpt`: row decoding is non-trivial; keep `rows: []` and surface a note via a new `rowsAvailable: boolean` flag so the preview can show "row data not available for SAS XPORT".
 
-Seed with 2–3 mock projects so the home list isn't empty (e.g. "Project 1" with `Dataset_A.csv`, `Dataset_B.csv`).
+Type becomes `ParsedDataset = { attrs, rowCount, rows, rowsAvailable }`. Existing callers keep working because they only read `attrs`/`rowCount`.
 
-## 1. Home page (`src/routes/index.tsx`)
+Built-in mock slots (`Dataset_A.csv`, `Dataset_B.csv`) have no real rows. Add a tiny deterministic row generator in `datasets.tsx` (~25 rows each, seeded from attr name + index) so the preview is never empty for the seeded demo.
 
-- Section heading: **"Recent files" → "Recent Projects"**.
-- Replace the Supabase `datasets` query with `useProjects()`.
-- Table columns: **`Name | Files | MetS prevalence | Modified`** (drop the Type column entirely; rename Rows → Files).
-  - Files cell renders `${p.datasets.length} file${...s}` (e.g. "3 files", "1 file", "0 files" greyed).
-- Row click navigates to `/datasets?projectId=<id>` (instead of `datasetId`).
-- "New Dataset" tile keeps current `to="/datasets"` (no `projectId` → unassociated path on the Datasets page).
-- MetS prevalence: leave as `—` for now (not in the project model); keep column for parity.
-- Adjust grid template to remove the Type column (collapse from 6 cols to 5).
+## 2. Lift attribute selection + pipeline to page level
 
-## 2. Datasets page (`src/routes/datasets.tsx`)
+Today `AttrGroup` owns selected attrs locally and `PipelineStrip` owns `steps` locally. Both need to feed the preview, so lift them into `DatasetsPage`:
 
-### Search params
-Replace `datasetId` validator with:
-```ts
-projectId: string | undefined
-```
-(Drop the existing single-dataset Supabase query — no longer used.)
+- `selectedAttrs: Record<slot, Set<string>>` — default to "all selected" when a slot is first added.
+- `steps: Step[]` — current `initialPipeline`, but with `FROM` re-seeded to `datasetSlots[0]` when slots change and the current FROM value disappears.
+- `AttrGroup` and `PipelineStrip` accept controlled props.
 
-### Project context resolution
-- Read `projectId` from `Route.useSearch()`.
-- If present: `project = useProject(projectId)`; initial `datasetSlots` ← `project.datasets`.
-- If absent: no project; `datasetSlots` defaults to `[]` (was `["Dataset_A.csv"]`). Heading shows "No project associated" in `text-ink-3` (muted).
+## 3. Fix 1 — pipeline dropdowns reflect implemented datasets
 
-### New `ProjectHeader` component (replaces the current `<h1>` + subtitle block)
+In `optionsForPart` (datasets.tsx), the `availableNames` source for `FROM` and `JOIN` currently comes from `ctx.availableNames = [...ALL_DATASETS, ...imported]`. Change `EditCtx` to receive `slotNames: string[]` (the current `datasetSlots`) and use it for both branches:
 
-A Google-Docs-style title bar:
+- `FROM` → `slotNames`
+- `JOIN` → `slotNames.filter(n => n !== fromValue)`
+- `ON` / `AGGREGATE` / `FILTER` / `SORT` column lists already derive from `schemaBySlot` and `referencedDatasets`, which automatically restrict to the chosen slots — no change needed beyond the slotNames swap.
 
-```
-[ Project name input (or "No project associated" muted) ]   [ ▾ Switch project ]
-```
+When a slot is removed, sweep `steps` to either drop or null-out parts that referenced the removed name, so dropdowns never display stale values.
 
-- Title is a borderless `<input>` styled as the heading (`text-[22px] text-ink`, transparent bg, focus shows hairline). When `projectId` is set, edits call `renameProject`. When no project, the title shows "No project associated" as muted, non-editable text.
-- Dropdown trigger ("Switch project ▾") opens a small popover listing existing projects + a "New project" item. Selecting one calls `navigate({ to: "/datasets", search: { projectId: chosen.id } })`. "New project" creates an empty project and navigates to it.
+## 4. Pipeline executor (`src/lib/pipeline-exec.ts`, new)
 
-### Auto-name behaviour (Google-Docs style)
+Pure function `runPipeline(steps, tables, selectedCols) → { columns, rows, totalRows, truncated, notes }` where `tables: Record<slot, Row[]>`.
 
-When the current project's `name === ""` (untitled), the title input shows a muted placeholder of the first dataset slot's name (sans extension) and treats that as the effective name. On first edit, persist whatever the user types via `renameProject`. Additionally, when the first dataset is added/changed and the name is still empty, persist that as the default name via `renameProject` (user can still edit any time).
+Supported ops (matches existing Step kinds):
 
-### Dataset slot ↔ project sync
+- `FROM` → start with `tables[name]`
+- `JOIN` (inner/left/right/outer/cross) on `ON` key, prefixing collided columns with slot stem
+- `AGGREGATE` numeric column `BY` Sum/Mean/Median/Count/Min/Max — groups by all remaining non-numeric columns currently selected (or returns a single scalar row if none)
+- `FILTER` with Equals/Contains/Greater than/Less than/Between (Between takes `a..b`)
+- `SORT` Ascending/Descending/Alphabetical/Reverse Alpha (Custom Order = no-op for now)
 
-- On every change to `datasetSlots` (add/remove/replace, file import success), if `projectId` is set call `setProjectDatasets(projectId, datasetSlots)` + `touchProject(projectId)`.
-- If the user is in the "no project associated" state and imports/adds a dataset, do NOT auto-create a project — keep the local-only flow. (User can switch via the Switch project menu to associate.)
+Final projection trims to `selectedCols` (union of selected attrs across referenced slots, minus columns removed by aggregate). Rows truncated to 200 for preview; full set used for export. `notes[]` collects any soft warnings ("XPT rows unavailable", "GROUP BY produced 1 row", etc).
 
-### Re-association via dropdown
-Selecting a different project navigates to that project's URL, which re-seeds `datasetSlots` from the chosen project's stored list. This satisfies "Dataset A and Dataset B is linked to Project 1" — each project's slot list is independent.
+## 5. Preview table UI
 
-## Files
+Replace the "No preview yet" empty state in `datasets.tsx` (lines ~1064-1076) with `<PreviewTable result={runPipeline(...)} />`:
 
-- New: `src/lib/projects-store.ts`
-- Edited: `src/routes/index.tsx` (Recent Projects table, columns, navigation)
-- Edited: `src/routes/datasets.tsx` (search param, ProjectHeader, slot sync, drop `datasetQ`)
+- Header `<th>` cells use `text-primary` (token already in styles.css as `--primary`/`coral`).
+- Body `<td>` cells use `text-muted-foreground` (mapped from `--ink-2`).
+- Sticky header inside the scroll container, `tabular-nums`, max-height ~340px, monospace for numeric columns.
+- Footer line: "Showing N of M rows · K cols" + any `notes`.
+- Recomputed via `useMemo` over `steps`, `selectedAttrs`, `tables`, so any pipeline edit or attribute toggle re-renders instantly.
+
+Also update the sticky footer `Result: — rows × — cols` to show the real counts.
+
+## 6. Export one combined file
+
+Replace the Export button onClick with a small format picker (popover): CSV, TSV, JSON, XLSX. (XPT export is out-of-scope — SAS XPORT writing is non-trivial; show it as disabled with a "not supported" hint, matching what import does already.) Export uses the full (non-truncated) executor result:
+
+- CSV/TSV — built inline, BOM + RFC-4180 quoting.
+- JSON — `JSON.stringify(rows, null, 2)`.
+- XLSX — reuse already-installed `xlsx` (`XLSX.utils.json_to_sheet` → `XLSX.writeFile`).
+
+Filename = `<projectName||"dataset">.<ext>`.
+
+## 7. Share pipeline result with AI Analysis (Fix 2)
+
+Extend `src/lib/projects-store.ts`:
+
+- Add `Project.pipelineSteps?: Step[]` and `Project.selectedAttrs?: Record<slot, string[]>` (serialized as arrays).
+- Add `setProjectPipeline(id, steps, selectedAttrs)` — called from `DatasetsPage` via a debounced `useEffect`.
+
+In `src/routes/ai-analysis.tsx`:
+
+- Delete the Supabase `datasetsQ` (`useQuery` on the `datasets` table) and `selectedDatasetId` state.
+- Add `selectedProjectId` + `useProjects()`; default initial value to `projects[0]?.id` (list is already sorted by `modifiedAt desc`).
+- Replace `<DatasetSelector />` with `<ProjectSelector />` (same shape, lists `{id, name, datasets.length}` and shows "n files · last modified …").
+- Heading copy: "Select a dataset" → "Select a project". Disabled-CTA copy: "Select a dataset in Step 1 to run." → "Select a project in Step 1 to run.".
+- Mapping rows: column dropdown options derive from the project's pipeline-executor output columns (via `runPipeline` reused from the lib), so AI Analysis sees the same joined/merged table that Datasets showed.
+- `runMutation` payload changes `dataset_id: selectedDatasetId` → `project_id: selectedProjectId` (the Supabase `analysis_runs` row keeps its existing shape minus `dataset_id`; if the column is required, store the first slot name in a new `project_name` text field — flag if you'd rather migrate the schema).
+
+## 8. Files
+
+- New: `src/lib/pipeline-exec.ts`
+- Edited: `src/lib/dataset-import.ts` (return rows + flag)
+- Edited: `src/lib/projects-store.ts` (pipeline + selectedAttrs fields, setter)
+- Edited: `src/routes/datasets.tsx` (lift state, fix dropdowns, preview table, export picker, sync to store)
+- Edited: `src/routes/ai-analysis.tsx` (project selector, default = latest, drop datasetsQ, use executor columns)
 
 ## Not touched
 
-`dataset-import.ts`, `__root.tsx`, styles, pipeline editor, other routes.
+`__root.tsx`, `index.tsx`, styles, other routes, Supabase schema.
 
-## Open assumption
+## Open questions / assumptions
 
-Recent Projects MetS prevalence stays as `—` until a separate request adds project-level metrics. Flag if you want me to drop that column instead.
+- XPT export is excluded (write path not implemented); CSV/TSV/JSON/XLSX cover the user's "etc". Flag if XPT-out is required.
+- `analysis_runs` row stores `project_id` as free text (session-local id like `p1`); no DB migration. Flag if you'd like a real `projects` table.
+- Preview is capped at 200 rows for performance; export uses the full dataset.

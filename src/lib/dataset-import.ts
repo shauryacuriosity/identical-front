@@ -3,7 +3,8 @@ import * as XLSX from "xlsx";
 export type AttrType = "id" | "num" | "cat";
 export type Attr = { name: string; type: AttrType };
 
-export type ParsedDataset = { attrs: Attr[]; rowCount: number };
+export type Row = Record<string, unknown>;
+export type ParsedDataset = { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean };
 
 function inferType(name: string, samples: unknown[]): AttrType {
   const lower = name.toLowerCase();
@@ -44,7 +45,7 @@ async function parseSheetLike(file: File): Promise<ParsedDataset> {
     }
     return result.length ? result : Object.keys(rows[0] ?? {});
   })();
-  return { attrs: attrsFromRows(headers, rows), rowCount: rows.length };
+  return { attrs: attrsFromRows(headers, rows), rowCount: rows.length, rows, rowsAvailable: true };
 }
 
 async function parseJson(file: File): Promise<ParsedDataset> {
@@ -58,7 +59,7 @@ async function parseJson(file: File): Promise<ParsedDataset> {
       for (const k of Object.keys(row)) headerSet.add(k);
     }
   }
-  return { attrs: attrsFromRows([...headerSet], rows), rowCount: rows.length };
+  return { attrs: attrsFromRows([...headerSet], rows), rowCount: rows.length, rows, rowsAvailable: true };
 }
 
 /** Decode bytes as ASCII (XPORT uses EBCDIC-like trimmed ASCII for names). */
@@ -107,7 +108,7 @@ async function parseXpt(file: File): Promise<ParsedDataset> {
     const obsBytes = buf.length - obsStart;
     rowCount = Math.max(0, Math.floor(obsBytes / totalRowLen));
   }
-  return { attrs, rowCount };
+  return { attrs, rowCount, rows: [], rowsAvailable: false };
 }
 
 export async function parseDatasetFile(file: File): Promise<ParsedDataset> {

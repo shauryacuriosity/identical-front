@@ -1,14 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { parseDatasetFile } from "@/lib/dataset-import";
+import * as XLSX from "xlsx";
+import { parseDatasetFile, type Row } from "@/lib/dataset-import";
+import { runPipeline, type Step, type StepKind } from "@/lib/pipeline-exec";
 import {
   useProjects,
   useProject,
   createProject,
   renameProject,
   setProjectDatasets,
+  setProjectPipeline,
 } from "@/lib/projects-store";
 
 export const Route = createFileRoute("/datasets")({
@@ -84,21 +87,32 @@ function Checkbox({
   );
 }
 
-function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
+function AttrGroup({
+  name,
+  items,
+  selected,
+  onChange,
+}: {
+  name: string;
+  items: Attr[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
   const [open, setOpen] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const allSelected = items.length > 0 && selected.size === items.length;
-  const someSelected = selected.size > 0 && !allSelected;
+  const allSelected = items.length > 0 && items.every((i) => selected.has(i.name));
+  const someSelected = items.some((i) => selected.has(i.name)) && !allSelected;
 
   const toggleAll = (next: boolean) => {
-    setSelected(next ? new Set(items.map((i) => i.name)) : new Set());
+    const copy = new Set(selected);
+    if (next) for (const i of items) copy.add(i.name);
+    else for (const i of items) copy.delete(i.name);
+    onChange(copy);
   };
   const toggleOne = (attrName: string, next: boolean) => {
-    setSelected((prev) => {
-      const copy = new Set(prev);
-      if (next) copy.add(attrName); else copy.delete(attrName);
-      return copy;
-    });
+    const copy = new Set(selected);
+    if (next) copy.add(attrName);
+    else copy.delete(attrName);
+    onChange(copy);
   };
 
   return (
@@ -233,8 +247,7 @@ function DatasetBar({
   );
 }
 
-type StepKind = "from" | "join" | "aggregate" | "filter" | "sort";
-type Step = { id: string; kind: StepKind; parts: { label: string; value: string; mono?: boolean }[] };
+type LocalStepKind = StepKind;
 
 const initialPipeline: Step[] = [
   { id: "s1", kind: "from", parts: [
@@ -269,7 +282,7 @@ const addOptions: { kind: StepKind; label: string }[] = [
 type PartOptions = { kind: "list"; options: string[] } | { kind: "text" };
 
 type EditCtx = {
-  availableNames: string[];
+  slotNames: string[];
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
 };
@@ -307,11 +320,11 @@ function optionsForPart(step: Step, partLabel: string, ctx: EditCtx): PartOption
   const refs = referencedDatasets(ctx.steps, step.id);
   switch (step.kind) {
     case "from":
-      return { kind: "list", options: ctx.availableNames };
+      return { kind: "list", options: ctx.slotNames };
     case "join":
       if (partLabel === "JOIN") {
         const fromName = ctx.steps.find((s) => s.kind === "from")?.parts.find((p) => p.label === "FROM")?.value;
-        return { kind: "list", options: ctx.availableNames.filter((n) => n !== fromName) };
+        return { kind: "list", options: ctx.slotNames.filter((n) => n !== fromName) };
       }
       if (partLabel === "ON") return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot) };
       if (partLabel === "USING") return { kind: "list", options: joinOptions };
@@ -647,18 +660,21 @@ function PipelineSentence({
 
 
 function PipelineStrip({
-  availableNames,
+  slotNames,
   schemaBySlot,
+  steps,
+  setSteps,
 }: {
-  availableNames: string[];
+  slotNames: string[];
   schemaBySlot: Record<string, Attr[]>;
+  steps: Step[];
+  setSteps: React.Dispatch<React.SetStateAction<Step[]>>;
 }) {
-  const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const ctx: EditCtx = { availableNames, schemaBySlot, steps };
+  const ctx: EditCtx = { slotNames, schemaBySlot, steps };
 
   const updatePart = (stepId: string, partIndex: number, next: string) => {
     setSteps((prev) =>
@@ -681,15 +697,22 @@ function PipelineStrip({
 
   const addStep = (kind: StepKind) => {
     const id = `s${Date.now()}`;
+    const fromName = steps.find((s) => s.kind === "from")?.parts.find((p) => p.label === "FROM")?.value;
+    const otherSlot = slotNames.find((n) => n !== fromName) ?? slotNames[0] ?? "";
+    const refs = [fromName, otherSlot].filter(Boolean) as string[];
+    const allCols = columnsFor(refs, schemaBySlot);
+    const numCols = columnsFor(refs, schemaBySlot, (a) => a.type === "num");
+    const idCol = allCols.find((c) => /id|seqn/i.test(c)) ?? allCols[0] ?? "";
     const templates: Record<Exclude<StepKind, "from">, Step["parts"]> = {
-      join: [{ label: "JOIN", value: availableNames[1] ?? availableNames[0] ?? "", mono: true }, { label: "ON", value: "id", mono: true }, { label: "USING", value: "Inner Join" }],
-      aggregate: [{ label: "AGGREGATE", value: "level_sugar", mono: true }, { label: "BY", value: "Mean" }],
-      filter: [{ label: "FILTER", value: "blood_pressureH", mono: true }, { label: ">", value: "120", mono: true }],
-      sort: [{ label: "SORT", value: "heartRate_avg", mono: true }, { label: "↓", value: "Descending" }],
+      join: [{ label: "JOIN", value: otherSlot, mono: true }, { label: "ON", value: idCol, mono: true }, { label: "USING", value: "Inner Join" }],
+      aggregate: [{ label: "AGGREGATE", value: numCols[0] ?? "", mono: true }, { label: "BY", value: "Mean" }],
+      filter: [{ label: "FILTER", value: numCols[0] ?? allCols[0] ?? "", mono: true }, { label: "Greater than", value: "0", mono: true }],
+      sort: [{ label: "SORT", value: allCols[0] ?? "", mono: true }, { label: "↓", value: "Descending" }],
     };
     setSteps([...steps, { id, kind, parts: templates[kind as Exclude<StepKind, "from">] }]);
     setAdding(false);
   };
+
 
   return (
     <>
@@ -861,6 +884,205 @@ function ProjectHeader({
   );
 }
 
+// Deterministic mock-row generator for built-in demo datasets, so the preview
+// table is never empty before the user imports anything real.
+function mockRowsFor(slot: string, attrs: Attr[], count = 25): Row[] {
+  let seed = 0;
+  for (let i = 0; i < slot.length; i++) seed = (seed * 31 + slot.charCodeAt(i)) | 0;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) | 0;
+    return ((seed >>> 0) % 10000) / 10000;
+  };
+  const rows: Row[] = [];
+  for (let i = 0; i < count; i++) {
+    const r: Row = {};
+    for (const a of attrs) {
+      if (a.type === "id") r[a.name] = i + 1;
+      else if (a.type === "num") r[a.name] = Math.round((20 + rand() * 180) * 10) / 10;
+      else r[a.name] = ["A", "B", "C", "D"][Math.floor(rand() * 4)];
+    }
+    rows.push(r);
+  }
+  return rows;
+}
+
+const datasetARows = mockRowsFor("Dataset_A.csv", datasetA);
+const datasetBRows = mockRowsFor("Dataset_B.csv", datasetB);
+
+function PreviewTable({
+  result,
+}: {
+  result: ReturnType<typeof runPipeline>;
+}) {
+  if (result.columns.length === 0 || result.rows.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[340px] px-6 py-10">
+        <div className="h-12 w-12 rounded-xl bg-coral-tint flex items-center justify-center mb-3">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 text-coral" fill="none" stroke="currentColor" strokeWidth="1.75">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <path d="M3 10h18M9 4v16" />
+          </svg>
+        </div>
+        <p className="text-[14.5px] text-ink font-medium">No preview yet</p>
+        <p className="text-[13px] text-ink-2 mt-1 max-w-sm text-center">
+          Add a dataset and configure the FROM step to see your resulting table here.
+        </p>
+        {result.notes.length > 0 && (
+          <p className="text-[11.5px] text-ink-3 mt-3 italic">{result.notes.join(" · ")}</p>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 flex flex-col min-h-[340px]">
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-[12.5px] tabular border-collapse">
+          <thead className="sticky top-0 bg-surface z-10">
+            <tr className="border-b border-hairline">
+              {result.columns.map((c) => (
+                <th
+                  key={c}
+                  className="text-left font-mono font-semibold text-primary px-3 py-2 whitespace-nowrap"
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {result.rows.map((r, i) => (
+              <tr key={i} className="border-b border-hairline/40 hover:bg-canvas/40">
+                {result.columns.map((c) => {
+                  const v = r[c];
+                  const display = v === null || v === undefined || v === "" ? "—" : String(v);
+                  return (
+                    <td
+                      key={c}
+                      className="px-3 py-1.5 text-muted-foreground font-mono whitespace-nowrap"
+                    >
+                      {display}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="border-t border-hairline px-4 py-2 text-[11.5px] text-ink-3 tabular flex items-center gap-3">
+        <span>
+          Showing {result.rows.length.toLocaleString()} of {result.totalRows.toLocaleString()} rows · {result.columns.length} cols
+        </span>
+        {result.notes.length > 0 && <span className="italic">· {result.notes.join(" · ")}</span>}
+      </div>
+    </div>
+  );
+}
+
+const EXPORT_FORMATS = [
+  { ext: "csv", label: "CSV (.csv)", disabled: false },
+  { ext: "tsv", label: "TSV (.tsv)", disabled: false },
+  { ext: "json", label: "JSON (.json)", disabled: false },
+  { ext: "xlsx", label: "Excel (.xlsx)", disabled: false },
+  { ext: "xpt", label: "SAS XPORT (.xpt)", disabled: true },
+] as const;
+
+function downloadBlob(content: BlobPart, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(v: unknown, delim: string): string {
+  if (v === null || v === undefined) return "";
+  const s = String(v);
+  if (s.includes(delim) || s.includes("\n") || s.includes('"')) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function exportResult(result: ReturnType<typeof runPipeline>, baseName: string, ext: string) {
+  const cleanName = baseName.replace(/[^\w\- ]+/g, "").trim() || "dataset";
+  const filename = `${cleanName}.${ext}`;
+  if (ext === "csv" || ext === "tsv") {
+    const delim = ext === "csv" ? "," : "\t";
+    const lines = [result.columns.join(delim)];
+    for (const r of result.rows) {
+      lines.push(result.columns.map((c) => csvEscape(r[c], delim)).join(delim));
+    }
+    downloadBlob("\uFEFF" + lines.join("\n"), filename, `text/${ext}`);
+  } else if (ext === "json") {
+    downloadBlob(JSON.stringify(result.rows, null, 2), filename, "application/json");
+  } else if (ext === "xlsx") {
+    const ws = XLSX.utils.json_to_sheet(result.rows, { header: result.columns });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+    XLSX.writeFile(wb, filename);
+  }
+}
+
+function ExportMenu({
+  result,
+  baseName,
+}: {
+  result: ReturnType<typeof runPipeline>;
+  baseName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const disabled = result.columns.length === 0 || result.rows.length === 0;
+  return (
+    <div className="relative" ref={wrapRef}>
+      <button
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)] disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <Download className="h-3.5 w-3.5" />Export
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 bottom-full mb-2 min-w-[200px] bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 z-30 animate-in fade-in slide-in-from-bottom-1 duration-150">
+          {EXPORT_FORMATS.map((f) => (
+            <button
+              key={f.ext}
+              disabled={f.disabled}
+              onClick={() => {
+                setOpen(false);
+                exportResult(result, baseName, f.ext);
+                toast.success(`Exported as ${f.ext.toUpperCase()}`);
+              }}
+              className={`block w-full text-left px-3 py-2 text-[12.5px] transition ${
+                f.disabled
+                  ? "text-ink-3/50 cursor-not-allowed"
+                  : "text-ink hover:bg-surface-hover"
+              }`}
+            >
+              {f.label}
+              {f.disabled && <span className="ml-2 text-[10.5px] text-ink-3">not supported</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DatasetsPage() {
   const { projectId } = Route.useSearch();
   const project = useProject(projectId);
@@ -869,15 +1091,32 @@ function DatasetsPage() {
     project ? project.datasets : [],
   );
   const [importedDatasets, setImportedDatasets] = useState<
-    Record<string, { attrs: Attr[]; rowCount: number }>
+    Record<string, { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean }>
   >({});
+  const [steps, setSteps] = useState<Step[]>(() =>
+    project?.pipelineSteps && project.pipelineSteps.length > 0
+      ? project.pipelineSteps
+      : [{ id: "s1", kind: "from", parts: [{ label: "FROM", value: "", mono: true }] }],
+  );
+  const [selectedAttrs, setSelectedAttrs] = useState<Record<string, Set<string>>>({});
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // When switching projects, reseed slots from the new project's stored list.
+  // When switching projects, reseed slots + pipeline + selectedAttrs.
   useEffect(() => {
-    if (project) setDatasetSlots(project.datasets);
-    else setDatasetSlots([]);
+    if (project) {
+      setDatasetSlots(project.datasets);
+      if (project.pipelineSteps && project.pipelineSteps.length > 0) {
+        setSteps(project.pipelineSteps);
+      }
+      if (project.selectedAttrs) {
+        const map: Record<string, Set<string>> = {};
+        for (const [k, v] of Object.entries(project.selectedAttrs)) map[k] = new Set(v);
+        setSelectedAttrs(map);
+      }
+    } else {
+      setDatasetSlots([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
@@ -892,8 +1131,7 @@ function DatasetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetSlots, projectId]);
 
-  // Google-Docs-style auto-name: if project name is empty and a first dataset
-  // exists, persist its stem as the default name.
+  // Auto-name from first dataset stem.
   useEffect(() => {
     if (!projectId || !project) return;
     if (project.name.trim() !== "") return;
@@ -905,15 +1143,73 @@ function DatasetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetSlots, projectId, project?.name]);
 
+  // Default-select all attrs for newly added slots; drop selections for removed slots.
+  useEffect(() => {
+    setSelectedAttrs((prev) => {
+      const next: Record<string, Set<string>> = {};
+      for (const slot of datasetSlots) {
+        if (prev[slot]) next[slot] = prev[slot];
+        else {
+          const attrs =
+            slot === "Dataset_A.csv" ? datasetA
+            : slot === "Dataset_B.csv" ? datasetB
+            : importedDatasets[slot]?.attrs ?? [];
+          next[slot] = new Set(attrs.map((a) => a.name));
+        }
+      }
+      return next;
+    });
+  }, [datasetSlots, importedDatasets]);
+
+  // Sweep stale references in pipeline steps when slots change.
+  useEffect(() => {
+    setSteps((prev) => {
+      const slotSet = new Set(datasetSlots);
+      const swept = prev.map((s) => {
+        if (s.kind === "from") {
+          const fromVal = s.parts.find((p) => p.label === "FROM")?.value ?? "";
+          if (!slotSet.has(fromVal)) {
+            return {
+              ...s,
+              parts: s.parts.map((p) => p.label === "FROM" ? { ...p, value: datasetSlots[0] ?? "" } : p),
+            };
+          }
+        } else if (s.kind === "join") {
+          const joinVal = s.parts.find((p) => p.label === "JOIN")?.value ?? "";
+          if (!slotSet.has(joinVal)) return null;
+        }
+        return s;
+      });
+      return swept.filter(Boolean) as Step[];
+    });
+  }, [datasetSlots]);
+
+  // Persist pipeline + attr selection to project store.
+  useEffect(() => {
+    if (!projectId) return;
+    const selObj: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(selectedAttrs)) selObj[k] = [...v];
+    setProjectPipeline(projectId, steps, selObj);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [steps, selectedAttrs, projectId]);
+
   const q = attrFilter.trim().toLowerCase();
   const schemaBySlot: Record<string, Attr[]> = {
     "Dataset_A.csv": datasetA,
     "Dataset_B.csv": datasetB,
     ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.attrs])),
   };
-  const rowCountBySlot: Record<string, number | undefined> = Object.fromEntries(
-    Object.entries(importedDatasets).map(([k, v]) => [k, v.rowCount]),
-  );
+  const rowCountBySlot: Record<string, number | undefined> = {
+    "Dataset_A.csv": datasetARows.length,
+    "Dataset_B.csv": datasetBRows.length,
+    ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rowCount])),
+  };
+  const tables: Record<string, Row[]> = useMemo(() => ({
+    "Dataset_A.csv": datasetARows,
+    "Dataset_B.csv": datasetBRows,
+    ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rows])),
+  }), [importedDatasets]);
+
   const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
   const groups = datasetSlots.map((slot) => {
     const base = schemaBySlot[slot] ?? [];
@@ -921,6 +1217,26 @@ function DatasetsPage() {
     return { name: slot, items };
   });
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
+
+  // Flatten selected columns across all slots for the executor.
+  const selectedCols = useMemo(() => {
+    const out = new Set<string>();
+    for (const slot of datasetSlots) {
+      const sel = selectedAttrs[slot];
+      if (!sel) continue;
+      for (const c of sel) out.add(c);
+    }
+    return [...out];
+  }, [datasetSlots, selectedAttrs]);
+
+  const previewResult = useMemo(
+    () => runPipeline(steps, tables, selectedCols, { limit: 200 }),
+    [steps, tables, selectedCols],
+  );
+  const fullResult = useMemo(
+    () => runPipeline(steps, tables, selectedCols, { limit: Number.POSITIVE_INFINITY }),
+    [steps, tables, selectedCols],
+  );
 
   const addSlot = () => {
     const next = availableNames.find((d) => !datasetSlots.includes(d));
@@ -940,7 +1256,7 @@ function DatasetsPage() {
   const onFilesPicked = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     setImporting(true);
-    const newEntries: Record<string, { attrs: Attr[]; rowCount: number }> = {};
+    const newEntries: Record<string, { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean }> = {};
     const newSlotNames: string[] = [];
     const taken = new Set<string>([...ALL_DATASETS, ...Object.keys(importedDatasets)]);
     for (const file of Array.from(files)) {
@@ -1013,7 +1329,15 @@ function DatasetsPage() {
             />
           </div>
           {groups.map((g) => (
-            <AttrGroup key={g.name} name={g.name} items={g.items} />
+            <AttrGroup
+              key={g.name}
+              name={g.name}
+              items={g.items}
+              selected={selectedAttrs[g.name] ?? new Set()}
+              onChange={(next) =>
+                setSelectedAttrs((prev) => ({ ...prev, [g.name]: next }))
+              }
+            />
           ))}
           <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
             <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-data-plum" strokeWidth={2.5} />ID</span>
@@ -1062,17 +1386,13 @@ function DatasetsPage() {
 
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
-            <PipelineStrip availableNames={availableNames} schemaBySlot={schemaBySlot} />
-            <div className="flex-1 flex flex-col items-center justify-center min-h-[340px] px-6 py-10">
-              <div className="h-12 w-12 rounded-xl bg-coral-tint flex items-center justify-center mb-3">
-                <svg viewBox="0 0 24 24" className="h-5 w-5 text-coral" fill="none" stroke="currentColor" strokeWidth="1.75">
-                  <rect x="3" y="4" width="18" height="16" rx="2" />
-                  <path d="M3 10h18M9 4v16" />
-                </svg>
-              </div>
-              <p className="text-[14.5px] text-ink font-medium">No preview yet</p>
-              <p className="text-[13px] text-ink-2 mt-1 max-w-sm text-center">Add a step to your pipeline above to see your resulting table here.</p>
-            </div>
+            <PipelineStrip
+              slotNames={datasetSlots}
+              schemaBySlot={schemaBySlot}
+              steps={steps}
+              setSteps={setSteps}
+            />
+            <PreviewTable result={previewResult} />
           </div>
         </section>
       </div>
@@ -1081,20 +1401,20 @@ function DatasetsPage() {
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas/85 backdrop-blur-md">
         <div className="mx-auto max-w-[1280px] px-6 h-14 flex items-center justify-between">
           <div className="text-[12.5px] text-ink-2 tabular">
-            <span className="text-ink-3">Result:</span> <span className="font-mono text-ink">— rows × — cols</span>
-            <span className="mx-2 text-ink-3">·</span>
-            <span className="text-ink-3">Last saved 2 min ago</span>
+            <span className="text-ink-3">Result:</span>{" "}
+            <span className="font-mono text-ink">
+              {previewResult.totalRows.toLocaleString()} rows × {previewResult.columns.length} cols
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:bg-surface-hover transition flex items-center gap-1.5">
               <Save className="h-3.5 w-3.5" />Save
             </button>
-            <button className="h-9 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)]">
-              <Download className="h-3.5 w-3.5" />Export
-            </button>
+            <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
           </div>
         </div>
       </div>
     </div>
   );
 }
+
