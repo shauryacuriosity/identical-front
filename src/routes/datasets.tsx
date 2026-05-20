@@ -1239,8 +1239,8 @@ function DatasetsPage() {
   );
 
   const addSlot = () => {
-    const next = availableNames.find((d) => !datasetSlots.includes(d));
-    if (next) setDatasetSlots([...datasetSlots, next]);
+    if (datasetSlots.includes("")) return;
+    setDatasetSlots([...datasetSlots, ""]);
   };
 
   const uniqueName = (base: string, taken: Set<string>) => {
