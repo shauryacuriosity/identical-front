@@ -180,6 +180,9 @@
   --accent-foreground: var(--text-primary);
   --border: var(--border-muted);
   --input: var(--border-muted);
+
+  --shadow-drop-color: rgba(200, 200, 255, 0.25);
+  --shadow-inner-color: rgba(200, 200, 255, 0.25);
 }
 
 @layer base {
