@@ -49,15 +49,27 @@ const TypeIcon = ({ t }: { t: AttrType }) => {
   return <Type className="h-3 w-3 text-data-sage" strokeWidth={2.25} />;
 };
 
-function Checkbox({ label, mono }: { label: string; mono?: boolean }) {
-  const [on, setOn] = useState(false);
+function Checkbox({
+  label,
+  mono,
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  label: string;
+  mono?: boolean;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
     <label className="flex items-center gap-2.5 py-1 cursor-pointer text-[13px] group">
       <span
-        onClick={(e) => { e.preventDefault(); setOn(!on); }}
-        className={`h-[14px] w-[14px] rounded-[3px] border transition flex items-center justify-center ${on ? "bg-coral border-coral" : "border-ink-3/50 group-hover:border-ink-2"}`}
+        onClick={(e) => { e.preventDefault(); onChange(!checked); }}
+        className={`h-[14px] w-[14px] rounded-[3px] border transition flex items-center justify-center ${checked || indeterminate ? "bg-coral border-coral" : "border-ink-3/50 group-hover:border-ink-2"}`}
       >
-        {on && <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        {checked && !indeterminate && <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        {indeterminate && <span className="h-0.5 w-2 bg-white rounded-sm" />}
       </span>
       <span className={mono ? "font-mono text-[12px] text-ink" : "text-ink"}>{label}</span>
     </label>
@@ -66,6 +78,21 @@ function Checkbox({ label, mono }: { label: string; mono?: boolean }) {
 
 function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
   const [open, setOpen] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleAll = (next: boolean) => {
+    setSelected(next ? new Set(items.map((i) => i.name)) : new Set());
+  };
+  const toggleOne = (attrName: string, next: boolean) => {
+    setSelected((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(attrName); else copy.delete(attrName);
+      return copy;
+    });
+  };
+
   return (
     <div className="mb-4">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-[12px] font-semibold text-ink mb-1.5 w-full">
@@ -75,13 +102,19 @@ function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
       </button>
       {open && (
         <div className="pl-4 border-l border-hairline ml-1.5">
-          <Checkbox label="Select all" />
-          {items.map((a) => (
-            <div key={a.name} className="flex items-center gap-1.5">
-              <Checkbox label={a.name} mono />
-              <TypeIcon t={a.type} />
-            </div>
-          ))}
+          {items.length === 0 ? (
+            <p className="text-[11.5px] text-ink-2 italic py-1">No attributes</p>
+          ) : (
+            <>
+              <Checkbox label="Select all" checked={allSelected} indeterminate={someSelected} onChange={toggleAll} />
+              {items.map((a) => (
+                <div key={a.name} className="flex items-center gap-1.5">
+                  <Checkbox label={a.name} mono checked={selected.has(a.name)} onChange={(n) => toggleOne(a.name, n)} />
+                  <TypeIcon t={a.type} />
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
