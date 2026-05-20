@@ -1318,6 +1318,7 @@ function DatasetsPage() {
         effectiveName={effectiveName}
         isUntitled={isUntitled}
         placeholder={placeholder}
+        autoFocus={focusName}
       />
 
       <div className="flex gap-5">
