@@ -1,49 +1,94 @@
-Three small, contained fixes — all visual / state wiring, no query or token changes.
+# Palette + icon rollout
 
-## 1. Recent files: remove the status dot
+Five contained changes. No data/query/route logic touched.
 
-In `src/routes/index.tsx`, the leading cell currently swaps a `StatusDot` for a `RowCheckbox` on hover/selection. Drop the dot entirely and render the `RowCheckbox` permanently for every row (same component already used in the header for "select all"). Result: a normal selection column, no animated swap.
+## 1. Rebuild the design tokens (`src/styles.css`)
 
-- Delete the two stacked `<span>`s and the `StatusDot` usage in the row.
-- Keep the `RowCheckbox` (always visible, `checked={isSelected}`, `onChange={() => toggleOne(f.id)}`).
-- Leave `StatusDot` import/declaration in place if unused elsewhere — safer than ripping out and risking an unused-import flag; I'll remove it only if it's truly orphaned.
+Replace the current `:root` + `.dark` palette with the exact table values. Token names stay the same so no consumer code breaks; values change.
 
-## 2. Dark mode toggle — make the switch actually flip + give the theme something to do
+Light (`:root`):
+- `--bg-page: #F2D0CF` *(bg-dark — main page background)*
+- `--bg-emphasis: #CAA8A7` *(bg-dark faded)*
+- `--bg-surface: #FFF5F5` *(bg — cards, tiles, header pill)*
+- `--bg-highlight: #FFFFFF` *(NEW — hover/highlight)*
+- `--text-primary: #1A0003`
+- `--text-muted: #673D3D`
+- `--border-default: #A06B6B`
+- `--border-muted: #C49090`
+- `--accent-primary: #E8928E` (unchanged)
+- `--accent-secondary: #0077FF`
+- Inner shadow: `rgba(255,255,255,0.25)`; drop shadow: `rgba(0,0,0,0.25)`.
 
-Two problems today:
+Dark (`.dark`):
+- `--bg-page: #140F0F`
+- `--bg-emphasis: #0A0101`
+- `--bg-surface: #140405`
+- `--bg-highlight: #6E4A4A`
+- `--text-primary: #FFFFFF`
+- `--text-muted: #D4908A`
+- `--border-default: #737373`
+- `--border-muted: #3D1718`
+- `--accent-primary: #E8928E` (unchanged)
+- Inner shadow: `rgba(200,200,255,0.25)`; drop shadow: `rgba(200,200,255,0.25)`.
 
-a. **The switch UI doesn't visibly move.** The current `className` override on `<Switch>` (`h-6 w-11 [&>span]:h-5 [&>span]:w-5 [&>span]:data-[state=checked]:translate-x-5`) fights the thumb's built-in `translate-x-4`. Fix by either (i) dropping the custom size override and letting the default `h-5 w-9` switch render cleanly, or (ii) restyling via a small wrapper that sets thumb translate to match. I'll go with (i) — simpler, matches the prototype's pink pill feel via `data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/40` only, no size overrides. The thumb already animates correctly at default size.
+Add new token + alias: `--highlight: var(--bg-highlight)` and Tailwind utility binding `--color-highlight: var(--highlight)` in the `@theme inline` block so `bg-highlight` works.
 
-b. **Toggling `.dark` does almost nothing visually** because `src/styles.css` only redefines `--background` and `--foreground` under `.dark` — every other semantic token stays light. Add a proper dark override block under the existing `.dark { … }` selector that remaps the semantic tokens (canvas, surface, surface-hover, ink, ink-2, hairline, coral stays the same, etc.) to dark-mode values derived from the existing accent. This is a token *addition* under `.dark`, not a change to the locked light palette — the user's earlier "don't touch tokens" rule was about the light palette and is preserved.
+`--canvas / --surface / --surface-hover / --ink / --ink-2 / --hairline / --coral` aliases stay pointing at the same semantic slots so existing class usage keeps working — they just inherit the new hex values.
 
-   Dark values (semantic, no new accent hex — coral stays the same so brand carries through):
-   - `--bg-page: #1A0E0F` (very dark warm)
-   - `--bg-surface: #261617`
-   - `--bg-emphasis: #3A2122`
-   - `--text-primary: #FFF5F5`
-   - `--text-muted: #C49090`
-   - `--border-default: #4A2A2B`
-   - `--border-muted: #3A2122`
-   - Keep `--accent-primary` (coral) the same so buttons / links still pop.
+## 2. Copy uploaded assets into the project
 
-## 3. Header drop shadow: contain it to the pill, not the page
+- `user-uploads://File_plus.svg` → `src/assets/icon-file-plus.svg`
+- `user-uploads://Icon_shapes.svg` → `src/assets/icon-shapes.svg`
+- `user-uploads://Codesandbox.svg` → `src/assets/icon-codesandbox.svg`
+- `user-uploads://icon_warning_L.svg` → `src/assets/icon-warning.svg`
 
-In `src/routes/__root.tsx`, the `<header>` is `sticky top-0 z-30 pt-4 pb-2 px-6` with no background — but on scroll the pill's `0 8px 24px -10px` shadow visually reads as a band across the page because there's nothing clipping it and the header has no rounding of its own.
+Create a tiny `src/components/brand-icons.tsx` exporting `FilePlusIcon`, `ShapesIcon`, `CodesandboxIcon`, `WarningIcon` as inline React SVGs (same paths as the uploads) but with `stroke="currentColor"` instead of the hardcoded `#1A0003` / `#E8928E`. This lets us color them via Tailwind `text-*` classes (primary, ink, highlight).
 
-Fix on the **nav element only** (the pill):
-- Tighten the shadow so it hugs the pill: replace the current two-layer shadow with a softer, smaller-radius one — `box-shadow: 0 2px 8px -4px rgba(0,0,0,0.12), 0 8px 20px -12px rgba(0,0,0,0.18)`. Smaller spread + tighter offset = shadow stays inside the pill's footprint and follows its rounded shape (shadows are always clipped to the element's border-radius, so the pill's `rounded-full` already shapes it — the previous values were just too wide).
-- No background or shadow added to the outer `<header>` — that's what was making it feel like a full-width bar.
+## 3. Home page tiles (`src/routes/index.tsx`)
 
-After the edit I'll capture a screenshot at the user's viewport (1773px) to verify the shadow now reads as belonging to the pill, and that toggling dark mode actually changes the page.
+- Swap the Lucide `FilePlus` / `Shapes` / `Box` imports for the three brand icons above.
+- Icon color on tiles: `text-coral` (primary). Drop the tinted square wrapper background and the top accent bar — the icon itself carries the color.
+- `ActionTile` className change:
+  - Remove `hover:-translate-y-0.5 transition-all duration-200` → use `transition-colors`.
+  - Base bg: `bg-surface` (= `#FFF5F5` / `#140405`).
+  - Hover bg: `hover:bg-highlight` (= `#FFFFFF` / `#6E4A4A`).
+- Keep border + shadow as-is.
+
+## 4. Header tabs (`src/routes/__root.tsx`)
+
+Replace the Lucide `Database / BarChart3 / Sparkles` mapping with `{ FilePlusIcon, ShapesIcon, CodesandboxIcon }` from `brand-icons`. Render the icon (size 18) to the left of each label in the pill.
+
+State styling per spec:
+- **Inactive** tab: `text-ink` (icon + label both use text color), `hover:bg-highlight/40`.
+- **Active** tab: `bg-coral text-ink` (icon + label still text color, primary as highlight bg).
+
+Drop the current `text-ink-2` inactive and `bg-surface-hover/70` active treatments.
+
+## 5. AI Analysis status icon
+
+Wherever the AI-processing card shows the Codesandbox glyph (the live `runs.$runId.tsx` status panel, which is the implemented counterpart to screenshot 9):
+- While `status !== "complete"` (processing/pending/running) → render `<CodesandboxIcon className="text-highlight" />`.
+- When `status === "complete"` → `text-coral` (primary).
+
+If the run page currently uses a `Box`/`Loader` glyph for the status hero, swap it for `CodesandboxIcon` with the conditional class above. No state-machine or polling changes.
+
+## 6. Warning icon
+
+Add `WarningIcon` to `brand-icons` already colored via `text-coral` by default (its source stroke is `#E8928E`, which equals primary — re-export it with `stroke="currentColor"` and document that callers should pass `className="text-coral"`). Not wired into any page yet — this just makes it available and on-brand when used.
 
 ## Files touched
 
-- `src/routes/index.tsx` — remove dot swap, always render checkbox.
-- `src/routes/__root.tsx` — simplify `<Switch>` className; tighten nav `boxShadow`.
-- `src/styles.css` — extend the existing `.dark { … }` block with semantic token overrides (no changes to `:root`).
+- `src/styles.css` — token values for `:root` and `.dark`, add `--bg-highlight` + theme binding.
+- `src/components/brand-icons.tsx` — NEW, four inline SVG components.
+- `src/assets/icon-*.svg` — NEW, raw copies (kept for reference / future direct `<img>` use).
+- `src/routes/index.tsx` — swap icons on `ActionTile`, remove translate hover, switch to `bg-surface → hover:bg-highlight`.
+- `src/routes/__root.tsx` — swap tab icons, recolor active/inactive states.
+- `src/routes/runs.$runId.tsx` — conditional Codesandbox icon color for processing vs complete.
 
 ## Not touched
 
-- Any Supabase query, route, or `runs.$runId.tsx` polling.
-- The locked light palette in `:root`.
-- `src/components/ui/switch.tsx`.
+- Supabase queries, route registrations, settings dialog logic.
+- Locked accent (`--accent-primary` = `#E8928E`) — same in both modes.
+- `src/components/ui/*` primitives.
+
+After implementation I'll screenshot light + dark at the user's viewport to confirm: page bg = `#F2D0CF` / `#140F0F`, tiles hover to white / muted-rose, active tab pill is coral with dark text, processing icon is white-ish (highlight) and complete is coral.

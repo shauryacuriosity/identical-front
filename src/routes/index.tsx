@@ -2,14 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import {
-  FilePlus,
-  Shapes,
-  Box,
   FileText,
   SquareArrowOutUpRight,
   Copy,
   Archive,
 } from "lucide-react";
+import { FilePlusIcon, ShapesIcon, CodesandboxIcon } from "@/components/brand-icons";
 import { supabase } from "@/integrations/supabase/client";
 import lotusMark from "@/assets/logo_lotus.png";
 
@@ -98,19 +96,11 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-highlight transition-colors overflow-hidden"
       style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: "var(--coral)" }}
-      />
-      <div
-        className="flex items-center justify-center h-10 w-10 rounded-lg"
-        style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
-      >
-        <Icon className="h-5 w-5 text-coral" strokeWidth={1.75} />
+      <div className="flex items-center justify-center h-10 w-10 text-coral">
+        <Icon size={36} strokeWidth={3} />
       </div>
       <div className="flex flex-col gap-1">
         <div className="text-[15px] font-semibold text-ink leading-tight">{label}</div>
@@ -272,9 +262,9 @@ function Index() {
 
         {/* Action tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-14">
-          <ActionTile icon={FilePlus} label="New Dataset" desc="Import a CSV or connect a source" href="/datasets" />
-          <ActionTile icon={Shapes} label="New Visualisation" desc="Chart distributions and correlations" href="/visualisation" />
-          <ActionTile icon={Box} label="New AI Analysis" desc="Run MetS prediction, SHAP rankings, and subgroup clustering" href="/ai-analysis" />
+          <ActionTile icon={FilePlusIcon} label="New Dataset" desc="Import a CSV or connect a source" href="/datasets" />
+          <ActionTile icon={ShapesIcon} label="New Visualisation" desc="Chart distributions and correlations" href="/visualisation" />
+          <ActionTile icon={CodesandboxIcon} label="New AI Analysis" desc="Run MetS prediction, SHAP rankings, and subgroup clustering" href="/ai-analysis" />
         </div>
 
         {/* Recent files */}

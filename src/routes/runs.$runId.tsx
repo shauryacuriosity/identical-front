@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { CodesandboxIcon } from "@/components/brand-icons";
 
 export const Route = createFileRoute("/runs/$runId")({
   component: RunPage,
@@ -178,13 +179,17 @@ function StatusPill({ status }: { status: string }) {
 
 function RunProgressCard({ run }: { run: RunRow }) {
   const progress = Math.max(0, Math.min(100, run.progress ?? 0));
+  const failed = run.status === "failed";
   return (
-    <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6">
-      <PanelHeader
-        title={run.status === "failed" ? "Run failed" : "Running analysis…"}
-        subtitle={run.status === "failed" ? "Check the message below." : "This page will update automatically when results are ready."}
-      />
+    <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6 flex flex-col items-center text-center">
+      <CodesandboxIcon size={120} strokeWidth={2} className={failed ? "text-coral" : "text-highlight"} />
       <div className="mt-4">
+        <PanelHeader
+          title={failed ? "Run failed" : "Running analysis…"}
+          subtitle={failed ? "Check the message below." : "This page will update automatically when results are ready."}
+        />
+      </div>
+      <div className="mt-4 w-full max-w-md">
         <div className="h-2 w-full rounded-full bg-hairline overflow-hidden">
           <div className="h-full bg-coral transition-all" style={{ width: `${progress}%` }} />
         </div>
