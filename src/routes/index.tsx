@@ -198,39 +198,18 @@ function SkeletonRow({ last }: { last?: boolean }) {
 }
 
 function Index() {
-  type DatasetRow = {
-    id: string;
-    name: string;
-    uploaded_at: string | null;
-    row_count: number | null;
-    mets_prevalence: number | null;
-    archived: boolean | null;
-    status: string | null;
-  };
+  const projects = useProjects();
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["datasets", "recent"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("datasets")
-        .select("id,name,uploaded_at,row_count,mets_prevalence,archived,status")
-        .eq("archived", false)
-        .order("uploaded_at", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return (data ?? []) as DatasetRow[];
-    },
-  });
-
-  const rows: Recent[] = (data ?? []).map((d) => ({
-    id: d.id,
-    name: d.name,
-    type: "Dataset",
-    rows: d.row_count,
-    prevalence: d.mets_prevalence,
-    modified: formatRelative(d.uploaded_at),
-    archived: d.archived ?? false,
+  const rows = projects.map((p) => ({
+    id: p.id,
+    name: p.name || "Untitled project",
+    files: p.datasets.length,
+    prevalence: null as number | null,
+    modified: formatRelative(p.modifiedAt),
+    archived: false,
   }));
+  const isLoading = false;
+  const error: Error | null = null;
 
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -292,10 +271,10 @@ function Index() {
           />
         </div>
 
-        {/* Recent files */}
+        {/* Recent projects */}
         <div className="flex items-baseline justify-between mb-4">
           <div className="flex items-baseline gap-3">
-            <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent files</h2>
+            <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent Projects</h2>
             {rows.length > 0 && (
               <span className="text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5 font-medium">
                 {rows.length}
@@ -311,7 +290,7 @@ function Index() {
           style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
         >
           {/* Header row */}
-          <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
+          <div className="grid grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
             <span className="flex items-center justify-center">
               {rows.length > 0 && (
                 <RowCheckbox
@@ -323,8 +302,7 @@ function Index() {
               )}
             </span>
             <span>Name</span>
-            <span>Type</span>
-            <span className="text-right tabular">Rows</span>
+            <span className="text-right tabular">Files</span>
             <span className="text-right">MetS prevalence</span>
             <span className="text-right">Modified</span>
           </div>
@@ -333,11 +311,11 @@ function Index() {
             {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
 
             {!isLoading && error && (
-              <div className="px-5 py-6 text-[13px] text-ink-2">Failed to load — {error.message}</div>
+              <div className="px-5 py-6 text-[13px] text-ink-2">Failed to load — {(error as Error).message}</div>
             )}
 
             {!isLoading && !error && rows.length === 0 && (
-              <div className="px-5 py-6 text-[13px] text-ink-2">No datasets yet</div>
+              <div className="px-5 py-6 text-[13px] text-ink-2">No projects yet</div>
             )}
 
             {!isLoading &&
@@ -351,14 +329,14 @@ function Index() {
                     key={f.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => navigate({ to: "/datasets", search: { datasetId: f.id } })}
+                    onClick={() => navigate({ to: "/datasets", search: { projectId: f.id } })}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        navigate({ to: "/datasets", search: { datasetId: f.id } });
+                        navigate({ to: "/datasets", search: { projectId: f.id } });
                       }
                     }}
-                    className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+                    className={`group relative grid grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
                       isLast ? "" : "border-b border-hairline"
                     } ${f.archived ? "opacity-75" : ""}`}
                   >
@@ -388,12 +366,10 @@ function Index() {
                       <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
                     </div>
 
-                    <div>
-                      <TypePill type={f.type} archived={f.archived} />
-                    </div>
-
-                    <span className="tabular text-[12.5px] text-ink-2 text-right">
-                      {f.rows != null ? f.rows.toLocaleString() : <Em />}
+                    <span
+                      className={`tabular text-[12.5px] text-right ${f.files === 0 ? "text-ink-3" : "text-ink-2"}`}
+                    >
+                      {f.files} file{f.files === 1 ? "" : "s"}
                     </span>
 
                     <span className="tabular text-[12.5px] text-ink-2 text-right">
