@@ -190,8 +190,9 @@ function DatasetBar({
   availableNames: string[];
   rowCount?: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(value === "");
   const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : "2,431 rows";
+  const isEmpty = value === "";
   return (
     <div className="relative mb-2.5">
       <button
@@ -199,9 +200,15 @@ function DatasetBar({
         className="w-full bg-surface rounded-lg px-5 h-12 flex items-center justify-between border border-hairline shadow-[var(--shadow-xs)] hover:border-ink-3/40 transition"
       >
         <div className="flex items-center gap-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-coral" />
-          <span className="font-mono text-[13.5px] text-ink">{value}</span>
-          <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
+          <span className={`h-1.5 w-1.5 rounded-full ${isEmpty ? "bg-ink-3/40" : "bg-coral"}`} />
+          {isEmpty ? (
+            <span className="text-[13.5px] text-ink-2 italic">Please select a dataset</span>
+          ) : (
+            <>
+              <span className="font-mono text-[13.5px] text-ink">{value}</span>
+              <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
