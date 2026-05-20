@@ -176,18 +176,19 @@ function Em() {
   return <span className="text-ink-2">—</span>;
 }
 
-function SkeletonRow() {
+function SkeletonRow({ last }: { last?: boolean }) {
   return (
     <div
-      className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-4 rounded-xl bg-surface"
-      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+      className={`grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 ${
+        last ? "" : "border-b border-hairline"
+      }`}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-hairline-grey opacity-40" />
-      <div className="h-3.5 rounded bg-surface-hover/70 animate-pulse" />
-      <div className="h-4 w-16 rounded-full bg-surface-hover/70 animate-pulse" />
-      <div className="h-3 w-12 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
-      <div className="h-3 w-16 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
-      <div className="h-3 w-14 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
+      <div className="h-3.5 rounded bg-surface-hover/60 animate-pulse" />
+      <div className="h-4 w-16 rounded-full bg-surface-hover/60 animate-pulse" />
+      <div className="h-3 w-12 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
+      <div className="h-3 w-16 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
+      <div className="h-3 w-14 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
     </div>
   );
 }
