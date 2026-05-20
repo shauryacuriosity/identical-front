@@ -277,7 +277,7 @@ function Index() {
         {/* Unified table card */}
         <div
           className="rounded-2xl bg-surface border border-hairline overflow-hidden"
-          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
+          style={{ boxShadow: "var(--shadow-depth)" }}
         >
           {/* Header row */}
           <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
