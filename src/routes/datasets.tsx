@@ -151,17 +151,72 @@ function Dropdown({ label, options }: { label: string; options: string[] }) {
   );
 }
 
-function DatasetBar({ name }: { name: string }) {
+const ALL_DATASETS = ["Dataset_A.csv", "Dataset_B.csv"];
+
+function DatasetBar({
+  value,
+  onChange,
+  onRemove,
+  usedNames,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  onRemove?: () => void;
+  usedNames: string[];
+}) {
   const [open, setOpen] = useState(false);
   return (
-    <button onClick={() => setOpen(!open)} className="w-full bg-surface rounded-lg px-5 h-12 flex items-center justify-between border border-hairline shadow-[var(--shadow-xs)] mb-2.5 hover:border-ink-3/40 transition">
-      <div className="flex items-center gap-3">
-        <span className="h-1.5 w-1.5 rounded-full bg-coral" />
-        <span className="font-mono text-[13.5px] text-ink">{name}</span>
-        <span className="text-[11px] text-ink-3 tabular">· 2,431 rows</span>
-      </div>
-      <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
-    </button>
+    <div className="relative mb-2.5">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full bg-surface rounded-lg px-5 h-12 flex items-center justify-between border border-hairline shadow-[var(--shadow-xs)] hover:border-ink-3/40 transition"
+      >
+        <div className="flex items-center gap-3">
+          <span className="h-1.5 w-1.5 rounded-full bg-coral" />
+          <span className="font-mono text-[13.5px] text-ink">{value}</span>
+          <span className="text-[11px] text-ink-3 tabular">· 2,431 rows</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+          {onRemove && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Remove dataset"
+              onClick={(e) => { e.stopPropagation(); onRemove(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onRemove(); } }}
+              className="ml-1 h-6 w-6 rounded-md flex items-center justify-center text-ink-3 hover:bg-surface-hover hover:text-ink transition cursor-pointer"
+            >
+              <X className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </div>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1.5 left-0 right-0 bg-surface rounded-lg shadow-[var(--shadow-lg)] overflow-hidden border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          {ALL_DATASETS.map((opt) => {
+            const disabled = opt !== value && usedNames.includes(opt);
+            return (
+              <button
+                key={opt}
+                disabled={disabled}
+                onClick={() => { onChange(opt); setOpen(false); }}
+                className={`block w-full text-left px-4 py-2 font-mono text-[13px] transition ${
+                  disabled
+                    ? "text-ink-3/50 cursor-not-allowed"
+                    : opt === value
+                      ? "text-coral hover:bg-surface-hover"
+                      : "text-ink hover:bg-surface-hover"
+                }`}
+              >
+                {opt}
+                {disabled && <span className="ml-2 font-sans text-[11px] text-ink-3">in use</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -450,8 +505,8 @@ function DatasetsPage() {
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const addSlot = () => {
-    const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
-    setDatasetSlots([...datasetSlots, `Dataset_${nextLetter}.csv`]);
+    const next = ALL_DATASETS.find((d) => !datasetSlots.includes(d));
+    if (next) setDatasetSlots([...datasetSlots, next]);
   };
 
   return (
@@ -494,12 +549,19 @@ function DatasetsPage() {
 
         {/* Main */}
         <section className="flex-1 flex flex-col min-w-0">
-          {datasetSlots.map((name) => (
-            <DatasetBar key={name} name={name} />
+          {datasetSlots.map((name, i) => (
+            <DatasetBar
+              key={`${name}-${i}`}
+              value={name}
+              usedNames={datasetSlots}
+              onChange={(next) => setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))}
+              onRemove={() => setDatasetSlots((slots) => slots.filter((_, idx) => idx !== i))}
+            />
           ))}
           <button
             onClick={addSlot}
-            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5"
+            disabled={datasetSlots.length >= ALL_DATASETS.length}
+            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
           >
             <Plus className="h-3.5 w-3.5" /> Add dataset
           </button>

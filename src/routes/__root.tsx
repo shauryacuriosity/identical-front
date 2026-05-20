@@ -110,7 +110,6 @@ function AppHeader() {
               "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors text-ink " +
               (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
-            style={homeActive ? { boxShadow: "var(--shadow-depth)" } : undefined}
           >
             {homeActive ? (
               <LotusMarkActive className="h-[18px] w-auto text-ink" />
@@ -137,7 +136,6 @@ function AppHeader() {
                     "h-10 px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink " +
                     (active ? "bg-coral" : "hover:bg-highlight/50")
                   }
-                  style={active ? { boxShadow: "var(--shadow-depth)" } : undefined}
                 >
                   <Icon size={18} strokeWidth={2.5} />
                   {t.label}
