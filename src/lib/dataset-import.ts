@@ -3,7 +3,8 @@ import * as XLSX from "xlsx";
 export type AttrType = "id" | "num" | "cat";
 export type Attr = { name: string; type: AttrType };
 
-export type ParsedDataset = { attrs: Attr[]; rowCount: number };
+export type Row = Record<string, unknown>;
+export type ParsedDataset = { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean };
 
 function inferType(name: string, samples: unknown[]): AttrType {
   const lower = name.toLowerCase();
