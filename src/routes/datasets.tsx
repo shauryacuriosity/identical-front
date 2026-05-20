@@ -612,17 +612,36 @@ function DatasetsPage() {
               key={`${name}-${i}`}
               value={name}
               usedNames={datasetSlots}
+              availableNames={availableNames}
+              rowCount={rowCountBySlot[name]}
               onChange={(next) => setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))}
               onRemove={() => setDatasetSlots((slots) => slots.filter((_, idx) => idx !== i))}
             />
           ))}
-          <button
-            onClick={addSlot}
-            disabled={datasetSlots.length >= ALL_DATASETS.length}
-            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add dataset
-          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.xpt"
+            onChange={(e) => onFilesPicked(e.target.files)}
+            className="hidden"
+          />
+          <div className="flex gap-2.5 mb-2.5">
+            <button
+              onClick={addSlot}
+              disabled={datasetSlots.length >= availableNames.length}
+              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add dataset
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+            >
+              <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import file"}
+            </button>
+          </div>
 
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
