@@ -835,6 +835,7 @@ function ProjectHeader({
     <div className="mb-4 flex items-center gap-2">
       {projectId ? (
         <input
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={(e) => commit(e.target.value)}
