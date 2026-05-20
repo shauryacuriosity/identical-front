@@ -383,6 +383,7 @@ function RootComponent() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </QueryClientProvider>
   );
 }
