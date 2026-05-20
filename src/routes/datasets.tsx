@@ -282,7 +282,7 @@ const addOptions: { kind: StepKind; label: string }[] = [
 type PartOptions = { kind: "list"; options: string[] } | { kind: "text" };
 
 type EditCtx = {
-  availableNames: string[];
+  slotNames: string[];
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
 };
@@ -320,11 +320,11 @@ function optionsForPart(step: Step, partLabel: string, ctx: EditCtx): PartOption
   const refs = referencedDatasets(ctx.steps, step.id);
   switch (step.kind) {
     case "from":
-      return { kind: "list", options: ctx.availableNames };
+      return { kind: "list", options: ctx.slotNames };
     case "join":
       if (partLabel === "JOIN") {
         const fromName = ctx.steps.find((s) => s.kind === "from")?.parts.find((p) => p.label === "FROM")?.value;
-        return { kind: "list", options: ctx.availableNames.filter((n) => n !== fromName) };
+        return { kind: "list", options: ctx.slotNames.filter((n) => n !== fromName) };
       }
       if (partLabel === "ON") return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot) };
       if (partLabel === "USING") return { kind: "list", options: joinOptions };
