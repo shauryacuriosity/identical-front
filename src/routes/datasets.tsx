@@ -1,17 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseDatasetFile } from "@/lib/dataset-import";
+import {
+  useProjects,
+  useProject,
+  createProject,
+  renameProject,
+  setProjectDatasets,
+} from "@/lib/projects-store";
 
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
-    datasetId: typeof s.datasetId === "string" ? s.datasetId : undefined,
+    projectId: typeof s.projectId === "string" ? s.projectId : undefined,
   }),
   component: DatasetsPage,
 });
+
 
 type AttrType = "id" | "num" | "cat";
 type Attr = { name: string; type: AttrType };
