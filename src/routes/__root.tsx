@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Database, BarChart3, Sparkles, User, X, ExternalLink } from "lucide-react";
+import * as React from "react";
 import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
