@@ -1092,7 +1092,7 @@ function ExportMenu({
 }
 
 function DatasetsPage() {
-  const { projectId } = Route.useSearch();
+  const { projectId, focusName } = Route.useSearch();
   const project = useProject(projectId);
   const [attrFilter, setAttrFilter] = useState("");
   const [datasetSlots, setDatasetSlots] = useState<string[]>(
