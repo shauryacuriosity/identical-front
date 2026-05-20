@@ -247,8 +247,7 @@ function DatasetBar({
   );
 }
 
-type StepKind = "from" | "join" | "aggregate" | "filter" | "sort";
-type Step = { id: string; kind: StepKind; parts: { label: string; value: string; mono?: boolean }[] };
+type LocalStepKind = StepKind;
 
 const initialPipeline: Step[] = [
   { id: "s1", kind: "from", parts: [
