@@ -1410,7 +1410,7 @@ function DatasetsPage() {
             <button className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:bg-surface-hover transition flex items-center gap-1.5">
               <Save className="h-3.5 w-3.5" />Save
             </button>
-            <ExportMenu result={exportResult} baseName={effectiveName || "dataset"} />
+            <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
           </div>
         </div>
       </div>
