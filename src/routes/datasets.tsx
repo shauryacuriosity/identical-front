@@ -549,12 +549,19 @@ function DatasetsPage() {
 
         {/* Main */}
         <section className="flex-1 flex flex-col min-w-0">
-          {datasetSlots.map((name) => (
-            <DatasetBar key={name} name={name} />
+          {datasetSlots.map((name, i) => (
+            <DatasetBar
+              key={`${name}-${i}`}
+              value={name}
+              usedNames={datasetSlots}
+              onChange={(next) => setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))}
+              onRemove={() => setDatasetSlots((slots) => slots.filter((_, idx) => idx !== i))}
+            />
           ))}
           <button
             onClick={addSlot}
-            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5"
+            disabled={datasetSlots.length >= ALL_DATASETS.length}
+            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
           >
             <Plus className="h-3.5 w-3.5" /> Add dataset
           </button>
