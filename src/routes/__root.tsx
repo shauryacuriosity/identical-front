@@ -75,36 +75,27 @@ function AppHeader() {
       <div className="mx-auto max-w-[1280px]">
         {/* Floating pill nav */}
         <nav
-          className="relative h-12 rounded-full bg-surface flex items-center pl-4 pr-3"
-          style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.25)" }}
+          className="relative h-14 rounded-full bg-surface flex items-center pl-5 pr-3 border border-hairline"
+          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 8px 24px -10px rgba(0,0,0,0.22)" }}
         >
           {/* Brand cluster — acts as Home link */}
           <Link
             to="/"
             aria-label="Home"
             className={
-              "relative flex items-center gap-2 px-4 h-9 my-auto rounded-2xl transition-colors " +
-              (homeActive ? "text-ink" : "text-ink hover:opacity-80")
-            }
-            style={
-              homeActive
-                ? { backgroundColor: "color-mix(in oklab, var(--accent-primary) 18%, transparent)" }
-                : undefined
+              "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors " +
+              (homeActive ? "bg-surface-hover/70 text-ink" : "text-ink hover:bg-surface-hover/40")
             }
           >
-            {/* Hide the lotus icon when active (coral background can wash it out) */}
-            {!homeActive && <img src={lotusMark} alt="" className="h-[18px] w-auto" />}
+            <img src={lotusMark} alt="" className="h-[18px] w-auto" />
             <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
-            {homeActive && (
-              <span
-                className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full"
-                style={{ backgroundColor: "var(--accent-primary)" }}
-              />
-            )}
           </Link>
 
+          {/* Divider */}
+          <span className="mx-3 h-6 w-px bg-hairline" />
+
           {/* Tabs */}
-          <div className="flex items-center gap-1 h-full ml-2">
+          <div className="flex items-center gap-1 h-full">
             {tabs.map((t) => {
               const active = pathname.startsWith(t.to);
               return (
@@ -113,22 +104,11 @@ function AppHeader() {
                   to={t.to}
                   aria-label={t.label}
                   className={
-                    "relative h-9 px-4 my-auto flex items-center justify-center text-[15px] font-medium rounded-2xl transition-colors " +
-                    (active ? "text-ink" : "text-ink hover:opacity-70")
-                  }
-                  style={
-                    active
-                      ? { backgroundColor: "color-mix(in oklab, var(--accent-primary) 18%, transparent)" }
-                      : undefined
+                    "h-10 px-4 my-auto flex items-center justify-center text-[14px] font-semibold tracking-tight rounded-full transition-colors " +
+                    (active ? "bg-surface-hover/70 text-ink" : "text-ink-2 hover:text-ink hover:bg-surface-hover/40")
                   }
                 >
                   {t.label}
-                  {active && (
-                    <span
-                      className="absolute left-3 right-3 bottom-1 h-[2px] rounded-full"
-                      style={{ backgroundColor: "var(--accent-primary)" }}
-                    />
-                  )}
                 </Link>
               );
             })}
@@ -136,14 +116,13 @@ function AppHeader() {
 
           {/* Right side */}
           <div className="ml-auto flex items-center gap-3">
-            <button className="hidden sm:flex items-center text-[13px] text-ink font-medium hover:opacity-70 transition">
+            <button className="hidden sm:flex items-center text-[13px] text-ink-2 font-medium hover:text-ink transition">
               UOW eAsia
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="h-9 w-9 rounded-full bg-surface flex items-center justify-center text-ink cursor-pointer"
-                  style={{ border: "2px solid var(--accent-primary)" }}
+                  className="h-10 w-10 rounded-full bg-surface flex items-center justify-center text-ink cursor-pointer border border-hairline-strong hover:bg-surface-hover/40 transition-colors"
                   aria-label="Account menu"
                 >
                   <User className="h-4 w-4" strokeWidth={1.75} />

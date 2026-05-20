@@ -87,6 +87,7 @@ function formatRelative(iso: string | null): string {
 function ActionTile({
   icon: Icon,
   label,
+  desc,
   href,
 }: {
   icon: React.ElementType;
@@ -97,11 +98,24 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group flex flex-col items-center justify-center gap-4 rounded-2xl bg-surface py-10 px-6 hover:-translate-y-0.5 transition-transform duration-150"
-      style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <Icon className="h-10 w-10 text-ink" strokeWidth={1.5} />
-      <div className="text-[15px] font-bold text-ink text-center">{label}</div>
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: "var(--coral)" }}
+      />
+      <div
+        className="flex items-center justify-center h-10 w-10 rounded-lg"
+        style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
+      >
+        <Icon className="h-5 w-5 text-coral" strokeWidth={1.75} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="text-[15px] font-semibold text-ink leading-tight">{label}</div>
+        <div className="text-[12.5px] text-ink-2 leading-snug">{desc}</div>
+      </div>
     </Link>
   );
 }
@@ -162,18 +176,19 @@ function Em() {
   return <span className="text-ink-2">—</span>;
 }
 
-function SkeletonRow() {
+function SkeletonRow({ last }: { last?: boolean }) {
   return (
     <div
-      className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-4 rounded-xl bg-surface"
-      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+      className={`grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 ${
+        last ? "" : "border-b border-hairline"
+      }`}
     >
       <span className="inline-block h-2 w-2 rounded-full bg-hairline-grey opacity-40" />
-      <div className="h-3.5 rounded bg-surface-hover/70 animate-pulse" />
-      <div className="h-4 w-16 rounded-full bg-surface-hover/70 animate-pulse" />
-      <div className="h-3 w-12 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
-      <div className="h-3 w-16 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
-      <div className="h-3 w-14 rounded bg-surface-hover/70 animate-pulse justify-self-end" />
+      <div className="h-3.5 rounded bg-surface-hover/60 animate-pulse" />
+      <div className="h-4 w-16 rounded-full bg-surface-hover/60 animate-pulse" />
+      <div className="h-3 w-12 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
+      <div className="h-3 w-16 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
+      <div className="h-3 w-14 rounded bg-surface-hover/60 animate-pulse justify-self-end" />
     </div>
   );
 }
@@ -231,138 +246,163 @@ function Index() {
   const hasSelection = selected.size > 0;
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-16">
-      {/* Greeting */}
-      <div className="mb-6">
-        <img src={lotusMark} alt="" className="h-8 w-auto mb-3" />
-        <h1 className="text-[28px] leading-tight text-ink">Welcome back</h1>
-        <p className="text-[13.5px] text-ink-2 mt-1">Pick up where you left off, or start something new.</p>
-      </div>
-
-      {/* Action tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12 max-w-[840px] mx-auto">
-        <ActionTile icon={FilePlus} label="New Dataset" desc="Import a CSV or connect a source" href="/datasets" />
-        <ActionTile icon={Shapes} label="New Visualisation" desc="Chart distributions and correlations" href="/visualisation" />
-        <ActionTile icon={Box} label="New AI Analysis" desc="Run MetS prediction, SHAP rankings, and subgroup clustering" href="/ai-analysis" />
-      </div>
-
-      {/* Recent files */}
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-[20px] text-ink">Recent files</h2>
-        <button className="text-[12.5px] text-ink-2 hover:text-ink transition">View all</button>
-      </div>
-
-      {/* Header row */}
-      <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-2 text-[10.5px] uppercase tracking-[0.12em] text-ink-2">
-        <span className="flex items-center justify-center">
-          {rows.length > 0 && (
-            <RowCheckbox
-              checked={allChecked}
-              indeterminate={someChecked}
-              onChange={toggleAll}
-              ariaLabel="Select all rows"
-            />
-          )}
-        </span>
-        <span>Name</span>
-        <span>Type</span>
-        <span className="text-right tabular">Rows</span>
-        <span className="text-right">MetS prevalence</span>
-        <span className="text-right">Modified</span>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
-
-        {!isLoading && error && (
-          <div
-            className="px-5 py-4 rounded-xl bg-surface text-[13px] text-ink-2"
-            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
-          >
-            Failed to load — {error.message}
-          </div>
-        )}
-
-        {!isLoading && !error && rows.length === 0 && (
-          <div
-            className="px-5 py-4 rounded-xl bg-surface text-[13px] text-ink-2"
-            style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
-          >
-            No datasets yet
-          </div>
-        )}
-
-        {!isLoading && !error && rows.map((f) => {
-          const isSelected = selected.has(f.id);
-          const showCheckbox = hasSelection || isSelected;
-          return (
-            <div
-              key={f.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate({ to: "/datasets", search: { datasetId: f.id } })}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  navigate({ to: "/datasets", search: { datasetId: f.id } });
-                }
-              }}
-              className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-4 rounded-xl bg-surface cursor-pointer hover:-translate-y-px transition-transform duration-150 ${
-                f.archived ? "opacity-75" : ""
-              }`}
-              style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
-            >
-              <span className="flex items-center justify-center relative h-[14px] w-[14px]">
-                <span
-                  className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                    showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
-                  }`}
-                >
-                  <StatusDot active={!f.archived} />
-                </span>
-                <span
-                  className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                    showCheckbox ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  }`}
-                >
-                  <RowCheckbox
-                    checked={isSelected}
-                    onChange={() => toggleOne(f.id)}
-                    ariaLabel={`Select ${f.name}`}
-                  />
-                </span>
-              </span>
-
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="h-4 w-4 text-ink-2 shrink-0" strokeWidth={1.75} />
-                <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
-              </div>
-
-              <div>
-                <TypePill type={f.type} archived={f.archived} />
-              </div>
-
-              <span className="tabular text-[12.5px] text-ink-2 text-right">
-                {f.rows != null ? f.rows.toLocaleString() : <Em />}
-              </span>
-
-              <span className="tabular text-[12.5px] text-ink-2 text-right">
-                {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
-              </span>
-
-              <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
-
-              <div
-                className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
-                style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
-              >
-                <RowAction icon={SquareArrowOutUpRight} label="Open" />
-                <RowAction icon={Copy} label="Duplicate" />
-                <RowAction icon={Archive} label="Archive" />
-              </div>
+    <div
+      className="relative"
+      style={{
+        backgroundImage:
+          "radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in oklab, var(--bg-surface) 45%, transparent), transparent 70%)",
+      }}
+    >
+      <div className="mx-auto max-w-[1280px] px-6 pt-10 pb-16">
+        {/* Greeting */}
+        <div className="mb-14 flex items-start gap-4">
+          <img src={lotusMark} alt="" className="h-12 w-auto mt-1 shrink-0" />
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">
+              Workbench
             </div>
-          );
-        })}
+            <h1 className="text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">
+              Welcome back
+            </h1>
+            <p className="text-[15px] text-ink-2 mt-3 max-w-[520px] leading-relaxed">
+              Pick up where you left off, or start something new.
+            </p>
+          </div>
+        </div>
+
+        {/* Action tiles */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-14">
+          <ActionTile icon={FilePlus} label="New Dataset" desc="Import a CSV or connect a source" href="/datasets" />
+          <ActionTile icon={Shapes} label="New Visualisation" desc="Chart distributions and correlations" href="/visualisation" />
+          <ActionTile icon={Box} label="New AI Analysis" desc="Run MetS prediction, SHAP rankings, and subgroup clustering" href="/ai-analysis" />
+        </div>
+
+        {/* Recent files */}
+        <div className="flex items-baseline justify-between mb-4">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent files</h2>
+            {rows.length > 0 && (
+              <span className="text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5 font-medium">
+                {rows.length}
+              </span>
+            )}
+          </div>
+          <button className="text-[12.5px] text-ink-2 hover:text-ink transition">View all</button>
+        </div>
+
+        {/* Unified table card */}
+        <div
+          className="rounded-2xl bg-surface border border-hairline overflow-hidden"
+          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
+        >
+          {/* Header row */}
+          <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
+            <span className="flex items-center justify-center">
+              {rows.length > 0 && (
+                <RowCheckbox
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onChange={toggleAll}
+                  ariaLabel="Select all rows"
+                />
+              )}
+            </span>
+            <span>Name</span>
+            <span>Type</span>
+            <span className="text-right tabular">Rows</span>
+            <span className="text-right">MetS prevalence</span>
+            <span className="text-right">Modified</span>
+          </div>
+
+          <div>
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonRow key={i} last={i === 4} />
+              ))}
+
+            {!isLoading && error && (
+              <div className="px-5 py-6 text-[13px] text-ink-2">
+                Failed to load — {error.message}
+              </div>
+            )}
+
+            {!isLoading && !error && rows.length === 0 && (
+              <div className="px-5 py-6 text-[13px] text-ink-2">No datasets yet</div>
+            )}
+
+            {!isLoading && !error && rows.map((f, i) => {
+              const isSelected = selected.has(f.id);
+              const showCheckbox = hasSelection || isSelected;
+              const isLast = i === rows.length - 1;
+              return (
+                <div
+                  key={f.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate({ to: "/datasets", search: { datasetId: f.id } })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate({ to: "/datasets", search: { datasetId: f.id } });
+                    }
+                  }}
+                  className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+                    isLast ? "" : "border-b border-hairline"
+                  } ${f.archived ? "opacity-75" : ""}`}
+                >
+                  <span className="flex items-center justify-center relative h-[14px] w-[14px]">
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center transition-opacity ${
+                        showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
+                      }`}
+                    >
+                      <StatusDot active={!f.archived} />
+                    </span>
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center transition-opacity ${
+                        showCheckbox ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                      }`}
+                    >
+                      <RowCheckbox
+                        checked={isSelected}
+                        onChange={() => toggleOne(f.id)}
+                        ariaLabel={`Select ${f.name}`}
+                      />
+                    </span>
+                  </span>
+
+                  <div className="flex items-center gap-3 min-w-0">
+                    <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
+                    <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
+                  </div>
+
+                  <div>
+                    <TypePill type={f.type} archived={f.archived} />
+                  </div>
+
+                  <span className="tabular text-[12.5px] text-ink-2 text-right">
+                    {f.rows != null ? f.rows.toLocaleString() : <Em />}
+                  </span>
+
+                  <span className="tabular text-[12.5px] text-ink-2 text-right">
+                    {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
+                  </span>
+
+                  <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
+
+                  <div
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
+                    style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+                  >
+                    <RowAction icon={SquareArrowOutUpRight} label="Open" />
+                    <RowAction icon={Copy} label="Duplicate" />
+                    <RowAction icon={Archive} label="Archive" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
