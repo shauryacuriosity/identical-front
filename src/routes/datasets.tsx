@@ -912,7 +912,7 @@ function DatasetsPage() {
 
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
-            <PipelineStrip />
+            <PipelineStrip availableNames={availableNames} schemaBySlot={schemaBySlot} />
             <div className="flex-1 flex flex-col items-center justify-center min-h-[340px] px-6 py-10">
               <div className="h-12 w-12 rounded-xl bg-coral-tint flex items-center justify-center mb-3">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 text-coral" fill="none" stroke="currentColor" strokeWidth="1.75">
