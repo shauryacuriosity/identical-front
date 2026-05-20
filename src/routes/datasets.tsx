@@ -995,7 +995,9 @@ function DatasetsPage() {
         placeholder={placeholder}
       />
 
+      <div className="flex gap-5">
         {/* Sidebar */}
+
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
