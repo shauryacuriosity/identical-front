@@ -87,21 +87,32 @@ function Checkbox({
   );
 }
 
-function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
+function AttrGroup({
+  name,
+  items,
+  selected,
+  onChange,
+}: {
+  name: string;
+  items: Attr[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+}) {
   const [open, setOpen] = useState(true);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const allSelected = items.length > 0 && selected.size === items.length;
-  const someSelected = selected.size > 0 && !allSelected;
+  const allSelected = items.length > 0 && items.every((i) => selected.has(i.name));
+  const someSelected = items.some((i) => selected.has(i.name)) && !allSelected;
 
   const toggleAll = (next: boolean) => {
-    setSelected(next ? new Set(items.map((i) => i.name)) : new Set());
+    const copy = new Set(selected);
+    if (next) for (const i of items) copy.add(i.name);
+    else for (const i of items) copy.delete(i.name);
+    onChange(copy);
   };
   const toggleOne = (attrName: string, next: boolean) => {
-    setSelected((prev) => {
-      const copy = new Set(prev);
-      if (next) copy.add(attrName); else copy.delete(attrName);
-      return copy;
-    });
+    const copy = new Set(selected);
+    if (next) copy.add(attrName);
+    else copy.delete(attrName);
+    onChange(copy);
   };
 
   return (
