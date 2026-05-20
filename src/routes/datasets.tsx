@@ -1155,6 +1155,7 @@ function DatasetsPage() {
     setSelectedAttrs((prev) => {
       const next: Record<string, Set<string>> = {};
       for (const slot of datasetSlots) {
+        if (!slot) continue;
         if (prev[slot]) next[slot] = prev[slot];
         else {
           const attrs =
