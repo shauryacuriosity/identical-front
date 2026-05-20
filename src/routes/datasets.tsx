@@ -190,8 +190,9 @@ function DatasetBar({
   availableNames: string[];
   rowCount?: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(value === "");
   const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : "2,431 rows";
+  const isEmpty = value === "";
   return (
     <div className="relative mb-2.5">
       <button
@@ -199,9 +200,15 @@ function DatasetBar({
         className="w-full bg-surface rounded-lg px-5 h-12 flex items-center justify-between border border-hairline shadow-[var(--shadow-xs)] hover:border-ink-3/40 transition"
       >
         <div className="flex items-center gap-3">
-          <span className="h-1.5 w-1.5 rounded-full bg-coral" />
-          <span className="font-mono text-[13.5px] text-ink">{value}</span>
-          <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
+          <span className={`h-1.5 w-1.5 rounded-full ${isEmpty ? "bg-ink-3/40" : "bg-coral"}`} />
+          {isEmpty ? (
+            <span className="text-[13.5px] text-ink-2 italic">Please select a dataset</span>
+          ) : (
+            <>
+              <span className="font-mono text-[13.5px] text-ink">{value}</span>
+              <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
+            </>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -1148,6 +1155,7 @@ function DatasetsPage() {
     setSelectedAttrs((prev) => {
       const next: Record<string, Set<string>> = {};
       for (const slot of datasetSlots) {
+        if (!slot) continue;
         if (prev[slot]) next[slot] = prev[slot];
         else {
           const attrs =
@@ -1164,14 +1172,15 @@ function DatasetsPage() {
   // Sweep stale references in pipeline steps when slots change.
   useEffect(() => {
     setSteps((prev) => {
-      const slotSet = new Set(datasetSlots);
+      const slotSet = new Set(datasetSlots.filter(Boolean));
+      const firstValid = datasetSlots.find(Boolean) ?? "";
       const swept = prev.map((s) => {
         if (s.kind === "from") {
           const fromVal = s.parts.find((p) => p.label === "FROM")?.value ?? "";
           if (!slotSet.has(fromVal)) {
             return {
               ...s,
-              parts: s.parts.map((p) => p.label === "FROM" ? { ...p, value: datasetSlots[0] ?? "" } : p),
+              parts: s.parts.map((p) => p.label === "FROM" ? { ...p, value: firstValid } : p),
             };
           }
         } else if (s.kind === "join") {
@@ -1211,7 +1220,7 @@ function DatasetsPage() {
   }), [importedDatasets]);
 
   const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
-  const groups = datasetSlots.map((slot) => {
+  const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
     return { name: slot, items };
@@ -1239,8 +1248,8 @@ function DatasetsPage() {
   );
 
   const addSlot = () => {
-    const next = availableNames.find((d) => !datasetSlots.includes(d));
-    if (next) setDatasetSlots([...datasetSlots, next]);
+    if (datasetSlots.includes("")) return;
+    setDatasetSlots([...datasetSlots, ""]);
   };
 
   const uniqueName = (base: string, taken: Set<string>) => {
@@ -1284,21 +1293,20 @@ function DatasetsPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const firstNamedSlot = datasetSlots.find(Boolean);
   const effectiveName = project?.name?.trim()
     ? project.name
-    : datasetSlots[0]
+    : firstNamedSlot
       ? (() => {
-          const f = datasetSlots[0];
-          const dot = f.lastIndexOf(".");
-          return dot > 0 ? f.slice(0, dot) : f;
+          const dot = firstNamedSlot.lastIndexOf(".");
+          return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
         })()
       : "";
   const isUntitled = !project?.name?.trim();
-  const placeholder = datasetSlots[0]
+  const placeholder = firstNamedSlot
     ? (() => {
-        const f = datasetSlots[0];
-        const dot = f.lastIndexOf(".");
-        return dot > 0 ? f.slice(0, dot) : f;
+        const dot = firstNamedSlot.lastIndexOf(".");
+        return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
       })()
     : "Untitled project";
 
@@ -1370,7 +1378,7 @@ function DatasetsPage() {
           <div className="flex gap-2.5 mb-2.5">
             <button
               onClick={addSlot}
-              disabled={datasetSlots.length >= availableNames.length}
+              disabled={datasetSlots.includes("")}
               className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
             >
               <Plus className="h-3.5 w-3.5" /> Add dataset
@@ -1387,7 +1395,7 @@ function DatasetsPage() {
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
             <PipelineStrip
-              slotNames={datasetSlots}
+              slotNames={datasetSlots.filter(Boolean)}
               schemaBySlot={schemaBySlot}
               steps={steps}
               setSteps={setSteps}
