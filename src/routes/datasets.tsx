@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { parseDatasetFile } from "@/lib/dataset-import";
 
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -158,13 +160,18 @@ function DatasetBar({
   onChange,
   onRemove,
   usedNames,
+  availableNames,
+  rowCount,
 }: {
   value: string;
   onChange: (next: string) => void;
   onRemove?: () => void;
   usedNames: string[];
+  availableNames: string[];
+  rowCount?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : "2,431 rows";
   return (
     <div className="relative mb-2.5">
       <button
@@ -174,7 +181,7 @@ function DatasetBar({
         <div className="flex items-center gap-3">
           <span className="h-1.5 w-1.5 rounded-full bg-coral" />
           <span className="font-mono text-[13.5px] text-ink">{value}</span>
-          <span className="text-[11px] text-ink-3 tabular">· 2,431 rows</span>
+          <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
         </div>
         <div className="flex items-center gap-1">
           <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -194,7 +201,7 @@ function DatasetBar({
       </button>
       {open && (
         <div className="absolute z-20 mt-1.5 left-0 right-0 bg-surface rounded-lg shadow-[var(--shadow-lg)] overflow-hidden border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-          {ALL_DATASETS.map((opt) => {
+          {availableNames.map((opt) => {
             const disabled = opt !== value && usedNames.includes(opt);
             return (
               <button
@@ -477,6 +484,11 @@ function DatasetsPage() {
   const { datasetId } = Route.useSearch();
   const [attrFilter, setAttrFilter] = useState("");
   const [datasetSlots, setDatasetSlots] = useState<string[]>(["Dataset_A.csv"]);
+  const [importedDatasets, setImportedDatasets] = useState<
+    Record<string, { attrs: Attr[]; rowCount: number }>
+  >({});
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const datasetQ = useQuery({
     queryKey: ["datasets", "single", datasetId],
@@ -496,7 +508,12 @@ function DatasetsPage() {
   const schemaBySlot: Record<string, Attr[]> = {
     "Dataset_A.csv": datasetA,
     "Dataset_B.csv": datasetB,
+    ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.attrs])),
   };
+  const rowCountBySlot: Record<string, number | undefined> = Object.fromEntries(
+    Object.entries(importedDatasets).map(([k, v]) => [k, v.rowCount]),
+  );
+  const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
   const groups = datasetSlots.map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
@@ -505,8 +522,49 @@ function DatasetsPage() {
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const addSlot = () => {
-    const next = ALL_DATASETS.find((d) => !datasetSlots.includes(d));
+    const next = availableNames.find((d) => !datasetSlots.includes(d));
     if (next) setDatasetSlots([...datasetSlots, next]);
+  };
+
+  const uniqueName = (base: string, taken: Set<string>) => {
+    if (!taken.has(base)) return base;
+    const dot = base.lastIndexOf(".");
+    const stem = dot > 0 ? base.slice(0, dot) : base;
+    const ext = dot > 0 ? base.slice(dot) : "";
+    let i = 1;
+    while (taken.has(`${stem} (${i})${ext}`)) i++;
+    return `${stem} (${i})${ext}`;
+  };
+
+  const onFilesPicked = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    const newEntries: Record<string, { attrs: Attr[]; rowCount: number }> = {};
+    const newSlotNames: string[] = [];
+    const taken = new Set<string>([...ALL_DATASETS, ...Object.keys(importedDatasets)]);
+    for (const file of Array.from(files)) {
+      try {
+        const parsed = await parseDatasetFile(file);
+        if (parsed.attrs.length === 0) throw new Error("No columns detected");
+        const name = uniqueName(file.name, taken);
+        taken.add(name);
+        newEntries[name] = parsed;
+        newSlotNames.push(name);
+        toast.success(`Imported ${name}`, {
+          description: `${parsed.attrs.length} columns · ${parsed.rowCount.toLocaleString()} rows`,
+        });
+      } catch (err) {
+        toast.error(`Couldn't import ${file.name}`, {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    if (Object.keys(newEntries).length > 0) {
+      setImportedDatasets((prev) => ({ ...prev, ...newEntries }));
+      setDatasetSlots((prev) => [...prev, ...newSlotNames]);
+    }
+    setImporting(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -554,17 +612,36 @@ function DatasetsPage() {
               key={`${name}-${i}`}
               value={name}
               usedNames={datasetSlots}
+              availableNames={availableNames}
+              rowCount={rowCountBySlot[name]}
               onChange={(next) => setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))}
               onRemove={() => setDatasetSlots((slots) => slots.filter((_, idx) => idx !== i))}
             />
           ))}
-          <button
-            onClick={addSlot}
-            disabled={datasetSlots.length >= ALL_DATASETS.length}
-            className="w-full h-10 mb-2.5 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add dataset
-          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".csv,.tsv,.txt,.json,.xlsx,.xls,.xpt"
+            onChange={(e) => onFilesPicked(e.target.files)}
+            className="hidden"
+          />
+          <div className="flex gap-2.5 mb-2.5">
+            <button
+              onClick={addSlot}
+              disabled={datasetSlots.length >= availableNames.length}
+              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add dataset
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+            >
+              <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import file"}
+            </button>
+          </div>
 
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
