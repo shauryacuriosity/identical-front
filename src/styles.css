@@ -136,6 +136,12 @@
   --shadow-sm: var(--shadow-card);
   --shadow-md: var(--shadow-elevated);
   --shadow-lg: var(--shadow-elevated);
+
+  --shadow-drop-color: rgba(0, 0, 0, 0.25);
+  --shadow-inner-color: rgba(255, 255, 255, 0.25);
+  --shadow-depth:
+    0 10px 7px 0 var(--shadow-drop-color),
+    inset 0 10px 7px 0 var(--shadow-inner-color);
 }
 
 .dark {
