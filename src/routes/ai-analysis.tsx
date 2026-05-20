@@ -136,7 +136,7 @@ function StepIndicator({
   skipped?: Set<StepKey>;
 }) {
   return (
-    <div className="sticky top-14 z-20 -mx-6 px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline">
+    <div className="sticky top-20 z-20 -mx-6 px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline">
       <ol className="mx-auto max-w-[1280px] flex items-center gap-2">
         {STEPS.map((s, i) => {
           const isSkipped = skipped?.has(s.key) ?? false;
