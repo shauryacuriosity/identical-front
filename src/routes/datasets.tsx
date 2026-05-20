@@ -160,13 +160,18 @@ function DatasetBar({
   onChange,
   onRemove,
   usedNames,
+  availableNames,
+  rowCount,
 }: {
   value: string;
   onChange: (next: string) => void;
   onRemove?: () => void;
   usedNames: string[];
+  availableNames: string[];
+  rowCount?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : "2,431 rows";
   return (
     <div className="relative mb-2.5">
       <button
@@ -176,7 +181,7 @@ function DatasetBar({
         <div className="flex items-center gap-3">
           <span className="h-1.5 w-1.5 rounded-full bg-coral" />
           <span className="font-mono text-[13.5px] text-ink">{value}</span>
-          <span className="text-[11px] text-ink-3 tabular">· 2,431 rows</span>
+          <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
         </div>
         <div className="flex items-center gap-1">
           <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -196,7 +201,7 @@ function DatasetBar({
       </button>
       {open && (
         <div className="absolute z-20 mt-1.5 left-0 right-0 bg-surface rounded-lg shadow-[var(--shadow-lg)] overflow-hidden border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
-          {ALL_DATASETS.map((opt) => {
+          {availableNames.map((opt) => {
             const disabled = opt !== value && usedNames.includes(opt);
             return (
               <button
