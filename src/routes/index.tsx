@@ -1,13 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
-import {
-  FileText,
-  SquareArrowOutUpRight,
-  Copy,
-  Archive,
-} from "lucide-react";
-import { FilePlusIcon, ShapesIcon, CodesandboxIcon } from "@/components/brand-icons";
+import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, Copy, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import lotusMark from "@/assets/logo_lotus.png";
 
@@ -36,7 +30,11 @@ function RowCheckbox({
       role="checkbox"
       aria-checked={indeterminate ? "mixed" : checked}
       aria-label={ariaLabel}
-      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onChange();
+      }}
       className={`h-[14px] w-[14px] rounded-[3px] border flex items-center justify-center transition ${
         checked || indeterminate ? "bg-coral border-coral" : "border-ink-2 hover:border-ink"
       }`}
@@ -45,7 +43,14 @@ function RowCheckbox({
         <span className="h-[2px] w-[8px] bg-white rounded-sm" />
       ) : checked ? (
         <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white">
-          <path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M2.5 6.5l2.5 2.5 4.5-5"
+            stroke="currentColor"
+            strokeWidth="2"
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       ) : null}
       <input ref={ref} type="checkbox" className="sr-only" readOnly checked={checked} />
@@ -96,11 +101,19 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-highlight transition-colors overflow-hidden"
-      style={{ boxShadow: "var(--shadow-depth)" }}
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <div className="flex items-center justify-center h-10 w-10 text-coral">
-        <Icon size={36} strokeWidth={3} />
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: "var(--coral)" }}
+      />
+      <div
+        className="flex items-center justify-center h-10 w-10 rounded-lg"
+        style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
+      >
+        <Icon className="h-5 w-5 text-coral" strokeWidth={1.75} />
       </div>
       <div className="flex flex-col gap-1">
         <div className="text-[15px] font-semibold text-ink leading-tight">{label}</div>
@@ -119,7 +132,10 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
     );
   }
   const styles: Record<FileType, React.CSSProperties> = {
-    Dataset: { backgroundColor: "color-mix(in oklab, var(--coral) 22%, var(--bg-surface))", color: "var(--text-primary)" },
+    Dataset: {
+      backgroundColor: "color-mix(in oklab, var(--coral) 22%, var(--bg-surface))",
+      color: "var(--text-primary)",
+    },
     Analysis: {
       backgroundColor: "color-mix(in oklab, var(--data-sage) 20%, var(--bg-surface))",
       color: "color-mix(in oklab, var(--data-sage) 60%, var(--ink))",
@@ -142,9 +158,7 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
 function StatusDot({ active }: { active: boolean }) {
   return (
     <span
-      className={`inline-block h-2 w-2 rounded-full ${
-        active ? "bg-hairline-grey" : "bg-hairline-grey opacity-50"
-      }`}
+      className={`inline-block h-2 w-2 rounded-full ${active ? "bg-hairline-grey" : "bg-hairline-grey opacity-50"}`}
     />
   );
 }
@@ -236,18 +250,20 @@ function Index() {
   const hasSelection = selected.size > 0;
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      style={{
+        backgroundImage:
+          "radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in oklab, var(--bg-surface) 45%, transparent), transparent 70%)",
+      }}
+    >
       <div className="mx-auto max-w-[1280px] px-6 pt-10 pb-16">
         {/* Greeting */}
         <div className="mb-14 flex items-start gap-4">
           <img src={lotusMark} alt="" className="h-12 w-auto mt-1 shrink-0" />
           <div>
-            <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">
-              Workbench
-            </div>
-            <h1 className="text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">
-              Welcome back
-            </h1>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">Workbench</div>
+            <h1 className="text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">Welcome back</h1>
             <p className="text-[15px] text-ink-2 mt-3 max-w-[520px] leading-relaxed">
               Pick up where you left off, or start something new.
             </p>
@@ -256,9 +272,24 @@ function Index() {
 
         {/* Action tiles */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-14">
-          <ActionTile icon={FilePlusIcon} label="New Dataset" desc="Import a CSV or connect a source" href="/datasets" />
-          <ActionTile icon={ShapesIcon} label="New Visualisation" desc="Chart distributions and correlations" href="/visualisation" />
-          <ActionTile icon={CodesandboxIcon} label="New AI Analysis" desc="Run MetS prediction, SHAP rankings, and subgroup clustering" href="/ai-analysis" />
+          <ActionTile
+            icon={FilePlus}
+            label="New Dataset"
+            desc="Import a file (.csv, .xpt, .xls, .json, .tsv)"
+            href="/datasets"
+          />
+          <ActionTile
+            icon={Shapes}
+            label="New Visualisation"
+            desc="Chart distributions and correlations"
+            href="/visualisation"
+          />
+          <ActionTile
+            icon={Box}
+            label="New AI Analysis"
+            desc="Run MetS prediction, SHAP rankings, and subgroup clustering"
+            href="/ai-analysis"
+          />
         </div>
 
         {/* Recent files */}
@@ -277,7 +308,7 @@ function Index() {
         {/* Unified table card */}
         <div
           className="rounded-2xl bg-surface border border-hairline overflow-hidden"
-          style={{ boxShadow: "var(--shadow-depth)" }}
+          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
         >
           {/* Header row */}
           <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
@@ -299,82 +330,89 @@ function Index() {
           </div>
 
           <div>
-            {isLoading &&
-              Array.from({ length: 5 }).map((_, i) => (
-                <SkeletonRow key={i} last={i === 4} />
-              ))}
+            {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
 
             {!isLoading && error && (
-              <div className="px-5 py-6 text-[13px] text-ink-2">
-                Failed to load — {error.message}
-              </div>
+              <div className="px-5 py-6 text-[13px] text-ink-2">Failed to load — {error.message}</div>
             )}
 
             {!isLoading && !error && rows.length === 0 && (
               <div className="px-5 py-6 text-[13px] text-ink-2">No datasets yet</div>
             )}
 
-            {!isLoading && !error && rows.map((f, i) => {
-              const isSelected = selected.has(f.id);
-              const showCheckbox = hasSelection || isSelected;
-              const isLast = i === rows.length - 1;
-              return (
-                <div
-                  key={f.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => navigate({ to: "/datasets", search: { datasetId: f.id } })}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      navigate({ to: "/datasets", search: { datasetId: f.id } });
-                    }
-                  }}
-                  className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
-                    isLast ? "" : "border-b border-hairline"
-                  } ${f.archived ? "opacity-75" : ""}`}
-                >
-                  <span
-                    className="flex items-center justify-center"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <RowCheckbox
-                      checked={isSelected}
-                      onChange={() => toggleOne(f.id)}
-                      ariaLabel={`Select ${f.name}`}
-                    />
-                  </span>
-
-                  <div className="flex items-center gap-3 min-w-0">
-                    <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
-                    <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
-                  </div>
-
-                  <div>
-                    <TypePill type={f.type} archived={f.archived} />
-                  </div>
-
-                  <span className="tabular text-[12.5px] text-ink-2 text-right">
-                    {f.rows != null ? f.rows.toLocaleString() : <Em />}
-                  </span>
-
-                  <span className="tabular text-[12.5px] text-ink-2 text-right">
-                    {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
-                  </span>
-
-                  <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
-
+            {!isLoading &&
+              !error &&
+              rows.map((f, i) => {
+                const isSelected = selected.has(f.id);
+                const showCheckbox = hasSelection || isSelected;
+                const isLast = i === rows.length - 1;
+                return (
                   <div
-                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
-                    style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+                    key={f.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => navigate({ to: "/datasets", search: { datasetId: f.id } })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        navigate({ to: "/datasets", search: { datasetId: f.id } });
+                      }
+                    }}
+                    className={`group relative grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+                      isLast ? "" : "border-b border-hairline"
+                    } ${f.archived ? "opacity-75" : ""}`}
                   >
-                    <RowAction icon={SquareArrowOutUpRight} label="Open" />
-                    <RowAction icon={Copy} label="Duplicate" />
-                    <RowAction icon={Archive} label="Archive" />
+                    <span className="flex items-center justify-center relative h-[14px] w-[14px]">
+                      <span
+                        className={`absolute inset-0 flex items-center justify-center transition-opacity ${
+                          showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
+                        }`}
+                      >
+                        <StatusDot active={!f.archived} />
+                      </span>
+                      <span
+                        className={`absolute inset-0 flex items-center justify-center transition-opacity ${
+                          showCheckbox ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                      >
+                        <RowCheckbox
+                          checked={isSelected}
+                          onChange={() => toggleOne(f.id)}
+                          ariaLabel={`Select ${f.name}`}
+                        />
+                      </span>
+                    </span>
+
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
+                      <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
+                    </div>
+
+                    <div>
+                      <TypePill type={f.type} archived={f.archived} />
+                    </div>
+
+                    <span className="tabular text-[12.5px] text-ink-2 text-right">
+                      {f.rows != null ? f.rows.toLocaleString() : <Em />}
+                    </span>
+
+                    <span className="tabular text-[12.5px] text-ink-2 text-right">
+                      {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
+                    </span>
+
+                    <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
+
+                    <div
+                      className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
+                      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+                    >
+                      <RowAction icon={SquareArrowOutUpRight} label="Open" />
+                      <RowAction icon={Copy} label="Duplicate" />
+                      <RowAction icon={Archive} label="Archive" />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       </div>
