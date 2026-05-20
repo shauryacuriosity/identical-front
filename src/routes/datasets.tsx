@@ -789,17 +789,27 @@ function ProjectHeader({
   effectiveName,
   isUntitled,
   placeholder,
+  autoFocus,
 }: {
   projectId: string | undefined;
   effectiveName: string;
   isUntitled: boolean;
   placeholder: string;
+  autoFocus?: boolean;
 }) {
   const navigate = useNavigate();
   const projects = useProjects();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(effectiveName);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [autoFocus, projectId]);
 
   useEffect(() => {
     setDraft(isUntitled ? "" : effectiveName);
