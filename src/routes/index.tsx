@@ -257,13 +257,25 @@ function Index() {
 
         {/* Recent projects */}
         <div className="flex items-baseline justify-between mb-4">
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
             <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent Projects</h2>
             {rows.length > 0 && (
               <span className="text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5 font-medium">
                 {rows.length}
               </span>
             )}
+            <button
+              type="button"
+              aria-label="New project"
+              title="New project"
+              onClick={() => {
+                const id = createProject({ name: "", datasets: [] });
+                navigate({ to: "/datasets", search: { projectId: id, focusName: true } });
+              }}
+              className="inline-flex items-center justify-center h-6 w-6 rounded-full border border-coral/60 text-coral hover:bg-coral hover:text-white transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
           </div>
           <button className="text-[12.5px] text-ink-2 hover:text-ink transition">View all</button>
         </div>
