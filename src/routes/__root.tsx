@@ -98,7 +98,7 @@ function AppHeader() {
         {/* Floating pill nav */}
         <nav
           className="relative h-14 rounded-full bg-surface flex items-center pl-5 pr-3 border border-hairline"
-          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 8px 24px -10px rgba(0,0,0,0.22)" }}
+          style={{ boxShadow: "0 2px 8px -4px rgba(0,0,0,0.12), 0 8px 20px -12px rgba(0,0,0,0.18)" }}
         >
           {/* Brand cluster — acts as Home link */}
           <Link
