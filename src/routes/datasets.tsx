@@ -1,14 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { parseDatasetFile } from "@/lib/dataset-import";
+import * as XLSX from "xlsx";
+import { parseDatasetFile, type Row } from "@/lib/dataset-import";
+import { runPipeline, type Step, type StepKind } from "@/lib/pipeline-exec";
 import {
   useProjects,
   useProject,
   createProject,
   renameProject,
   setProjectDatasets,
+  setProjectPipeline,
 } from "@/lib/projects-store";
 
 export const Route = createFileRoute("/datasets")({
