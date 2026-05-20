@@ -1,94 +1,52 @@
-# Palette + icon rollout
+# Home banner + depth shadow fix
 
-Five contained changes. No data/query/route logic touched.
+Three small, contained changes — tokens, header, home page. No data/route logic touched.
 
-## 1. Rebuild the design tokens (`src/styles.css`)
+## 1. Add depth-shadow tokens (`src/styles.css`)
 
-Replace the current `:root` + `.dark` palette with the exact table values. Token names stay the same so no consumer code breaks; values change.
+Add new tokens for the user-specified shadow color pair (drop + inner, X:0 Y:10 blur:7 spread:0), themed per mode.
 
 Light (`:root`):
-- `--bg-page: #F2D0CF` *(bg-dark — main page background)*
-- `--bg-emphasis: #CAA8A7` *(bg-dark faded)*
-- `--bg-surface: #FFF5F5` *(bg — cards, tiles, header pill)*
-- `--bg-highlight: #FFFFFF` *(NEW — hover/highlight)*
-- `--text-primary: #1A0003`
-- `--text-muted: #673D3D`
-- `--border-default: #A06B6B`
-- `--border-muted: #C49090`
-- `--accent-primary: #E8928E` (unchanged)
-- `--accent-secondary: #0077FF`
-- Inner shadow: `rgba(255,255,255,0.25)`; drop shadow: `rgba(0,0,0,0.25)`.
+- `--shadow-drop-color: rgba(0, 0, 0, 0.25);`
+- `--shadow-inner-color: rgba(255, 255, 255, 0.25);`
 
 Dark (`.dark`):
-- `--bg-page: #140F0F`
-- `--bg-emphasis: #0A0101`
-- `--bg-surface: #140405`
-- `--bg-highlight: #6E4A4A`
-- `--text-primary: #FFFFFF`
-- `--text-muted: #D4908A`
-- `--border-default: #737373`
-- `--border-muted: #3D1718`
-- `--accent-primary: #E8928E` (unchanged)
-- Inner shadow: `rgba(200,200,255,0.25)`; drop shadow: `rgba(200,200,255,0.25)`.
+- `--shadow-drop-color: rgba(200, 200, 255, 0.25);`
+- `--shadow-inner-color: rgba(200, 200, 255, 0.25);`
 
-Add new token + alias: `--highlight: var(--bg-highlight)` and Tailwind utility binding `--color-highlight: var(--highlight)` in the `@theme inline` block so `bg-highlight` works.
+Composite (both modes, defined once in `:root` using the variables):
+```
+--shadow-depth:
+  0 10px 7px 0 var(--shadow-drop-color),
+  inset 0 10px 7px 0 var(--shadow-inner-color);
+```
 
-`--canvas / --surface / --surface-hover / --ink / --ink-2 / --hairline / --coral` aliases stay pointing at the same semantic slots so existing class usage keeps working — they just inherit the new hex values.
+Usage in components: `style={{ boxShadow: "var(--shadow-depth)" }}`.
 
-## 2. Copy uploaded assets into the project
+## 2. Header "Lotus" brand pill (`src/routes/__root.tsx`)
 
-- `user-uploads://File_plus.svg` → `src/assets/icon-file-plus.svg`
-- `user-uploads://Icon_shapes.svg` → `src/assets/icon-shapes.svg`
-- `user-uploads://Codesandbox.svg` → `src/assets/icon-codesandbox.svg`
-- `user-uploads://icon_warning_L.svg` → `src/assets/icon-warning.svg`
+The brand/home `<Link to="/">` currently uses `bg-surface-hover/70` when `homeActive`. Change it to match the other active tabs:
 
-Create a tiny `src/components/brand-icons.tsx` exporting `FilePlusIcon`, `ShapesIcon`, `CodesandboxIcon`, `WarningIcon` as inline React SVGs (same paths as the uploads) but with `stroke="currentColor"` instead of the hardcoded `#1A0003` / `#E8928E`. This lets us color them via Tailwind `text-*` classes (primary, ink, highlight).
+- Active (`homeActive === true`): `bg-coral text-ink`
+- Inactive: `text-ink hover:bg-highlight/50` (mirrors the other tabs)
 
-## 3. Home page tiles (`src/routes/index.tsx`)
+Also replace the nav pill's hand-tuned `boxShadow` string with `var(--shadow-depth)` so the header gets the same depth treatment as other prominent elements.
 
-- Swap the Lucide `FilePlus` / `Shapes` / `Box` imports for the three brand icons above.
-- Icon color on tiles: `text-coral` (primary). Drop the tinted square wrapper background and the top accent bar — the icon itself carries the color.
-- `ActionTile` className change:
-  - Remove `hover:-translate-y-0.5 transition-all duration-200` → use `transition-colors`.
-  - Base bg: `bg-surface` (= `#FFF5F5` / `#140405`).
-  - Hover bg: `hover:bg-highlight` (= `#FFFFFF` / `#6E4A4A`).
-- Keep border + shadow as-is.
+## 3. Home page — remove outer "banner" + apply depth shadow (`src/routes/index.tsx`)
 
-## 4. Header tabs (`src/routes/__root.tsx`)
-
-Replace the Lucide `Database / BarChart3 / Sparkles` mapping with `{ FilePlusIcon, ShapesIcon, CodesandboxIcon }` from `brand-icons`. Render the icon (size 18) to the left of each label in the pill.
-
-State styling per spec:
-- **Inactive** tab: `text-ink` (icon + label both use text color), `hover:bg-highlight/40`.
-- **Active** tab: `bg-coral text-ink` (icon + label still text color, primary as highlight bg).
-
-Drop the current `text-ink-2` inactive and `bg-surface-hover/70` active treatments.
-
-## 5. AI Analysis status icon
-
-Wherever the AI-processing card shows the Codesandbox glyph (the live `runs.$runId.tsx` status panel, which is the implemented counterpart to screenshot 9):
-- While `status !== "complete"` (processing/pending/running) → render `<CodesandboxIcon className="text-highlight" />`.
-- When `status === "complete"` → `text-coral` (primary).
-
-If the run page currently uses a `Box`/`Loader` glyph for the status hero, swap it for `CodesandboxIcon` with the conditional class above. No state-machine or polling changes.
-
-## 6. Warning icon
-
-Add `WarningIcon` to `brand-icons` already colored via `text-coral` by default (its source stroke is `#E8928E`, which equals primary — re-export it with `stroke="currentColor"` and document that callers should pass `className="text-coral"`). Not wired into any page yet — this just makes it available and on-brand when used.
+- Delete the `style={{ backgroundImage: "radial-gradient(...)" }}` on the outer `<div className="relative">` wrapper. This is the ghost secondary banner the user is seeing — a radial gradient bleeding behind the hero area. Wrapper becomes a plain `<div className="relative">`.
+- Replace the two existing custom `boxShadow` strings (on `ActionTile` and on the Recent files card) with `var(--shadow-depth)` so every prominent surface uses the same depth recipe.
 
 ## Files touched
 
-- `src/styles.css` — token values for `:root` and `.dark`, add `--bg-highlight` + theme binding.
-- `src/components/brand-icons.tsx` — NEW, four inline SVG components.
-- `src/assets/icon-*.svg` — NEW, raw copies (kept for reference / future direct `<img>` use).
-- `src/routes/index.tsx` — swap icons on `ActionTile`, remove translate hover, switch to `bg-surface → hover:bg-highlight`.
-- `src/routes/__root.tsx` — swap tab icons, recolor active/inactive states.
-- `src/routes/runs.$runId.tsx` — conditional Codesandbox icon color for processing vs complete.
+- `src/styles.css` — add `--shadow-drop-color`, `--shadow-inner-color` (light + dark) and `--shadow-depth` composite.
+- `src/routes/__root.tsx` — recolor active brand link to `bg-coral`; swap nav pill shadow to `var(--shadow-depth)`.
+- `src/routes/index.tsx` — remove radial-gradient wrapper style; swap tile + table shadows to `var(--shadow-depth)`.
 
 ## Not touched
 
-- Supabase queries, route registrations, settings dialog logic.
-- Locked accent (`--accent-primary` = `#E8928E`) — same in both modes.
-- `src/components/ui/*` primitives.
+- Tabs styling (already correct per previous turn).
+- Tokens for palette, accent, borders.
+- Any data fetching, routes, or settings dialog.
 
-After implementation I'll screenshot light + dark at the user's viewport to confirm: page bg = `#F2D0CF` / `#140F0F`, tiles hover to white / muted-rose, active tab pill is coral with dark text, processing icon is white-ish (highlight) and complete is coral.
+After implementation I'll screenshot `/` in both light and dark to confirm: no outer halo behind the hero, the "Lotus" pill turns coral on `/`, and tiles + nav + recent-files card all carry the same drop+inner depth.

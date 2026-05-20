@@ -97,7 +97,7 @@ function ActionTile({
     <Link
       to={href}
       className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-highlight transition-colors overflow-hidden"
-      style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
+      style={{ boxShadow: "var(--shadow-depth)" }}
     >
       <div className="flex items-center justify-center h-10 w-10 text-coral">
         <Icon size={36} strokeWidth={3} />
@@ -236,13 +236,7 @@ function Index() {
   const hasSelection = selected.size > 0;
 
   return (
-    <div
-      className="relative"
-      style={{
-        backgroundImage:
-          "radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in oklab, var(--bg-surface) 45%, transparent), transparent 70%)",
-      }}
-    >
+    <div className="relative">
       <div className="mx-auto max-w-[1280px] px-6 pt-10 pb-16">
         {/* Greeting */}
         <div className="mb-14 flex items-start gap-4">
@@ -283,7 +277,7 @@ function Index() {
         {/* Unified table card */}
         <div
           className="rounded-2xl bg-surface border border-hairline overflow-hidden"
-          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
+          style={{ boxShadow: "var(--shadow-depth)" }}
         >
           {/* Header row */}
           <div className="grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
