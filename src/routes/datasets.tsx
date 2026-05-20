@@ -260,20 +260,211 @@ const addOptions: { kind: StepKind; label: string }[] = [
   { kind: "sort", label: "Sort" },
 ];
 
-const PipelineChip = ({ step, onRemove, pulsing, chipRef }: { step: Step; onRemove: () => void; pulsing?: boolean; chipRef?: (el: HTMLDivElement | null) => void }) => {
+type PartOptions = { kind: "list"; options: string[] } | { kind: "text" };
+
+type EditCtx = {
+  availableNames: string[];
+  schemaBySlot: Record<string, Attr[]>;
+  steps: Step[];
+};
+
+function referencedDatasets(steps: Step[], uptoStepId: string): string[] {
+  const names: string[] = [];
+  for (const s of steps) {
+    if (s.kind === "from") {
+      const v = s.parts.find((p) => p.label === "FROM")?.value;
+      if (v) names.push(v);
+    } else if (s.kind === "join") {
+      const v = s.parts.find((p) => p.label === "JOIN")?.value;
+      if (v) names.push(v);
+    }
+    if (s.id === uptoStepId) break;
+  }
+  return Array.from(new Set(names));
+}
+
+function columnsFor(names: string[], schemaBySlot: Record<string, Attr[]>, filter?: (a: Attr) => boolean): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const n of names) {
+    for (const a of schemaBySlot[n] ?? []) {
+      if (filter && !filter(a)) continue;
+      if (seen.has(a.name)) continue;
+      seen.add(a.name);
+      out.push(a.name);
+    }
+  }
+  return out;
+}
+
+function optionsForPart(step: Step, partLabel: string, ctx: EditCtx): PartOptions {
+  const refs = referencedDatasets(ctx.steps, step.id);
+  switch (step.kind) {
+    case "from":
+      return { kind: "list", options: ctx.availableNames };
+    case "join":
+      if (partLabel === "JOIN") {
+        const fromName = ctx.steps.find((s) => s.kind === "from")?.parts.find((p) => p.label === "FROM")?.value;
+        return { kind: "list", options: ctx.availableNames.filter((n) => n !== fromName) };
+      }
+      if (partLabel === "ON") return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot) };
+      if (partLabel === "USING") return { kind: "list", options: joinOptions };
+      break;
+    case "aggregate":
+      if (partLabel === "AGGREGATE")
+        return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot, (a) => a.type === "num") };
+      if (partLabel === "BY") return { kind: "list", options: aggOptions };
+      break;
+    case "filter":
+      if (partLabel === "FILTER") return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot) };
+      return { kind: "text" };
+    case "sort":
+      if (partLabel === "SORT") return { kind: "list", options: columnsFor(refs, ctx.schemaBySlot) };
+      return { kind: "list", options: sortOptions };
+  }
+  return { kind: "text" };
+}
+
+function EditablePart({
+  value,
+  mono,
+  opts,
+  onChange,
+  variant = "chip",
+}: {
+  value: string;
+  mono?: boolean;
+  opts: PartOptions;
+  onChange: (next: string) => void;
+  variant?: "chip" | "sentence";
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const btnBase =
+    variant === "sentence"
+      ? "px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition"
+      : "px-1.5 py-0.5 rounded hover:bg-surface-hover transition";
+  const txt = mono ? "font-mono text-[12.5px] text-ink" : "text-[12.5px] text-ink";
+
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDraft(value);
+          setOpen((o) => !o);
+        }}
+        className={`${btnBase} ${txt}`}
+      >
+        {value || <span className="text-ink-3">—</span>}
+      </button>
+      {open && opts.kind === "list" && (
+        <div className="absolute left-0 top-full z-30 mt-1 min-w-[160px] max-h-64 overflow-y-auto bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          {opts.options.length === 0 ? (
+            <div className="px-3 py-2 text-[12px] text-ink-3 italic">No options</div>
+          ) : (
+            opts.options.map((o) => (
+              <button
+                key={o}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(o);
+                  setOpen(false);
+                }}
+                className={`block w-full text-left px-3 py-1.5 text-[12.5px] hover:bg-surface-hover transition ${
+                  o === value ? "text-coral" : "text-ink"
+                } ${mono ? "font-mono" : ""}`}
+              >
+                {o}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+      {open && opts.kind === "text" && (
+        <div className="absolute left-0 top-full z-30 mt-1 bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline p-2 animate-in fade-in slide-in-from-top-1 duration-150">
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                onChange(draft);
+                setOpen(false);
+              } else if (e.key === "Escape") {
+                setOpen(false);
+              }
+            }}
+            onBlur={() => {
+              if (draft !== value) onChange(draft);
+              setOpen(false);
+            }}
+            className="h-7 w-32 px-2 rounded border border-hairline bg-canvas text-[12.5px] text-ink focus:outline-none focus:border-coral/60"
+          />
+        </div>
+      )}
+    </span>
+  );
+}
+
+const PipelineChip = ({
+  step,
+  onRemove,
+  pulsing,
+  chipRef,
+  ctx,
+  onUpdatePart,
+  onUpdatePartLabel,
+}: {
+  step: Step;
+  onRemove: () => void;
+  pulsing?: boolean;
+  chipRef?: (el: HTMLDivElement | null) => void;
+  ctx: EditCtx;
+  onUpdatePart: (partIndex: number, next: string) => void;
+  onUpdatePartLabel: (partIndex: number, nextLabel: string) => void;
+}) => {
   const accent = stepAccent[step.kind];
   return (
     <div
       ref={chipRef}
       className={`group inline-flex items-center gap-2 h-9 pl-2.5 pr-1 rounded-md border ${accent} text-[12.5px] transition-shadow duration-300 ${pulsing ? "ring-2 ring-coral/70 ring-offset-1 ring-offset-surface" : ""}`}
     >
-      {step.parts.map((p, i) => (
-        <span key={i} className="inline-flex items-center gap-1.5">
-          <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">{p.label}</span>
-          <span className={p.mono ? "font-mono text-[12.5px] text-ink" : "text-ink"}>{p.value}</span>
-          {i < step.parts.length - 1 && <span className="text-ink-3/60">·</span>}
-        </span>
-      ))}
+      {step.parts.map((p, i) => {
+        const isFilterOp = step.kind === "filter" && p.label !== "FILTER";
+        return (
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {isFilterOp ? (
+              <EditablePart
+                value={p.label}
+                opts={{ kind: "list", options: filterOptions }}
+                onChange={(next) => onUpdatePartLabel(i, next)}
+              />
+            ) : (
+              <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">{p.label}</span>
+            )}
+            <EditablePart
+              value={p.value}
+              mono={p.mono}
+              opts={optionsForPart(step, p.label, ctx)}
+              onChange={(next) => onUpdatePart(i, next)}
+            />
+            {i < step.parts.length - 1 && <span className="text-ink-3/60">·</span>}
+          </span>
+        );
+      })}
       {step.kind !== "from" && (
         <button onClick={onRemove} className="ml-1 h-6 w-6 rounded-md flex items-center justify-center text-ink-3 opacity-0 group-hover:opacity-100 hover:bg-surface-hover hover:text-ink transition" aria-label="Remove step">
           <X className="h-3 w-3" />
@@ -283,66 +474,111 @@ const PipelineChip = ({ step, onRemove, pulsing, chipRef }: { step: Step; onRemo
   );
 };
 
-function partsByLabel(step: Step) {
-  return Object.fromEntries(step.parts.map((p) => [p.label, p])) as Record<string, Step["parts"][number] | undefined>;
-}
-
-function SentenceFragment({ step, onClick }: { step: Step; onClick: () => void }) {
-  const Mono = ({ children }: { children: React.ReactNode }) => (
-    <button onClick={onClick} className="font-mono text-[13px] text-ink px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition">{children}</button>
-  );
-  const Plain = ({ children }: { children: React.ReactNode }) => (
-    <button onClick={onClick} className="text-[13px] text-ink px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition">{children}</button>
-  );
+function SentenceFragment({
+  step,
+  ctx,
+  onUpdatePart,
+  onUpdatePartLabel,
+}: {
+  step: Step;
+  ctx: EditCtx;
+  onUpdatePart: (partIndex: number, next: string) => void;
+  onUpdatePartLabel: (partIndex: number, nextLabel: string) => void;
+}) {
   const Op = ({ children }: { children: React.ReactNode }) => (
     <span className="text-[12.5px] text-ink-2">{children}</span>
   );
+  const indexOf = (label: string) => step.parts.findIndex((p) => p.label === label);
+  const Edit = ({ label, mono }: { label: string; mono?: boolean }) => {
+    const idx = indexOf(label);
+    const p = step.parts[idx];
+    if (!p) return null;
+    return (
+      <EditablePart
+        value={p.value}
+        mono={mono ?? p.mono}
+        opts={optionsForPart(step, label, ctx)}
+        onChange={(next) => onUpdatePart(idx, next)}
+        variant="sentence"
+      />
+    );
+  };
 
-  const p = partsByLabel(step);
   switch (step.kind) {
     case "from":
-      return <Mono>{p.FROM?.value}</Mono>;
+      return <Edit label="FROM" mono />;
     case "join":
       return (
         <>
           <Op>+</Op>
-          <Mono>{p.JOIN?.value}</Mono>
+          <Edit label="JOIN" mono />
           <Op>joined by</Op>
-          <Mono>{p.ON?.value}</Mono>
-          <Plain>{`(${p.USING?.value})`}</Plain>
+          <Edit label="ON" mono />
+          <Edit label="USING" />
         </>
       );
     case "aggregate":
       return (
         <>
           <Op>aggregated</Op>
-          <Mono>{p.AGGREGATE?.value}</Mono>
+          <Edit label="AGGREGATE" mono />
           <Op>by</Op>
-          <Plain>{p.BY?.value}</Plain>
+          <Edit label="BY" />
         </>
       );
     case "sort":
       return (
         <>
           <Op>sorted</Op>
-          <Mono>{p.SORT?.value}</Mono>
-          <Plain>{p["↓"]?.value}</Plain>
+          <Edit label="SORT" mono />
+          <Edit label="↓" />
         </>
       );
     case "filter": {
-      const col = p.FILTER?.value;
-      const opPart = step.parts[1];
+      const opIdx = 1;
+      const opPart = step.parts[opIdx];
       return (
         <>
           <Op>filtered where</Op>
-          <Mono>{`${col} ${opPart?.label} ${opPart?.value}`}</Mono>
+          <Edit label="FILTER" mono />
+          {opPart && (
+            <EditablePart
+              value={opPart.label}
+              opts={{ kind: "list", options: filterOptions }}
+              onChange={(next) => onUpdatePartLabel(opIdx, next)}
+              variant="sentence"
+            />
+          )}
+          {opPart && (
+            <EditablePart
+              value={opPart.value}
+              mono
+              opts={{ kind: "text" }}
+              onChange={(next) => onUpdatePart(opIdx, next)}
+              variant="sentence"
+            />
+          )}
         </>
       );
     }
   }
 }
 
-function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: Step[]; onChipClick: (id: string) => void; view: "compact" | "list"; onViewChange: (v: "compact" | "list") => void }) {
+function PipelineSentence({
+  steps,
+  view,
+  onViewChange,
+  ctx,
+  onUpdatePart,
+  onUpdatePartLabel,
+}: {
+  steps: Step[];
+  view: "compact" | "list";
+  onViewChange: (v: "compact" | "list") => void;
+  ctx: EditCtx;
+  onUpdatePart: (stepId: string, partIndex: number, next: string) => void;
+  onUpdatePartLabel: (stepId: string, partIndex: number, nextLabel: string) => void;
+}) {
   const hasOps = steps.some((s) => s.kind !== "from");
   return (
     <div className="px-5 pt-4 pb-3 border-b border-hairline">
@@ -372,7 +608,12 @@ function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: S
             return (
               <span key={s.id} className="inline-flex items-center gap-1.5">
                 {showArrow && <ArrowRight className="h-3.5 w-3.5 text-coral shrink-0" strokeWidth={2.25} />}
-                <SentenceFragment step={s} onClick={() => onChipClick(s.id)} />
+                <SentenceFragment
+                  step={s}
+                  ctx={ctx}
+                  onUpdatePart={(pi, next) => onUpdatePart(s.id, pi, next)}
+                  onUpdatePartLabel={(pi, next) => onUpdatePartLabel(s.id, pi, next)}
+                />
               </span>
             );
           })}
@@ -382,14 +623,14 @@ function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: S
           {steps.map((s) => (
             <div key={s.id} className="grid grid-cols-[80px_1fr] items-center gap-3 px-2 py-1.5 rounded-md hover:bg-canvas/60">
               <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{s.kind}</span>
-              <button onClick={() => onChipClick(s.id)} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-left">
-                {s.parts.map((p, i) => (
-                  <span key={i} className="inline-flex items-center gap-1.5">
-                    <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-2">{p.label}</span>
-                    <span className={p.mono ? "font-mono text-[12.5px] text-ink" : "text-[12.5px] text-ink"}>{p.value}</span>
-                  </span>
-                ))}
-              </button>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <SentenceFragment
+                  step={s}
+                  ctx={ctx}
+                  onUpdatePart={(pi, next) => onUpdatePart(s.id, pi, next)}
+                  onUpdatePartLabel={(pi, next) => onUpdatePartLabel(s.id, pi, next)}
+                />
+              </div>
             </div>
           ))}
         </div>
@@ -399,26 +640,43 @@ function PipelineSentence({ steps, onChipClick, view, onViewChange }: { steps: S
 }
 
 
-function PipelineStrip() {
+function PipelineStrip({
+  availableNames,
+  schemaBySlot,
+}: {
+  availableNames: string[];
+  schemaBySlot: Record<string, Attr[]>;
+}) {
   const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
-  const [pulseId, setPulseId] = useState<string | null>(null);
   const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const focusChip = (id: string) => {
-    const el = chipRefs.current[id];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-    }
-    setPulseId(id);
-    window.setTimeout(() => setPulseId((cur) => (cur === id ? null : cur)), 600);
+  const ctx: EditCtx = { availableNames, schemaBySlot, steps };
+
+  const updatePart = (stepId: string, partIndex: number, next: string) => {
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.id === stepId
+          ? { ...s, parts: s.parts.map((p, i) => (i === partIndex ? { ...p, value: next } : p)) }
+          : s,
+      ),
+    );
+  };
+  const updatePartLabel = (stepId: string, partIndex: number, nextLabel: string) => {
+    setSteps((prev) =>
+      prev.map((s) =>
+        s.id === stepId
+          ? { ...s, parts: s.parts.map((p, i) => (i === partIndex ? { ...p, label: nextLabel } : p)) }
+          : s,
+      ),
+    );
   };
 
   const addStep = (kind: StepKind) => {
     const id = `s${Date.now()}`;
     const templates: Record<Exclude<StepKind, "from">, Step["parts"]> = {
-      join: [{ label: "JOIN", value: "Dataset_B.csv", mono: true }, { label: "ON", value: "id", mono: true }, { label: "USING", value: "Inner Join" }],
+      join: [{ label: "JOIN", value: availableNames[1] ?? availableNames[0] ?? "", mono: true }, { label: "ON", value: "id", mono: true }, { label: "USING", value: "Inner Join" }],
       aggregate: [{ label: "AGGREGATE", value: "level_sugar", mono: true }, { label: "BY", value: "Mean" }],
       filter: [{ label: "FILTER", value: "blood_pressureH", mono: true }, { label: ">", value: "120", mono: true }],
       sort: [{ label: "SORT", value: "heartRate_avg", mono: true }, { label: "↓", value: "Descending" }],
@@ -429,7 +687,14 @@ function PipelineStrip() {
 
   return (
     <>
-      <PipelineSentence steps={steps} onChipClick={focusChip} view={view} onViewChange={setView} />
+      <PipelineSentence
+        steps={steps}
+        view={view}
+        onViewChange={setView}
+        ctx={ctx}
+        onUpdatePart={updatePart}
+        onUpdatePartLabel={updatePartLabel}
+      />
       <div className="border-b border-hairline px-5 py-4">
         <div className="flex items-center gap-1.5 mb-2">
           <span className="text-[10.5px] uppercase tracking-[0.1em] font-semibold text-ink-3">Steps</span>
@@ -440,8 +705,10 @@ function PipelineStrip() {
             <span key={s.id} className="inline-flex items-center gap-2">
               <PipelineChip
                 step={s}
-                pulsing={pulseId === s.id}
+                ctx={ctx}
                 chipRef={(el) => { chipRefs.current[s.id] = el; }}
+                onUpdatePart={(pi, next) => updatePart(s.id, pi, next)}
+                onUpdatePartLabel={(pi, next) => updatePartLabel(s.id, pi, next)}
                 onRemove={() => setSteps(steps.filter((x) => x.id !== s.id))}
               />
               {i < steps.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-ink-3/60 shrink-0" strokeWidth={2} />}
