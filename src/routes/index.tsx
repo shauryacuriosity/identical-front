@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useEffect, useState } from "react";
-import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, Copy, Archive } from "lucide-react";
-import { useProjects, formatRelative } from "@/lib/projects-store";
+import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, Copy, Archive, Plus } from "lucide-react";
+import { useProjects, formatRelative, createProject } from "@/lib/projects-store";
 import lotusMark from "@/assets/logo_lotus.png";
 
 
@@ -85,7 +85,7 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-surface-hover transition-colors overflow-hidden"
       style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
       <span
@@ -257,13 +257,25 @@ function Index() {
 
         {/* Recent projects */}
         <div className="flex items-baseline justify-between mb-4">
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-3">
             <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent Projects</h2>
             {rows.length > 0 && (
               <span className="text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5 font-medium">
                 {rows.length}
               </span>
             )}
+            <button
+              type="button"
+              aria-label="New project"
+              title="New project"
+              onClick={() => {
+                const id = createProject({ name: "", datasets: [] });
+                navigate({ to: "/datasets", search: { projectId: id, focusName: true } });
+              }}
+              className="inline-flex items-center justify-center h-6 w-6 rounded-full border border-coral/60 text-coral hover:bg-coral hover:text-white transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
           </div>
           <button className="text-[12.5px] text-ink-2 hover:text-ink transition">View all</button>
         </div>
@@ -330,7 +342,7 @@ function Index() {
                           showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
                         }`}
                       >
-                        <StatusDot active={!f.archived} />
+                        <RowCheckbox checked={false} onChange={() => toggleOne(f.id)} ariaLabel={`Select ${f.name}`} />
                       </span>
                       <span
                         className={`absolute inset-0 flex items-center justify-center transition-opacity ${

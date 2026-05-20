@@ -17,6 +17,7 @@ import {
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
     projectId: typeof s.projectId === "string" ? s.projectId : undefined,
+    focusName: s.focusName === true || s.focusName === "true" ? true : undefined,
   }),
   component: DatasetsPage,
 });
@@ -788,17 +789,27 @@ function ProjectHeader({
   effectiveName,
   isUntitled,
   placeholder,
+  autoFocus,
 }: {
   projectId: string | undefined;
   effectiveName: string;
   isUntitled: boolean;
   placeholder: string;
+  autoFocus?: boolean;
 }) {
   const navigate = useNavigate();
   const projects = useProjects();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(effectiveName);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [autoFocus, projectId]);
 
   useEffect(() => {
     setDraft(isUntitled ? "" : effectiveName);
@@ -824,6 +835,7 @@ function ProjectHeader({
     <div className="mb-4 flex items-center gap-2">
       {projectId ? (
         <input
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={(e) => commit(e.target.value)}
@@ -1091,7 +1103,7 @@ function ExportMenu({
 }
 
 function DatasetsPage() {
-  const { projectId } = Route.useSearch();
+  const { projectId, focusName } = Route.useSearch();
   const project = useProject(projectId);
   const [attrFilter, setAttrFilter] = useState("");
   const [datasetSlots, setDatasetSlots] = useState<string[]>(
@@ -1317,6 +1329,7 @@ function DatasetsPage() {
         effectiveName={effectiveName}
         isUntitled={isUntitled}
         placeholder={placeholder}
+        autoFocus={focusName}
       />
 
       <div className="flex gap-5">
