@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useRef, useEffect, useState } from "react";
 import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, Copy, Archive } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { useProjects, formatRelative } from "@/lib/projects-store";
 import lotusMark from "@/assets/logo_lotus.png";
+
 
 export const Route = createFileRoute("/")({
   component: Index,
