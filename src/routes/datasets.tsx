@@ -505,8 +505,8 @@ function DatasetsPage() {
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const addSlot = () => {
-    const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
-    setDatasetSlots([...datasetSlots, `Dataset_${nextLetter}.csv`]);
+    const next = ALL_DATASETS.find((d) => !datasetSlots.includes(d));
+    if (next) setDatasetSlots([...datasetSlots, next]);
   };
 
   return (
