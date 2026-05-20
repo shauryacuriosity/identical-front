@@ -87,6 +87,7 @@ function formatRelative(iso: string | null): string {
 function ActionTile({
   icon: Icon,
   label,
+  desc,
   href,
 }: {
   icon: React.ElementType;
@@ -97,11 +98,24 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group flex flex-col items-center justify-center gap-4 rounded-2xl bg-surface py-10 px-6 hover:-translate-y-0.5 transition-transform duration-150"
-      style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.25)" }}
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <Icon className="h-10 w-10 text-ink" strokeWidth={1.5} />
-      <div className="text-[15px] font-bold text-ink text-center">{label}</div>
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: "var(--coral)" }}
+      />
+      <div
+        className="flex items-center justify-center h-10 w-10 rounded-lg"
+        style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
+      >
+        <Icon className="h-5 w-5 text-coral" strokeWidth={1.75} />
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="text-[15px] font-semibold text-ink leading-tight">{label}</div>
+        <div className="text-[12.5px] text-ink-2 leading-snug">{desc}</div>
+      </div>
     </Link>
   );
 }
