@@ -1,70 +1,88 @@
 ## Goal
 
-Make every step in the Datasets pipeline editable in-place. Click any value (dataset name, column, join type, aggregation, filter operator/value, sort direction) and pick a new one from a dropdown driven by the current dataset schemas — including imported datasets.
+Introduce a session-local "Projects" concept. A project owns a set of dataset files. The home page lists Recent Projects (not files). The Datasets page reflects which project (if any) the user is working in, supports inline rename, and lets the user re-associate to another project.
 
-## Scope
+## Model (session-local, no DB)
 
-`src/routes/datasets.tsx` only. No backend, no styles changes beyond a small popover.
-
-## Changes
-
-### 1. Wire schema + dataset list into `PipelineStrip`
-
-Currently `PipelineStrip` owns `steps` state but has no access to schemas. Lift the data it needs as props:
+New module `src/lib/projects-store.ts` — tiny in-memory store with `useSyncExternalStore` subscription:
 
 ```ts
-<PipelineStrip
-  availableNames={availableNames}
-  schemaBySlot={schemaBySlot}
-/>
+type Project = {
+  id: string;
+  name: string;            // editable; "" means untitled (auto-fills from first dataset)
+  datasets: string[];      // slot names belonging to this project, e.g. ["Dataset_A.csv"]
+  modifiedAt: string;      // ISO
+};
 ```
 
-(Steps state stays inside `PipelineStrip` — only the option sources move in.)
+API:
+- `useProjects()` → `Project[]` sorted by `modifiedAt desc`
+- `useProject(id)` → `Project | null`
+- `createProject(seed?: Partial<Project>) → id`
+- `renameProject(id, name)`
+- `setProjectDatasets(id, names[])`
+- `touchProject(id)` — bumps `modifiedAt`
 
-### 2. New `EditablePart` component
+Seed with 2–3 mock projects so the home list isn't empty (e.g. "Project 1" with `Dataset_A.csv`, `Dataset_B.csv`).
 
-Replaces the read-only `<span>` rendering inside both `PipelineChip` and `SentenceFragment`. Renders as a small button; on click opens a dropdown of options (reuses the existing dropdown styling from `DatasetBar`/`Dropdown`).
+## 1. Home page (`src/routes/index.tsx`)
 
-Props: `value`, `mono`, `options: string[] | { type: "text" }`, `onChange(next)`.
+- Section heading: **"Recent files" → "Recent Projects"**.
+- Replace the Supabase `datasets` query with `useProjects()`.
+- Table columns: **`Name | Files | MetS prevalence | Modified`** (drop the Type column entirely; rename Rows → Files).
+  - Files cell renders `${p.datasets.length} file${...s}` (e.g. "3 files", "1 file", "0 files" greyed).
+- Row click navigates to `/datasets?projectId=<id>` (instead of `datasetId`).
+- "New Dataset" tile keeps current `to="/datasets"` (no `projectId` → unassociated path on the Datasets page).
+- MetS prevalence: leave as `—` for now (not in the project model); keep column for parity.
+- Adjust grid template to remove the Type column (collapse from 6 cols to 5).
 
-Free-text variant (for filter value `120`) renders an `<input>` instead of a list.
+## 2. Datasets page (`src/routes/datasets.tsx`)
 
-### 3. Per-step option resolution
+### Search params
+Replace `datasetId` validator with:
+```ts
+projectId: string | undefined
+```
+(Drop the existing single-dataset Supabase query — no longer used.)
 
-A helper `optionsForPart(step, partLabel, ctx)` returns the option list for each part, where `ctx = { availableNames, schemaBySlot, currentSteps }`:
+### Project context resolution
+- Read `projectId` from `Route.useSearch()`.
+- If present: `project = useProject(projectId)`; initial `datasetSlots` ← `project.datasets`.
+- If absent: no project; `datasetSlots` defaults to `[]` (was `["Dataset_A.csv"]`). Heading shows "No project associated" in `text-ink-3` (muted).
 
-| Step | Part | Options |
-|---|---|---|
-| `from` | FROM | `availableNames` |
-| `join` | JOIN | `availableNames` (excluding the current FROM dataset) |
-| `join` | ON | union of column names from FROM + JOIN datasets |
-| `join` | USING | `joinOptions` |
-| `aggregate` | AGGREGATE | numeric columns across all datasets currently referenced in the pipeline |
-| `aggregate` | BY | `aggOptions` |
-| `filter` | FILTER | all columns from referenced datasets |
-| `filter` | operator (`>`, `=`, …) | `filterOptions` (changes the part `label`, not value) |
-| `filter` | value | free-text input |
-| `sort` | SORT | all columns from referenced datasets |
-| `sort` | `↓` | `sortOptions` |
+### New `ProjectHeader` component (replaces the current `<h1>` + subtitle block)
 
-"Referenced datasets" = the FROM dataset plus any JOIN datasets that appear earlier in the pipeline than the step being edited.
+A Google-Docs-style title bar:
 
-### 4. Update existing components
+```
+[ Project name input (or "No project associated" muted) ]   [ ▾ Switch project ]
+```
 
-- `PipelineChip`: render each `part` via `EditablePart` instead of plain spans. Keep the remove button.
-- `SentenceFragment`: replace each `Mono`/`Plain` button with `EditablePart`. Drop the existing `onClick → focusChip` behaviour (clicking a value now edits it). Move the focus/pulse behaviour onto a small caret-grip area or just remove it — the sentence is now directly editable, which is more useful.
-- Mutation: `EditablePart`'s `onChange` calls a `updatePart(stepId, partLabel, next)` that lives in `PipelineStrip` and does an immutable `setSteps` update. For filter operator-label changes, use `updatePartLabel(stepId, partIndex, nextLabel)`.
+- Title is a borderless `<input>` styled as the heading (`text-[22px] text-ink`, transparent bg, focus shows hairline). When `projectId` is set, edits call `renameProject`. When no project, the title shows "No project associated" as muted, non-editable text.
+- Dropdown trigger ("Switch project ▾") opens a small popover listing existing projects + a "New project" item. Selecting one calls `navigate({ to: "/datasets", search: { projectId: chosen.id } })`. "New project" creates an empty project and navigates to it.
 
-### 5. Edge cases
+### Auto-name behaviour (Google-Docs style)
 
-- Changing a `from` value to one no longer in `availableNames` shouldn't be possible — the dropdown only lists current names.
-- If a join's ON column is no longer in the joined dataset's schema after the user changes JOIN target, leave the value as-is (stale) but it'll be selectable from the new list — no auto-reset, keeps edits non-destructive.
-- Filter free-text value is stored as a string; no type coercion.
+When the current project's `name === ""` (untitled), the title input shows a muted placeholder of the first dataset slot's name (sans extension) and treats that as the effective name. On first edit, persist whatever the user types via `renameProject`. Additionally, when the first dataset is added/changed and the name is still empty, persist that as the default name via `renameProject` (user can still edit any time).
+
+### Dataset slot ↔ project sync
+
+- On every change to `datasetSlots` (add/remove/replace, file import success), if `projectId` is set call `setProjectDatasets(projectId, datasetSlots)` + `touchProject(projectId)`.
+- If the user is in the "no project associated" state and imports/adds a dataset, do NOT auto-create a project — keep the local-only flow. (User can switch via the Switch project menu to associate.)
+
+### Re-association via dropdown
+Selecting a different project navigates to that project's URL, which re-seeds `datasetSlots` from the chosen project's stored list. This satisfies "Dataset A and Dataset B is linked to Project 1" — each project's slot list is independent.
 
 ## Files
 
-- `src/routes/datasets.tsx` — all edits
+- New: `src/lib/projects-store.ts`
+- Edited: `src/routes/index.tsx` (Recent Projects table, columns, navigation)
+- Edited: `src/routes/datasets.tsx` (search param, ProjectHeader, slot sync, drop `datasetQ`)
 
 ## Not touched
 
-`dataset-import.ts`, `__root.tsx`, styles, other routes.
+`dataset-import.ts`, `__root.tsx`, styles, pipeline editor, other routes.
+
+## Open assumption
+
+Recent Projects MetS prevalence stays as `—` until a separate request adds project-level metrics. Flag if you want me to drop that column instead.

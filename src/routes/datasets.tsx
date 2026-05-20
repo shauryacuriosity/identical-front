@@ -1,17 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { parseDatasetFile } from "@/lib/dataset-import";
+import {
+  useProjects,
+  useProject,
+  createProject,
+  renameProject,
+  setProjectDatasets,
+} from "@/lib/projects-store";
 
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
-    datasetId: typeof s.datasetId === "string" ? s.datasetId : undefined,
+    projectId: typeof s.projectId === "string" ? s.projectId : undefined,
   }),
   component: DatasetsPage,
 });
+
 
 type AttrType = "id" | "num" | "cat";
 type Attr = { name: string; type: AttrType };
@@ -747,29 +753,157 @@ function PipelineStrip({
 }
 
 
+function ProjectHeader({
+  projectId,
+  effectiveName,
+  isUntitled,
+  placeholder,
+}: {
+  projectId: string | undefined;
+  effectiveName: string;
+  isUntitled: boolean;
+  placeholder: string;
+}) {
+  const navigate = useNavigate();
+  const projects = useProjects();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(effectiveName);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setDraft(isUntitled ? "" : effectiveName);
+  }, [effectiveName, isUntitled, projectId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const commit = (next: string) => {
+    if (!projectId) return;
+    const trimmed = next.trim();
+    if (trimmed === effectiveName) return;
+    renameProject(projectId, trimmed);
+  };
+
+  return (
+    <div className="mb-4 flex items-center gap-2">
+      {projectId ? (
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              setDraft(isUntitled ? "" : effectiveName);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          placeholder={placeholder || "Untitled project"}
+          className="text-[22px] leading-tight text-ink bg-transparent border border-transparent rounded-md px-2 -mx-2 py-0.5 hover:border-hairline focus:border-coral/50 focus:outline-none min-w-0 flex-1"
+        />
+      ) : (
+        <h1 className="text-[22px] leading-tight text-ink-3 px-2 -mx-2 py-0.5 flex-1">
+          No project associated
+        </h1>
+      )}
+
+      <div className="relative" ref={wrapRef}>
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-hairline bg-surface text-[12.5px] text-ink-2 hover:text-ink hover:border-ink-3/40 transition"
+        >
+          {projectId ? "Switch project" : "Associate project"}
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="absolute right-0 z-30 mt-1.5 min-w-[220px] bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+            {projects.length === 0 && (
+              <div className="px-3 py-2 text-[12px] text-ink-3 italic">No projects yet</div>
+            )}
+            {projects.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setOpen(false);
+                  navigate({ to: "/datasets", search: { projectId: p.id } });
+                }}
+                className={`block w-full text-left px-3 py-2 text-[12.5px] hover:bg-surface-hover transition ${
+                  p.id === projectId ? "text-coral" : "text-ink"
+                }`}
+              >
+                {p.name || "Untitled project"}
+                <span className="ml-2 text-ink-3 text-[11px]">
+                  {p.datasets.length} file{p.datasets.length === 1 ? "" : "s"}
+                </span>
+              </button>
+            ))}
+            <div className="border-t border-hairline my-1" />
+            <button
+              onClick={() => {
+                setOpen(false);
+                const id = createProject({ name: "" });
+                navigate({ to: "/datasets", search: { projectId: id } });
+              }}
+              className="block w-full text-left px-3 py-2 text-[12.5px] text-ink hover:bg-surface-hover transition flex items-center gap-1.5"
+            >
+              <Plus className="h-3.5 w-3.5" /> New project
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DatasetsPage() {
-  const { datasetId } = Route.useSearch();
+  const { projectId } = Route.useSearch();
+  const project = useProject(projectId);
   const [attrFilter, setAttrFilter] = useState("");
-  const [datasetSlots, setDatasetSlots] = useState<string[]>(["Dataset_A.csv"]);
+  const [datasetSlots, setDatasetSlots] = useState<string[]>(
+    project ? project.datasets : [],
+  );
   const [importedDatasets, setImportedDatasets] = useState<
     Record<string, { attrs: Attr[]; rowCount: number }>
   >({});
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const datasetQ = useQuery({
-    queryKey: ["datasets", "single", datasetId],
-    enabled: !!datasetId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("datasets")
-        .select("id,name")
-        .eq("id", datasetId!)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; name: string } | null;
-    },
-  });
+  // When switching projects, reseed slots from the new project's stored list.
+  useEffect(() => {
+    if (project) setDatasetSlots(project.datasets);
+    else setDatasetSlots([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Sync slot changes back to project store.
+  useEffect(() => {
+    if (!projectId) return;
+    const current = project?.datasets ?? [];
+    const same =
+      current.length === datasetSlots.length &&
+      current.every((v, i) => v === datasetSlots[i]);
+    if (!same) setProjectDatasets(projectId, datasetSlots);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetSlots, projectId]);
+
+  // Google-Docs-style auto-name: if project name is empty and a first dataset
+  // exists, persist its stem as the default name.
+  useEffect(() => {
+    if (!projectId || !project) return;
+    if (project.name.trim() !== "") return;
+    const first = datasetSlots[0];
+    if (!first) return;
+    const dot = first.lastIndexOf(".");
+    const stem = dot > 0 ? first.slice(0, dot) : first;
+    renameProject(projectId, stem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasetSlots, projectId, project?.name]);
 
   const q = attrFilter.trim().toLowerCase();
   const schemaBySlot: Record<string, Attr[]> = {
@@ -834,20 +968,36 @@ function DatasetsPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const effectiveName = project?.name?.trim()
+    ? project.name
+    : datasetSlots[0]
+      ? (() => {
+          const f = datasetSlots[0];
+          const dot = f.lastIndexOf(".");
+          return dot > 0 ? f.slice(0, dot) : f;
+        })()
+      : "";
+  const isUntitled = !project?.name?.trim();
+  const placeholder = datasetSlots[0]
+    ? (() => {
+        const f = datasetSlots[0];
+        const dot = f.lastIndexOf(".");
+        return dot > 0 ? f.slice(0, dot) : f;
+      })()
+    : "Untitled project";
+
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
-      <div className="mb-4">
-        <h1 className="text-[22px] leading-tight text-ink">
-          {datasetId ? (datasetQ.data?.name ?? (datasetQ.isLoading ? "Loading…" : "Datasets")) : "Datasets"}
-        </h1>
-        {datasetId && (
-          <p className="text-[12.5px] text-ink-2 mt-1">
-            Selected from Recent files
-          </p>
-        )}
-      </div>
+      <ProjectHeader
+        projectId={projectId}
+        effectiveName={effectiveName}
+        isUntitled={isUntitled}
+        placeholder={placeholder}
+      />
+
       <div className="flex gap-5">
         {/* Sidebar */}
+
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
