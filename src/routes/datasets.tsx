@@ -17,6 +17,7 @@ import {
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
     projectId: typeof s.projectId === "string" ? s.projectId : undefined,
+    focusName: s.focusName === true || s.focusName === "true" ? true : undefined,
   }),
   component: DatasetsPage,
 });
