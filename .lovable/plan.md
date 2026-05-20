@@ -1,76 +1,59 @@
-## Visual polish pass — plan
+## Home + nav visual polish
 
-Scope: className/style tweaks only. No logic, no token, no route, no query changes.
-
----
-
-### File 1 — `src/routes/index.tsx` (items 1, 2, 4)
-
-**1. Restore Lotus brand on Home hero (item 1).**
-Add the lotus mark above the "Welcome back" heading inside the greeting block (line ~234). Import `lotusMark from "@/assets/logo_lotus.png"` and render `<img src={lotusMark} alt="" className="h-8 w-auto mb-3" />`. No wordmark — the page already says "Welcome back" as the H1, and the nav already shows "Lotus". This restores the visual brand presence on `/` without duplicating the wordmark.
-
-**2. Re-soften secondary text (item 2).** Surgical reverts:
-
-- `text-ink` → `text-ink-2` on:
-  - greeting subtitle "Pick up where you left off…" (line 237)
-  - Recent files header timestamps cell `f.modified` (line 351)
-  - Recent files rows count cell (line 343) and prevalence cell (line 347) — these are tabular supporting data, not body content
-- Keep `text-ink` on: H1 "Welcome back" (236), H2 "Recent files" (249), file name (336), ActionTile label (103).
-- Column header row (line 254) already uses `text-ink-2` — leave as is.
-
-**4. Card surfaces (item 4).** Recent files rows + skeleton already use `bg-surface` (cream #FFF5F5). Verify and leave untouched. No change needed unless an inline white snuck in — none found in this file.
+Scope: visual only. No tokens added, no queries/routes/functional logic touched. All colors come from existing CSS vars.
 
 ---
 
-### File 2 — `src/routes/__root.tsx` (item 3)
+### 1. `src/routes/__root.tsx` — make the nav feel premium
 
-**Match Home pill to tab system.** Currently the Home brand link uses `pl-2 pr-4` while tabs use `px-4` — that asymmetry makes the Home pill feel different. Fix:
+- Thicken the pill: `h-12` → `h-14`, switch shadow from `0 2px 4px` to layered `0 1px 0 rgba(0,0,0,.04), 0 8px 24px -8px rgba(0,0,0,.18)` for a floating-glass feel.
+- Add a 1px hairline border (`border-hairline`) on the pill so it reads as a defined surface against the pink canvas.
+- Tab labels: bump weight `font-medium` → `font-semibold`, tighten tracking (`tracking-tight`), drop size to `[14px]` for editorial density.
+- Active tab: replace the 18% coral wash + underline pill-bottom bar with a cleaner approach — solid `bg-surface-hover` chip + ink text (no bottom bar). Quieter, more confident.
+- Brand "Lotus": keep lotus mark visible even when Home is active (small, 16px), wordmark in `font-semibold tracking-tight`.
+- Account avatar: 1px coral ring → subtle `border-hairline-strong` ring; matches the new restrained tone.
 
-- Change brand link className from `pr-4 pl-2 h-9 my-auto rounded-2xl` → `px-4 h-9 my-auto rounded-2xl` for symmetric padding identical to tab triggers.
-- Keep coral 18% background, keep `left-3 right-3 bottom-1 h-[2px]` underline — already identical to tabs.
-- Keep `homeActive && hide lotus icon` behavior so text-only "Lotus" sits inside the coral pill at the same visual weight as other tab labels.
+### 2. `src/routes/index.tsx` — establish hierarchy and card presence
 
-No new protrusion below the nav bar — the existing underline pattern (inside the pill, 1px above bottom) is the system used by every other tab; matching it is the goal.
+**Hero block**
+- Lotus mark grows `h-8` → `h-10`, paired inline-left with the H1 instead of stacked (icon + heading on the same baseline).
+- H1: `text-[28px]` → `text-[44px] font-bold tracking-[-0.02em] leading-[1.05]`. This is the single weight-carrying element on the page.
+- Add an eyebrow above H1: small uppercase `text-[11px] tracking-[0.18em] text-ink-2` reading "Workbench" — editorial signal.
+- Subtitle: bump to `text-[15px]`, max-width ~520px so it doesn't sprawl.
+- Vertical rhythm: `mb-6` → `mb-12` between hero and action tiles.
 
----
+**Action tiles (3 cards)**
+- Make them feel like physical objects: `bg-surface` + `border border-hairline` + layered shadow (`0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.25)`).
+- Add a thin top accent stripe in `--coral` (2px, full-width inside rounded corners) to differentiate from the table rows below.
+- Left-align icon + label instead of centered — feels more tool-like, less marketing.
+- Icon in a coral-tinted square chip (`bg-coral/12`, rounded-lg, 40px), label `text-[15px] font-semibold`, add one-line description back in `text-[12.5px] text-ink-2`.
+- Hover: lift `-translate-y-0.5` + shadow intensify (already there) + accent stripe brightens.
 
-### File 3 — `src/routes/datasets.tsx` (items 2, 5 audit)
+**Recent files section**
+- Section header gets weight: H2 `text-[20px]` → `text-[22px] font-semibold`, paired with row count chip `text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5` next to it.
+- Wrap the entire table (header row + rows) in ONE container card: `bg-surface` + `border border-hairline` + soft shadow + `rounded-2xl` + `overflow-hidden`. This gives the table a defined surface vs. floating rows on pink.
+- Inside the container, drop per-row shadows (no more puffy individual rows). Rows become flat with `border-b border-hairline` between them; last row no border.
+- Row padding `py-4` → `py-3.5`, hover state `bg-surface-hover/40` (subtle) instead of translate.
+- Column header row: keep uppercase tracked labels but slightly darker (`text-ink-2`), add `border-b border-hairline-strong` separator.
+- Name column: file icon in coral tint (`text-coral` instead of `text-ink-2`) — adds color accent without breaking the palette.
 
-Surgical sweep only — open the file, identify any place where the prior pass turned muted labels into `text-ink`, and revert per item 2 rules:
-
-- attribute group counts/badges → `text-ink-2`
-- sidebar section labels & filter placeholder helper text → `text-ink-2`
-- pipeline step parts (descriptive sub-text) → `text-ink-2`
-- dataset bar metadata (row counts, file size) → `text-ink-2`
-- Keep `text-ink` on: page H1, attribute names, dataset bar name, pipeline operation labels.
-
-Item 5 audit: scan for any `rounded-none` / missing radius on buttons added in the last pass (the `+` appender, List/Compact toggle, search input). Ensure each uses `rounded-lg` (toggles) or `rounded-xl` (dataset bars / +). Restore if missing.
-
----
-
-### File 4 — `src/routes/ai-analysis.tsx` (items 2, 5 audit)
-
-Same surgical sweep:
-
-- Step numbers / step descriptions / helper sublabels → `text-ink-2`
-- Mapping row field labels → `text-ink-2`
-- Run name input label may stay `text-ink` (item 12 promoted it intentionally — leave as is)
-- Add field button, dropdowns, chevron buttons: verify `rounded-lg`/`rounded-xl` matches the rest of the form. Restore if any went flat.
-
----
-
-### Sanity checks
-
-1. **Lotus on Home** — adding only the icon (~32px), no wordmark, above the H1. Confirm that placement vs. inline-with-H1 (icon + text side-by-side).
-2. **Muted reversion scope** — applying only to: timestamps, secondary metadata, helper sublabels, column headers, breadcrumbs, step descriptions. Body paragraphs and table primary identifiers stay `text-ink`. Confirm.
-3. **No token changes** — `text-ink` (#1A0003) and `text-ink-2` (#673D3D) classes already exist in styles.css; this is class swaps only.
+**Page background**
+- Add a very subtle vignette/radial behind the hero (`radial-gradient(ellipse at top, color-mix(in oklab, var(--bg-surface) 35%, transparent), transparent 60%)`) layered on the body bg — gives the home page a focal point and breaks the flat pink wash. Pure CSS, no new tokens.
 
 ---
 
-### Files I will NOT touch
+### Files NOT touched
 
-- `src/styles.css`, `src/integrations/supabase/*`, `src/routeTree.gen.ts`
-- `src/routes/runs.$runId.tsx`, `src/routes/ai-analysis.results.tsx`, `src/routes/visualisation.tsx` (not in the scope of the recent 13-item pass)
+- `src/styles.css` (no token changes)
+- `src/integrations/supabase/*` (no query changes)
+- `src/routes/datasets.tsx`, `ai-analysis.tsx`, `runs.$runId.tsx`, `visualisation.tsx` (out of scope — Home + nav only)
+- `src/routeTree.gen.ts`
 
-Approve and I'll apply all four files in one pass.  
-approving -- please make it look good, without changing all of the explicit rules mentioned earlier. it should be a small polish pass. :) 
+---
+
+### Net effect
+
+- Nav: thinner border + softer shadow + active-chip pattern reads premium, not marketing-y.
+- Home: one strong H1, three differentiated tool tiles with accent stripes, and a unified recent-files card. Hierarchy goes hero → tiles → table instead of three equally-weighted flat zones.
+
+Approve and I'll apply in one pass.
