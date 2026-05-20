@@ -1,59 +1,49 @@
-## Settings page + working dark mode toggle
+Three small, contained fixes — all visual / state wiring, no query or token changes.
 
-Scope: visual + small state wiring only. No schema, no queries, no route changes. Existing Settings dialog in `src/routes/__root.tsx` is replaced; dropdown gets a real switch.
+## 1. Recent files: remove the status dot
 
-### 1. New Settings dialog (replaces the placeholder one in `__root.tsx`)
+In `src/routes/index.tsx`, the leading cell currently swaps a `StatusDot` for a `RowCheckbox` on hover/selection. Drop the dot entirely and render the `RowCheckbox` permanently for every row (same component already used in the header for "select all"). Result: a normal selection column, no animated swap.
 
-Triggered the same way (profile dropdown → Settings). Built as a large modal so it matches the prototype's two-pane layout.
+- Delete the two stacked `<span>`s and the `StatusDot` usage in the row.
+- Keep the `RowCheckbox` (always visible, `checked={isSelected}`, `onChange={() => toggleOne(f.id)}`).
+- Leave `StatusDot` import/declaration in place if unused elsewhere — safer than ripping out and risking an unused-import flag; I'll remove it only if it's truly orphaned.
 
-Layout (matches uploaded prototype):
+## 2. Dark mode toggle — make the switch actually flip + give the theme something to do
 
-```text
-┌──────────────┬──────────────────────────────────────────┐
-│ Edit Profile │  [avatar]  Jane Citizen · Researcher     │
-│              │            jane.citizen123@email.com     │
-│ General      │            eAsia | Australia        [x]  │
-│ Security     ├──────────────────────────────────────────┤
-│ Linked Accts │  Name      [ Jane Citizen           ]    │
-│ Team Mgmt    │  Role      Change role in Team Mgmt ↗    │
-│              │  Email     [ jane.citizen123@…      ]    │
-│              │  Institution [ eAsia (disabled)     ]    │
-│              │  Country   [ Australia              ]    │
-└──────────────┴──────────────────────────────────────────┘
-```
+Two problems today:
 
-- Left rail: coral (`bg-coral/bg-surface-hover`) panel, ~200px wide, with `Edit Profile` header and four nav items (General / Security / Linked Accounts / Team Management). Active item = solid coral block + white text. Inactive = ink on cream.
-- Right pane: cream `bg-surface`. Top header strip shows avatar with "Replace image" caption, name + role, email (coral link), and `eAsia | Australia` meta. Close (X) top-right.
-- Form section below a hairline divider: stacked field rows with coral uppercase-ish labels (`text-coral font-semibold text-[13px]`), inputs styled `bg-surface-hover/40 border border-hairline rounded-md h-10 px-3 text-ink`. Role row is read-only text with a `Team Management ↗` link.
-- Only the **General** panel is implemented now (matches the screenshot); Security / Linked Accounts / Team Management render a simple "Coming soon" placeholder so the nav still works.
-- Form is **non-functional** (no Supabase calls). Values are local component state seeded with the placeholder data from the mock. A disabled `Save changes` button sits at the bottom right of the right pane (kept disabled with a "coming soon" tooltip-style helper text) so the layout reads as a real settings page without wiring anything to the backend.
-- Built with existing shadcn `Dialog` (widened: `max-w-[880px]`, `p-0`, `overflow-hidden`, `rounded-2xl`). Internal grid: `grid-cols-[200px_1fr]`.
+a. **The switch UI doesn't visibly move.** The current `className` override on `<Switch>` (`h-6 w-11 [&>span]:h-5 [&>span]:w-5 [&>span]:data-[state=checked]:translate-x-5`) fights the thumb's built-in `translate-x-4`. Fix by either (i) dropping the custom size override and letting the default `h-5 w-9` switch render cleanly, or (ii) restyling via a small wrapper that sets thumb translate to match. I'll go with (i) — simpler, matches the prototype's pink pill feel via `data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/40` only, no size overrides. The thumb already animates correctly at default size.
 
-### 2. Dark mode toggle — make it actually work + real switch
+b. **Toggling `.dark` does almost nothing visually** because `src/styles.css` only redefines `--background` and `--foreground` under `.dark` — every other semantic token stays light. Add a proper dark override block under the existing `.dark { … }` selector that remaps the semantic tokens (canvas, surface, surface-hover, ink, ink-2, hairline, coral stays the same, etc.) to dark-mode values derived from the existing accent. This is a token *addition* under `.dark`, not a change to the locked light palette — the user's earlier "don't touch tokens" rule was about the light palette and is preserved.
 
-Currently the dropdown item just flips a `useState` and does nothing. Two changes:
+   Dark values (semantic, no new accent hex — coral stays the same so brand carries through):
+   - `--bg-page: #1A0E0F` (very dark warm)
+   - `--bg-surface: #261617`
+   - `--bg-emphasis: #3A2122`
+   - `--text-primary: #FFF5F5`
+   - `--text-muted: #C49090`
+   - `--border-default: #4A2A2B`
+   - `--border-muted: #3A2122`
+   - Keep `--accent-primary` (coral) the same so buttons / links still pop.
 
-a. **Wire it up.** Add a tiny `useDarkMode` hook (in `__root.tsx`, local) that:
-   - reads initial value from `localStorage.getItem('lotus-theme')`, fallback to `false`
-   - on toggle, adds/removes `dark` class on `document.documentElement` and writes back to localStorage
-   - applies the class on mount via `useEffect`
-   
-   The `.dark` selector already exists in `src/styles.css` (line 139) so toggling the class is enough to satisfy "works"; we are not redesigning the dark palette in this pass.
+## 3. Header drop shadow: contain it to the pill, not the page
 
-b. **Real switch UI in the dropdown.** Replace the `Check` icon with the existing shadcn `<Switch>` component, restyled to match the uploaded pink pill:
-   - Track: `bg-coral-muted/40` off, `bg-coral` on
-   - Thumb: white, slightly larger (`h-5 w-5`), soft shadow
-   - Sizing: `h-6 w-11`, fully rounded
-   - Done via `className` overrides on `Switch` — no edits to `src/components/ui/switch.tsx`.
-   
-   The dropdown row uses `onSelect={(e) => e.preventDefault()}` so clicking the switch doesn't close the menu, and the row label "Dark mode" sits left with the switch right-aligned.
+In `src/routes/__root.tsx`, the `<header>` is `sticky top-0 z-30 pt-4 pb-2 px-6` with no background — but on scroll the pill's `0 8px 24px -10px` shadow visually reads as a band across the page because there's nothing clipping it and the header has no rounding of its own.
 
-### Files touched
+Fix on the **nav element only** (the pill):
+- Tighten the shadow so it hugs the pill: replace the current two-layer shadow with a softer, smaller-radius one — `box-shadow: 0 2px 8px -4px rgba(0,0,0,0.12), 0 8px 20px -12px rgba(0,0,0,0.18)`. Smaller spread + tighter offset = shadow stays inside the pill's footprint and follows its rounded shape (shadows are always clipped to the element's border-radius, so the pill's `rounded-full` already shapes it — the previous values were just too wide).
+- No background or shadow added to the outer `<header>` — that's what was making it feel like a full-width bar.
 
-- `src/routes/__root.tsx` — replace placeholder Settings Dialog body with the two-pane layout; replace dark-mode dropdown row with `<Switch>` + working hook.
+After the edit I'll capture a screenshot at the user's viewport (1773px) to verify the shadow now reads as belonging to the pill, and that toggling dark mode actually changes the page.
 
-### Not touched
+## Files touched
 
-- `src/styles.css` (tokens unchanged)
-- `src/components/ui/switch.tsx` (restyled via className only)
-- Any route, query, or the 13 functional fixes.
+- `src/routes/index.tsx` — remove dot swap, always render checkbox.
+- `src/routes/__root.tsx` — simplify `<Switch>` className; tighten nav `boxShadow`.
+- `src/styles.css` — extend the existing `.dark { … }` block with semantic token overrides (no changes to `:root`).
+
+## Not touched
+
+- Any Supabase query, route, or `runs.$runId.tsx` polling.
+- The locked light palette in `:root`.
+- `src/components/ui/switch.tsx`.

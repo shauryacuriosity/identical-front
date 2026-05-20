@@ -350,25 +350,15 @@ function Index() {
                     isLast ? "" : "border-b border-hairline"
                   } ${f.archived ? "opacity-75" : ""}`}
                 >
-                  <span className="flex items-center justify-center relative h-[14px] w-[14px]">
-                    <span
-                      className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                        showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
-                      }`}
-                    >
-                      <StatusDot active={!f.archived} />
-                    </span>
-                    <span
-                      className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                        showCheckbox ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                      }`}
-                    >
-                      <RowCheckbox
-                        checked={isSelected}
-                        onChange={() => toggleOne(f.id)}
-                        ariaLabel={`Select ${f.name}`}
-                      />
-                    </span>
+                  <span
+                    className="flex items-center justify-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <RowCheckbox
+                      checked={isSelected}
+                      onChange={() => toggleOne(f.id)}
+                      ariaLabel={`Select ${f.name}`}
+                    />
                   </span>
 
                   <div className="flex items-center gap-3 min-w-0">
