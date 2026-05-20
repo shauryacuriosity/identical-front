@@ -1172,14 +1172,15 @@ function DatasetsPage() {
   // Sweep stale references in pipeline steps when slots change.
   useEffect(() => {
     setSteps((prev) => {
-      const slotSet = new Set(datasetSlots);
+      const slotSet = new Set(datasetSlots.filter(Boolean));
+      const firstValid = datasetSlots.find(Boolean) ?? "";
       const swept = prev.map((s) => {
         if (s.kind === "from") {
           const fromVal = s.parts.find((p) => p.label === "FROM")?.value ?? "";
           if (!slotSet.has(fromVal)) {
             return {
               ...s,
-              parts: s.parts.map((p) => p.label === "FROM" ? { ...p, value: datasetSlots[0] ?? "" } : p),
+              parts: s.parts.map((p) => p.label === "FROM" ? { ...p, value: firstValid } : p),
             };
           }
         } else if (s.kind === "join") {
