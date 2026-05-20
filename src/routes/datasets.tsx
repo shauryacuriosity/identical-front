@@ -660,18 +660,21 @@ function PipelineSentence({
 
 
 function PipelineStrip({
-  availableNames,
+  slotNames,
   schemaBySlot,
+  steps,
+  setSteps,
 }: {
-  availableNames: string[];
+  slotNames: string[];
   schemaBySlot: Record<string, Attr[]>;
+  steps: Step[];
+  setSteps: React.Dispatch<React.SetStateAction<Step[]>>;
 }) {
-  const [steps, setSteps] = useState<Step[]>(initialPipeline);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const ctx: EditCtx = { availableNames, schemaBySlot, steps };
+  const ctx: EditCtx = { slotNames, schemaBySlot, steps };
 
   const updatePart = (stepId: string, partIndex: number, next: string) => {
     setSteps((prev) =>
@@ -694,15 +697,22 @@ function PipelineStrip({
 
   const addStep = (kind: StepKind) => {
     const id = `s${Date.now()}`;
+    const fromName = steps.find((s) => s.kind === "from")?.parts.find((p) => p.label === "FROM")?.value;
+    const otherSlot = slotNames.find((n) => n !== fromName) ?? slotNames[0] ?? "";
+    const refs = [fromName, otherSlot].filter(Boolean) as string[];
+    const allCols = columnsFor(refs, schemaBySlot);
+    const numCols = columnsFor(refs, schemaBySlot, (a) => a.type === "num");
+    const idCol = allCols.find((c) => /id|seqn/i.test(c)) ?? allCols[0] ?? "";
     const templates: Record<Exclude<StepKind, "from">, Step["parts"]> = {
-      join: [{ label: "JOIN", value: availableNames[1] ?? availableNames[0] ?? "", mono: true }, { label: "ON", value: "id", mono: true }, { label: "USING", value: "Inner Join" }],
-      aggregate: [{ label: "AGGREGATE", value: "level_sugar", mono: true }, { label: "BY", value: "Mean" }],
-      filter: [{ label: "FILTER", value: "blood_pressureH", mono: true }, { label: ">", value: "120", mono: true }],
-      sort: [{ label: "SORT", value: "heartRate_avg", mono: true }, { label: "↓", value: "Descending" }],
+      join: [{ label: "JOIN", value: otherSlot, mono: true }, { label: "ON", value: idCol, mono: true }, { label: "USING", value: "Inner Join" }],
+      aggregate: [{ label: "AGGREGATE", value: numCols[0] ?? "", mono: true }, { label: "BY", value: "Mean" }],
+      filter: [{ label: "FILTER", value: numCols[0] ?? allCols[0] ?? "", mono: true }, { label: "Greater than", value: "0", mono: true }],
+      sort: [{ label: "SORT", value: allCols[0] ?? "", mono: true }, { label: "↓", value: "Descending" }],
     };
     setSteps([...steps, { id, kind, parts: templates[kind as Exclude<StepKind, "from">] }]);
     setAdding(false);
   };
+
 
   return (
     <>
