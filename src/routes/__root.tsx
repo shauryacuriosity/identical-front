@@ -99,15 +99,15 @@ function AppHeader() {
         {/* Floating pill nav */}
         <nav
           className="relative h-14 rounded-full bg-surface flex items-center pl-5 pr-3 border border-hairline"
-          style={{ boxShadow: "0 2px 8px -4px rgba(0,0,0,0.12), 0 8px 20px -12px rgba(0,0,0,0.18)" }}
+          style={{ boxShadow: "var(--shadow-depth)" }}
         >
           {/* Brand cluster — acts as Home link */}
           <Link
             to="/"
             aria-label="Home"
             className={
-              "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors " +
-              (homeActive ? "bg-surface-hover/70 text-ink" : "text-ink hover:bg-surface-hover/40")
+              "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors text-ink " +
+              (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
           >
             <img src={lotusMark} alt="" className="h-[18px] w-auto" />
