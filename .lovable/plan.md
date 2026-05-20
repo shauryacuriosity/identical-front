@@ -1,52 +1,34 @@
-# Home banner + depth shadow fix
+# Plan
 
-Three small, contained changes — tokens, header, home page. No data/route logic touched.
+## 1. Themed active Lotus logo (`__root.tsx` + new component)
 
-## 1. Add depth-shadow tokens (`src/styles.css`)
+The active lotus SVG currently has hardcoded `#1A0003` fills/strokes, so importing it as `<img>` cannot inherit theme color. Convert it to an inline React component so it picks up `currentColor`.
 
-Add new tokens for the user-specified shadow color pair (drop + inner, X:0 Y:10 blur:7 spread:0), themed per mode.
+- New file `src/components/lotus-mark-active.tsx`: inline the SVG, replace every `fill="#1A0003"` / `stroke="#1A0003"` with `fill="currentColor"` / `stroke="currentColor"`. Accept `className` so the parent controls size and color.
+- `src/routes/__root.tsx`: drop the `lotusMarkActive` image import, use the new component when `homeActive`, and color it via `text-ink` (already on the brand link). This makes it follow the active text color in both light and dark modes.
+- Keep the pink PNG (`lotusMark`) when the home tab is inactive — unchanged.
 
-Light (`:root`):
-- `--shadow-drop-color: rgba(0, 0, 0, 0.25);`
-- `--shadow-inner-color: rgba(255, 255, 255, 0.25);`
+## 2. Shadow tuning + apply depth to active banner pills (`styles.css` + `__root.tsx`)
 
-Dark (`.dark`):
-- `--shadow-drop-color: rgba(200, 200, 255, 0.25);`
-- `--shadow-inner-color: rgba(200, 200, 255, 0.25);`
+Opacity is already at 25%, so reduce dimensions slightly per the user's instruction.
 
-Composite (both modes, defined once in `:root` using the variables):
-```
---shadow-depth:
-  0 10px 7px 0 var(--shadow-drop-color),
-  inset 0 10px 7px 0 var(--shadow-inner-color);
-```
+- `src/styles.css`: change `--shadow-depth` from `0 10px 7px 0` to `0 8px 5px 0` for both the outer and inset shadows (Y 10→8, blur 7→5; X and spread stay 0). Drop/inner color tokens (already 25% opacity) are unchanged.
+- `src/routes/__root.tsx`: when a nav pill is active (`bg-coral`), also apply `style={{ boxShadow: "var(--shadow-depth)" }}`. Applied to both the Lotus brand link (when `homeActive`) and each tab Link (when `active`). Inactive pills get no boxShadow.
 
-Usage in components: `style={{ boxShadow: "var(--shadow-depth)" }}`.
+## 3. Datasets page — sidebar mirrors loaded datasets, per-file Select all (`datasets.tsx`)
 
-## 2. Header "Lotus" brand pill (`src/routes/__root.tsx`)
+Today the sidebar always renders both `Dataset_A.csv` and `Dataset_B.csv` attribute groups regardless of how many dataset slots exist, and the `Checkbox` component has its own local `useState` so "Select all" is just a styled checkbox with no group behavior.
 
-The brand/home `<Link to="/">` currently uses `bg-surface-hover/70` when `homeActive`. Change it to match the other active tabs:
-
-- Active (`homeActive === true`): `bg-coral text-ink`
-- Inactive: `text-ink hover:bg-highlight/50` (mirrors the other tabs)
-
-Also replace the nav pill's hand-tuned `boxShadow` string with `var(--shadow-depth)` so the header gets the same depth treatment as other prominent elements.
-
-## 3. Home page — remove outer "banner" + apply depth shadow (`src/routes/index.tsx`)
-
-- Delete the `style={{ backgroundImage: "radial-gradient(...)" }}` on the outer `<div className="relative">` wrapper. This is the ghost secondary banner the user is seeing — a radial gradient bleeding behind the hero area. Wrapper becomes a plain `<div className="relative">`.
-- Replace the two existing custom `boxShadow` strings (on `ActionTile` and on the Recent files card) with `var(--shadow-depth)` so every prominent surface uses the same depth recipe.
+- Build a `datasetAttributes` lookup keyed by dataset filename (e.g. `Dataset_A.csv` → `datasetA`, `Dataset_B.csv` → `datasetB`). Newly-added slots without a known schema render an empty group (or fall back to `datasetA`'s shape) — pick the empty-group path so the sidebar accurately reflects what's actually present.
+- Render one `AttrGroup` per entry in `datasetSlots` (not hardcoded A and B). The "Filter attributes" count and the legend stay; the per-group `items.length` already comes from the group itself.
+- Refactor `AttrGroup` to own per-group selection state: a `Set<string>` of selected attribute names. Pass selection state + setters to the per-attribute checkboxes, and wire "Select all" to toggle all attribute names for *that group only* (indeterminate when partial). Replace the standalone `Checkbox` component's internal state with a controlled `checked` / `onChange` prop so each group's state is isolated.
+- No cross-group selection, no shared store — selecting all in `Dataset_A.csv` leaves `Dataset_B.csv` untouched.
 
 ## Files touched
-
-- `src/styles.css` — add `--shadow-drop-color`, `--shadow-inner-color` (light + dark) and `--shadow-depth` composite.
-- `src/routes/__root.tsx` — recolor active brand link to `bg-coral`; swap nav pill shadow to `var(--shadow-depth)`.
-- `src/routes/index.tsx` — remove radial-gradient wrapper style; swap tile + table shadows to `var(--shadow-depth)`.
+- `src/components/lotus-mark-active.tsx` (new)
+- `src/routes/__root.tsx`
+- `src/styles.css`
+- `src/routes/datasets.tsx`
 
 ## Not touched
-
-- Tabs styling (already correct per previous turn).
-- Tokens for palette, accent, borders.
-- Any data fetching, routes, or settings dialog.
-
-After implementation I'll screenshot `/` in both light and dark to confirm: no outer halo behind the hero, the "Lotus" pill turns coral on `/`, and tiles + nav + recent-files card all carry the same drop+inner depth.
+- Pipeline strip, dataset bars, footer, routes, data fetching, color tokens, light/dark palette values.
