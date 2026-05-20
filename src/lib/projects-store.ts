@@ -99,6 +99,20 @@ export function touchProject(id: string) {
   );
 }
 
+export function setProjectPipeline(
+  id: string,
+  pipelineSteps: Step[],
+  selectedAttrs: Record<string, string[]>,
+) {
+  update(
+    projects.map((p) =>
+      p.id === id
+        ? { ...p, pipelineSteps, selectedAttrs, modifiedAt: new Date().toISOString() }
+        : p,
+    ),
+  );
+}
+
 export function formatRelative(iso: string | null): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
