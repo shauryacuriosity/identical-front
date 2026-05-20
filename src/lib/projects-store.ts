@@ -1,10 +1,13 @@
 import { useSyncExternalStore } from "react";
+import type { Step } from "@/lib/pipeline-exec";
 
 export type Project = {
   id: string;
   name: string;
   datasets: string[];
   modifiedAt: string;
+  pipelineSteps?: Step[];
+  selectedAttrs?: Record<string, string[]>;
 };
 
 const listeners = new Set<() => void>();
