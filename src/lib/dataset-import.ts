@@ -108,7 +108,7 @@ async function parseXpt(file: File): Promise<ParsedDataset> {
     const obsBytes = buf.length - obsStart;
     rowCount = Math.max(0, Math.floor(obsBytes / totalRowLen));
   }
-  return { attrs, rowCount };
+  return { attrs, rowCount, rows: [], rowsAvailable: false };
 }
 
 export async function parseDatasetFile(file: File): Promise<ParsedDataset> {
