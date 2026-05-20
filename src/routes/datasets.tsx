@@ -1395,7 +1395,7 @@ function DatasetsPage() {
 
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
             <PipelineStrip
-              slotNames={datasetSlots}
+              slotNames={datasetSlots.filter(Boolean)}
               schemaBySlot={schemaBySlot}
               steps={steps}
               setSteps={setSteps}
