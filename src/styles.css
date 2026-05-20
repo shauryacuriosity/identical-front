@@ -137,8 +137,40 @@
 }
 
 .dark {
-  --background: var(--canvas);
-  --foreground: var(--ink);
+  --bg-page:      #1A0E0F;
+  --bg-surface:   #261617;
+  --bg-emphasis:  #3A2122;
+
+  --text-primary: #FFF5F5;
+  --text-muted:   #C49090;
+
+  --border-default: #4A2A2B;
+  --border-muted:   #3A2122;
+
+  --canvas: var(--bg-page);
+  --surface: var(--bg-surface);
+  --surface-hover: var(--bg-emphasis);
+  --ink: var(--text-primary);
+  --ink-2: var(--text-muted);
+  --ink-3: var(--text-muted);
+  --hairline: var(--border-muted);
+  --hairline-strong: var(--border-default);
+  --hairline-grey: var(--border-muted);
+
+  --background: var(--bg-page);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --secondary: var(--bg-surface);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--bg-emphasis);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--bg-emphasis);
+  --accent-foreground: var(--text-primary);
+  --border: var(--border-muted);
+  --input: var(--border-muted);
 }
 
 @layer base {

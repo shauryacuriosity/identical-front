@@ -98,7 +98,7 @@ function AppHeader() {
         {/* Floating pill nav */}
         <nav
           className="relative h-14 rounded-full bg-surface flex items-center pl-5 pr-3 border border-hairline"
-          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 8px 24px -10px rgba(0,0,0,0.22)" }}
+          style={{ boxShadow: "0 2px 8px -4px rgba(0,0,0,0.12), 0 8px 20px -12px rgba(0,0,0,0.18)" }}
         >
           {/* Brand cluster — acts as Home link */}
           <Link
@@ -168,7 +168,7 @@ function AppHeader() {
                   <Switch
                     checked={darkMode}
                     onCheckedChange={toggleDark}
-                    className="h-6 w-11 data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/30 border-transparent [&>span]:h-5 [&>span]:w-5 [&>span]:bg-white [&>span]:shadow-md [&>span]:data-[state=checked]:translate-x-5 [&>span]:data-[state=unchecked]:translate-x-0"
+                    className="data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/40"
                   />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-hairline" />
