@@ -58,6 +58,32 @@ function AppHeader() {
   const { pathname } = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [activeSection, setActiveSection] = useState<"general" | "security" | "linked" | "team">("general");
+  const [profile, setProfile] = useState({
+    name: "Jane Citizen",
+    email: "jane.citizen123@email.com",
+    institution: "eAsia",
+    country: "Australia",
+  });
+
+  useEffect(() => {
+    const stored = typeof window !== "undefined" ? localStorage.getItem("lotus-theme") : null;
+    const on = stored === "dark";
+    setDarkMode(on);
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.toggle("dark", on);
+    }
+  }, []);
+
+  const toggleDark = (next: boolean) => {
+    setDarkMode(next);
+    if (typeof document !== "undefined") {
+      document.documentElement.classList.toggle("dark", next);
+    }
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lotus-theme", next ? "dark" : "light");
+    }
+  };
   const tabs = [
     { to: "/datasets", label: "Datasets", icon: Database },
     { to: "/visualisation", label: "Visualisation", icon: BarChart3 },
