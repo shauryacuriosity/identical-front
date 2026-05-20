@@ -1220,7 +1220,7 @@ function DatasetsPage() {
   }), [importedDatasets]);
 
   const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
-  const groups = datasetSlots.map((slot) => {
+  const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
     return { name: slot, items };
