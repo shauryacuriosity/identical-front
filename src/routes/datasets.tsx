@@ -438,8 +438,16 @@ function DatasetsPage() {
   });
 
   const q = attrFilter.trim().toLowerCase();
-  const filteredA = q ? datasetA.filter((a) => a.name.toLowerCase().includes(q)) : datasetA;
-  const filteredB = q ? datasetB.filter((a) => a.name.toLowerCase().includes(q)) : datasetB;
+  const schemaBySlot: Record<string, Attr[]> = {
+    "Dataset_A.csv": datasetA,
+    "Dataset_B.csv": datasetB,
+  };
+  const groups = datasetSlots.map((slot) => {
+    const base = schemaBySlot[slot] ?? [];
+    const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
+    return { name: slot, items };
+  });
+  const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const addSlot = () => {
     const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
@@ -463,7 +471,7 @@ function DatasetsPage() {
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
-            <span className="text-[10.5px] text-ink-2 tabular">{filteredA.length + filteredB.length}</span>
+            <span className="text-[10.5px] text-ink-2 tabular">{totalCount}</span>
           </div>
           <div className="relative mb-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-2" />
@@ -474,8 +482,9 @@ function DatasetsPage() {
               className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] text-ink placeholder:text-ink-2 focus:outline-none focus:border-coral/50"
             />
           </div>
-          <AttrGroup name="Dataset_A.csv" items={filteredA} />
-          <AttrGroup name="Dataset_B.csv" items={filteredB} />
+          {groups.map((g) => (
+            <AttrGroup key={g.name} name={g.name} items={g.items} />
+          ))}
           <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
             <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-data-plum" strokeWidth={2.5} />ID</span>
             <span className="flex items-center gap-1"><Hash className="h-2.5 w-2.5 text-data-slate" strokeWidth={2.5} />Numeric</span>
