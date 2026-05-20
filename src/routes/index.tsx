@@ -342,7 +342,7 @@ function Index() {
                           showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
                         }`}
                       >
-                        <StatusDot active={!f.archived} />
+                        <RowCheckbox checked={false} onChange={() => toggleOne(f.id)} ariaLabel={`Select ${f.name}`} />
                       </span>
                       <span
                         className={`absolute inset-0 flex items-center justify-center transition-opacity ${
