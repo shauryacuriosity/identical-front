@@ -6,6 +6,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
+import lotusMarkActive from "@/assets/logo_lotus_active.svg";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
