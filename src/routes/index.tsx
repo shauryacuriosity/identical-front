@@ -97,7 +97,7 @@ function ActionTile({
     <Link
       to={href}
       className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-highlight transition-colors overflow-hidden"
-      style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
+      style={{ boxShadow: "var(--shadow-depth)" }}
     >
       <div className="flex items-center justify-center h-10 w-10 text-coral">
         <Icon size={36} strokeWidth={3} />
