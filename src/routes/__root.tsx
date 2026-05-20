@@ -1,6 +1,6 @@
 import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Database, BarChart3, Sparkles, User, X, ExternalLink } from "lucide-react";
+import { User, X, ExternalLink } from "lucide-react";
 import { FilePlusIcon, ShapesIcon, CodesandboxIcon } from "@/components/brand-icons";
 import * as React from "react";
 import { useEffect, useState } from "react";
