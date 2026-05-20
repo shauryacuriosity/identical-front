@@ -6,7 +6,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
-import lotusMarkActive from "@/assets/logo_lotus_active.svg";
+import { LotusMarkActive } from "@/components/lotus-mark-active";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -110,8 +110,13 @@ function AppHeader() {
               "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors text-ink " +
               (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
+            style={homeActive ? { boxShadow: "var(--shadow-depth)" } : undefined}
           >
-            <img src={homeActive ? lotusMarkActive : lotusMark} alt="" className="h-[18px] w-auto" />
+            {homeActive ? (
+              <LotusMarkActive className="h-[18px] w-auto text-ink" />
+            ) : (
+              <img src={lotusMark} alt="" className="h-[18px] w-auto" />
+            )}
             <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
           </Link>
 
@@ -132,6 +137,7 @@ function AppHeader() {
                     "h-10 px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink " +
                     (active ? "bg-coral" : "hover:bg-highlight/50")
                   }
+                  style={active ? { boxShadow: "var(--shadow-depth)" } : undefined}
                 >
                   <Icon size={18} strokeWidth={2.5} />
                   {t.label}

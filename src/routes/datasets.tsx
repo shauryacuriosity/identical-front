@@ -49,15 +49,27 @@ const TypeIcon = ({ t }: { t: AttrType }) => {
   return <Type className="h-3 w-3 text-data-sage" strokeWidth={2.25} />;
 };
 
-function Checkbox({ label, mono }: { label: string; mono?: boolean }) {
-  const [on, setOn] = useState(false);
+function Checkbox({
+  label,
+  mono,
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  label: string;
+  mono?: boolean;
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
     <label className="flex items-center gap-2.5 py-1 cursor-pointer text-[13px] group">
       <span
-        onClick={(e) => { e.preventDefault(); setOn(!on); }}
-        className={`h-[14px] w-[14px] rounded-[3px] border transition flex items-center justify-center ${on ? "bg-coral border-coral" : "border-ink-3/50 group-hover:border-ink-2"}`}
+        onClick={(e) => { e.preventDefault(); onChange(!checked); }}
+        className={`h-[14px] w-[14px] rounded-[3px] border transition flex items-center justify-center ${checked || indeterminate ? "bg-coral border-coral" : "border-ink-3/50 group-hover:border-ink-2"}`}
       >
-        {on && <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        {checked && !indeterminate && <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-white"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+        {indeterminate && <span className="h-0.5 w-2 bg-white rounded-sm" />}
       </span>
       <span className={mono ? "font-mono text-[12px] text-ink" : "text-ink"}>{label}</span>
     </label>
@@ -66,6 +78,21 @@ function Checkbox({ label, mono }: { label: string; mono?: boolean }) {
 
 function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
   const [open, setOpen] = useState(true);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleAll = (next: boolean) => {
+    setSelected(next ? new Set(items.map((i) => i.name)) : new Set());
+  };
+  const toggleOne = (attrName: string, next: boolean) => {
+    setSelected((prev) => {
+      const copy = new Set(prev);
+      if (next) copy.add(attrName); else copy.delete(attrName);
+      return copy;
+    });
+  };
+
   return (
     <div className="mb-4">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 text-[12px] font-semibold text-ink mb-1.5 w-full">
@@ -75,13 +102,19 @@ function AttrGroup({ name, items }: { name: string; items: Attr[] }) {
       </button>
       {open && (
         <div className="pl-4 border-l border-hairline ml-1.5">
-          <Checkbox label="Select all" />
-          {items.map((a) => (
-            <div key={a.name} className="flex items-center gap-1.5">
-              <Checkbox label={a.name} mono />
-              <TypeIcon t={a.type} />
-            </div>
-          ))}
+          {items.length === 0 ? (
+            <p className="text-[11.5px] text-ink-2 italic py-1">No attributes</p>
+          ) : (
+            <>
+              <Checkbox label="Select all" checked={allSelected} indeterminate={someSelected} onChange={toggleAll} />
+              {items.map((a) => (
+                <div key={a.name} className="flex items-center gap-1.5">
+                  <Checkbox label={a.name} mono checked={selected.has(a.name)} onChange={(n) => toggleOne(a.name, n)} />
+                  <TypeIcon t={a.type} />
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -405,8 +438,16 @@ function DatasetsPage() {
   });
 
   const q = attrFilter.trim().toLowerCase();
-  const filteredA = q ? datasetA.filter((a) => a.name.toLowerCase().includes(q)) : datasetA;
-  const filteredB = q ? datasetB.filter((a) => a.name.toLowerCase().includes(q)) : datasetB;
+  const schemaBySlot: Record<string, Attr[]> = {
+    "Dataset_A.csv": datasetA,
+    "Dataset_B.csv": datasetB,
+  };
+  const groups = datasetSlots.map((slot) => {
+    const base = schemaBySlot[slot] ?? [];
+    const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
+    return { name: slot, items };
+  });
+  const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   const addSlot = () => {
     const nextLetter = String.fromCharCode("A".charCodeAt(0) + datasetSlots.length);
@@ -430,7 +471,7 @@ function DatasetsPage() {
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
-            <span className="text-[10.5px] text-ink-2 tabular">{filteredA.length + filteredB.length}</span>
+            <span className="text-[10.5px] text-ink-2 tabular">{totalCount}</span>
           </div>
           <div className="relative mb-4">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-2" />
@@ -441,8 +482,9 @@ function DatasetsPage() {
               className="w-full h-8 pl-8 pr-2 rounded-md bg-canvas border border-hairline text-[12.5px] text-ink placeholder:text-ink-2 focus:outline-none focus:border-coral/50"
             />
           </div>
-          <AttrGroup name="Dataset_A.csv" items={filteredA} />
-          <AttrGroup name="Dataset_B.csv" items={filteredB} />
+          {groups.map((g) => (
+            <AttrGroup key={g.name} name={g.name} items={g.items} />
+          ))}
           <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
             <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-data-plum" strokeWidth={2.5} />ID</span>
             <span className="flex items-center gap-1"><Hash className="h-2.5 w-2.5 text-data-slate" strokeWidth={2.5} />Numeric</span>
