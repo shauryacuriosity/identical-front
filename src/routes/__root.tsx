@@ -110,7 +110,6 @@ function AppHeader() {
               "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors text-ink " +
               (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
-            style={homeActive ? { boxShadow: "var(--shadow-depth)" } : undefined}
           >
             {homeActive ? (
               <LotusMarkActive className="h-[18px] w-auto text-ink" />

@@ -1,34 +1,29 @@
-# Plan
+## Changes
 
-## 1. Themed active Lotus logo (`__root.tsx` + new component)
+### 1. Datasets page — remove dataset slots
+In `src/routes/datasets.tsx`:
+- Refactor `DatasetBar` to accept an `onRemove?: () => void` prop. Add a small X button (lucide `X`) on the right side of the bar (next to the chevron), shown only when `onRemove` is provided. Stop propagation so clicking remove doesn't toggle the bar's open state.
+- In `DatasetsPage`, pass `onRemove={() => setDatasetSlots(slots => slots.filter((_, idx) => idx !== i))}` to each `DatasetBar`. Always allow removal (including the last one — empty state is fine; the existing "Add dataset" button restores it).
 
-The active lotus SVG currently has hardcoded `#1A0003` fills/strokes, so importing it as `<img>` cannot inherit theme color. Convert it to an inline React component so it picks up `currentColor`.
+### 2. Datasets page — make the dataset bar dropdown selectable
+Currently `DatasetBar` toggles an `open` state that does nothing visible. Replace it with a real selector:
+- Convert `DatasetBar` into a controlled component: props `{ value: string; onChange: (next: string) => void; onRemove?: () => void; usedNames: string[] }`.
+- Available options: a fixed list `["Dataset_A.csv", "Dataset_B.csv"]` (matches the two `schemaBySlot` entries). Disable options already chosen by another slot (using `usedNames`) so each dataset appears at most once.
+- On click, open a dropdown panel (same visual pattern as `Dropdown` component already in the file) listing the options; selecting one calls `onChange` and closes the panel.
+- In `DatasetsPage`:
+  - Change `datasetSlots` state to hold the actual selected dataset name per slot (initial `["Dataset_A.csv"]`).
+  - `addSlot` picks the first unused option from `["Dataset_A.csv", "Dataset_B.csv"]`; if all are used, disable the "Add dataset" button.
+  - `schemaBySlot` lookup and `groups` already key off the slot name, so the sidebar auto-updates when a slot's dataset changes.
 
-- New file `src/components/lotus-mark-active.tsx`: inline the SVG, replace every `fill="#1A0003"` / `stroke="#1A0003"` with `fill="currentColor"` / `stroke="currentColor"`. Accept `className` so the parent controls size and color.
-- `src/routes/__root.tsx`: drop the `lotusMarkActive` image import, use the new component when `homeActive`, and color it via `text-ink` (already on the brand link). This makes it follow the active text color in both light and dark modes.
-- Keep the pink PNG (`lotusMark`) when the home tab is inactive — unchanged.
-
-## 2. Shadow tuning + apply depth to active banner pills (`styles.css` + `__root.tsx`)
-
-Opacity is already at 25%, so reduce dimensions slightly per the user's instruction.
-
-- `src/styles.css`: change `--shadow-depth` from `0 10px 7px 0` to `0 8px 5px 0` for both the outer and inset shadows (Y 10→8, blur 7→5; X and spread stay 0). Drop/inner color tokens (already 25% opacity) are unchanged.
-- `src/routes/__root.tsx`: when a nav pill is active (`bg-coral`), also apply `style={{ boxShadow: "var(--shadow-depth)" }}`. Applied to both the Lotus brand link (when `homeActive`) and each tab Link (when `active`). Inactive pills get no boxShadow.
-
-## 3. Datasets page — sidebar mirrors loaded datasets, per-file Select all (`datasets.tsx`)
-
-Today the sidebar always renders both `Dataset_A.csv` and `Dataset_B.csv` attribute groups regardless of how many dataset slots exist, and the `Checkbox` component has its own local `useState` so "Select all" is just a styled checkbox with no group behavior.
-
-- Build a `datasetAttributes` lookup keyed by dataset filename (e.g. `Dataset_A.csv` → `datasetA`, `Dataset_B.csv` → `datasetB`). Newly-added slots without a known schema render an empty group (or fall back to `datasetA`'s shape) — pick the empty-group path so the sidebar accurately reflects what's actually present.
-- Render one `AttrGroup` per entry in `datasetSlots` (not hardcoded A and B). The "Filter attributes" count and the legend stay; the per-group `items.length` already comes from the group itself.
-- Refactor `AttrGroup` to own per-group selection state: a `Set<string>` of selected attribute names. Pass selection state + setters to the per-attribute checkboxes, and wire "Select all" to toggle all attribute names for *that group only* (indeterminate when partial). Replace the standalone `Checkbox` component's internal state with a controlled `checked` / `onChange` prop so each group's state is isolated.
-- No cross-group selection, no shared store — selecting all in `Dataset_A.csv` leaves `Dataset_B.csv` untouched.
+### 3. Header — remove drop shadow from active nav pills
+In `src/routes/__root.tsx`:
+- Remove the `style={homeActive ? { boxShadow: "var(--shadow-depth)" } : undefined}` on the brand `<Link to="/">`.
+- Remove the `style={active ? { boxShadow: "var(--shadow-depth)" } : undefined}` on each tab `<Link>`.
+- Leave the outer pill nav's `boxShadow: "var(--shadow-depth)"` untouched (it's the container, not the selected area).
 
 ## Files touched
-- `src/components/lotus-mark-active.tsx` (new)
 - `src/routes/__root.tsx`
-- `src/styles.css`
 - `src/routes/datasets.tsx`
 
 ## Not touched
-- Pipeline strip, dataset bars, footer, routes, data fetching, color tokens, light/dark palette values.
+- Pipeline strip, sidebar, footer, styles.css, other routes, data fetching.
