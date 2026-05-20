@@ -47,6 +47,7 @@
   --color-coral-muted: var(--coral-muted);
   --color-coral-soft: var(--coral-muted);
   --color-coral-tint: var(--surface-hover);
+  --color-highlight: var(--bg-highlight);
   --color-data-sage: var(--data-sage);
   --color-data-ochre: var(--data-ochre);
   --color-data-slate: var(--data-slate);
@@ -68,6 +69,7 @@
   --bg-page:      #F2D0CF;
   --bg-surface:   #FFF5F5;
   --bg-emphasis:  #CAA8A7;
+  --bg-highlight: #FFFFFF;
 
   --accent-primary:   #E8928E;
   --accent-secondary: #0077FF;
@@ -137,19 +139,20 @@
 }
 
 .dark {
-  --bg-page:      #1A0E0F;
-  --bg-surface:   #261617;
-  --bg-emphasis:  #3A2122;
+  --bg-page:      #140F0F;
+  --bg-surface:   #140405;
+  --bg-emphasis:  #0A0101;
+  --bg-highlight: #6E4A4A;
 
-  --text-primary: #FFF5F5;
-  --text-muted:   #C49090;
+  --text-primary: #FFFFFF;
+  --text-muted:   #D4908A;
 
-  --border-default: #4A2A2B;
-  --border-muted:   #3A2122;
+  --border-default: #737373;
+  --border-muted:   #3D1718;
 
   --canvas: var(--bg-page);
   --surface: var(--bg-surface);
-  --surface-hover: var(--bg-emphasis);
+  --surface-hover: var(--bg-highlight);
   --ink: var(--text-primary);
   --ink-2: var(--text-muted);
   --ink-3: var(--text-muted);
