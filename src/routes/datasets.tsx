@@ -1293,21 +1293,20 @@ function DatasetsPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const firstNamedSlot = datasetSlots.find(Boolean);
   const effectiveName = project?.name?.trim()
     ? project.name
-    : datasetSlots[0]
+    : firstNamedSlot
       ? (() => {
-          const f = datasetSlots[0];
-          const dot = f.lastIndexOf(".");
-          return dot > 0 ? f.slice(0, dot) : f;
+          const dot = firstNamedSlot.lastIndexOf(".");
+          return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
         })()
       : "";
   const isUntitled = !project?.name?.trim();
-  const placeholder = datasetSlots[0]
+  const placeholder = firstNamedSlot
     ? (() => {
-        const f = datasetSlots[0];
-        const dot = f.lastIndexOf(".");
-        return dot > 0 ? f.slice(0, dot) : f;
+        const dot = firstNamedSlot.lastIndexOf(".");
+        return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
       })()
     : "Untitled project";
 
