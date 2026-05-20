@@ -1,59 +1,59 @@
-## Home + nav visual polish
+## Settings page + working dark mode toggle
 
-Scope: visual only. No tokens added, no queries/routes/functional logic touched. All colors come from existing CSS vars.
+Scope: visual + small state wiring only. No schema, no queries, no route changes. Existing Settings dialog in `src/routes/__root.tsx` is replaced; dropdown gets a real switch.
 
----
+### 1. New Settings dialog (replaces the placeholder one in `__root.tsx`)
 
-### 1. `src/routes/__root.tsx` — make the nav feel premium
+Triggered the same way (profile dropdown → Settings). Built as a large modal so it matches the prototype's two-pane layout.
 
-- Thicken the pill: `h-12` → `h-14`, switch shadow from `0 2px 4px` to layered `0 1px 0 rgba(0,0,0,.04), 0 8px 24px -8px rgba(0,0,0,.18)` for a floating-glass feel.
-- Add a 1px hairline border (`border-hairline`) on the pill so it reads as a defined surface against the pink canvas.
-- Tab labels: bump weight `font-medium` → `font-semibold`, tighten tracking (`tracking-tight`), drop size to `[14px]` for editorial density.
-- Active tab: replace the 18% coral wash + underline pill-bottom bar with a cleaner approach — solid `bg-surface-hover` chip + ink text (no bottom bar). Quieter, more confident.
-- Brand "Lotus": keep lotus mark visible even when Home is active (small, 16px), wordmark in `font-semibold tracking-tight`.
-- Account avatar: 1px coral ring → subtle `border-hairline-strong` ring; matches the new restrained tone.
+Layout (matches uploaded prototype):
 
-### 2. `src/routes/index.tsx` — establish hierarchy and card presence
+```text
+┌──────────────┬──────────────────────────────────────────┐
+│ Edit Profile │  [avatar]  Jane Citizen · Researcher     │
+│              │            jane.citizen123@email.com     │
+│ General      │            eAsia | Australia        [x]  │
+│ Security     ├──────────────────────────────────────────┤
+│ Linked Accts │  Name      [ Jane Citizen           ]    │
+│ Team Mgmt    │  Role      Change role in Team Mgmt ↗    │
+│              │  Email     [ jane.citizen123@…      ]    │
+│              │  Institution [ eAsia (disabled)     ]    │
+│              │  Country   [ Australia              ]    │
+└──────────────┴──────────────────────────────────────────┘
+```
 
-**Hero block**
-- Lotus mark grows `h-8` → `h-10`, paired inline-left with the H1 instead of stacked (icon + heading on the same baseline).
-- H1: `text-[28px]` → `text-[44px] font-bold tracking-[-0.02em] leading-[1.05]`. This is the single weight-carrying element on the page.
-- Add an eyebrow above H1: small uppercase `text-[11px] tracking-[0.18em] text-ink-2` reading "Workbench" — editorial signal.
-- Subtitle: bump to `text-[15px]`, max-width ~520px so it doesn't sprawl.
-- Vertical rhythm: `mb-6` → `mb-12` between hero and action tiles.
+- Left rail: coral (`bg-coral/bg-surface-hover`) panel, ~200px wide, with `Edit Profile` header and four nav items (General / Security / Linked Accounts / Team Management). Active item = solid coral block + white text. Inactive = ink on cream.
+- Right pane: cream `bg-surface`. Top header strip shows avatar with "Replace image" caption, name + role, email (coral link), and `eAsia | Australia` meta. Close (X) top-right.
+- Form section below a hairline divider: stacked field rows with coral uppercase-ish labels (`text-coral font-semibold text-[13px]`), inputs styled `bg-surface-hover/40 border border-hairline rounded-md h-10 px-3 text-ink`. Role row is read-only text with a `Team Management ↗` link.
+- Only the **General** panel is implemented now (matches the screenshot); Security / Linked Accounts / Team Management render a simple "Coming soon" placeholder so the nav still works.
+- Form is **non-functional** (no Supabase calls). Values are local component state seeded with the placeholder data from the mock. A disabled `Save changes` button sits at the bottom right of the right pane (kept disabled with a "coming soon" tooltip-style helper text) so the layout reads as a real settings page without wiring anything to the backend.
+- Built with existing shadcn `Dialog` (widened: `max-w-[880px]`, `p-0`, `overflow-hidden`, `rounded-2xl`). Internal grid: `grid-cols-[200px_1fr]`.
 
-**Action tiles (3 cards)**
-- Make them feel like physical objects: `bg-surface` + `border border-hairline` + layered shadow (`0 1px 0 rgba(0,0,0,.04), 0 12px 32px -12px rgba(0,0,0,.25)`).
-- Add a thin top accent stripe in `--coral` (2px, full-width inside rounded corners) to differentiate from the table rows below.
-- Left-align icon + label instead of centered — feels more tool-like, less marketing.
-- Icon in a coral-tinted square chip (`bg-coral/12`, rounded-lg, 40px), label `text-[15px] font-semibold`, add one-line description back in `text-[12.5px] text-ink-2`.
-- Hover: lift `-translate-y-0.5` + shadow intensify (already there) + accent stripe brightens.
+### 2. Dark mode toggle — make it actually work + real switch
 
-**Recent files section**
-- Section header gets weight: H2 `text-[20px]` → `text-[22px] font-semibold`, paired with row count chip `text-[11px] text-ink-2 bg-surface border border-hairline rounded-full px-2 py-0.5` next to it.
-- Wrap the entire table (header row + rows) in ONE container card: `bg-surface` + `border border-hairline` + soft shadow + `rounded-2xl` + `overflow-hidden`. This gives the table a defined surface vs. floating rows on pink.
-- Inside the container, drop per-row shadows (no more puffy individual rows). Rows become flat with `border-b border-hairline` between them; last row no border.
-- Row padding `py-4` → `py-3.5`, hover state `bg-surface-hover/40` (subtle) instead of translate.
-- Column header row: keep uppercase tracked labels but slightly darker (`text-ink-2`), add `border-b border-hairline-strong` separator.
-- Name column: file icon in coral tint (`text-coral` instead of `text-ink-2`) — adds color accent without breaking the palette.
+Currently the dropdown item just flips a `useState` and does nothing. Two changes:
 
-**Page background**
-- Add a very subtle vignette/radial behind the hero (`radial-gradient(ellipse at top, color-mix(in oklab, var(--bg-surface) 35%, transparent), transparent 60%)`) layered on the body bg — gives the home page a focal point and breaks the flat pink wash. Pure CSS, no new tokens.
+a. **Wire it up.** Add a tiny `useDarkMode` hook (in `__root.tsx`, local) that:
+   - reads initial value from `localStorage.getItem('lotus-theme')`, fallback to `false`
+   - on toggle, adds/removes `dark` class on `document.documentElement` and writes back to localStorage
+   - applies the class on mount via `useEffect`
+   
+   The `.dark` selector already exists in `src/styles.css` (line 139) so toggling the class is enough to satisfy "works"; we are not redesigning the dark palette in this pass.
 
----
+b. **Real switch UI in the dropdown.** Replace the `Check` icon with the existing shadcn `<Switch>` component, restyled to match the uploaded pink pill:
+   - Track: `bg-coral-muted/40` off, `bg-coral` on
+   - Thumb: white, slightly larger (`h-5 w-5`), soft shadow
+   - Sizing: `h-6 w-11`, fully rounded
+   - Done via `className` overrides on `Switch` — no edits to `src/components/ui/switch.tsx`.
+   
+   The dropdown row uses `onSelect={(e) => e.preventDefault()}` so clicking the switch doesn't close the menu, and the row label "Dark mode" sits left with the switch right-aligned.
 
-### Files NOT touched
+### Files touched
 
-- `src/styles.css` (no token changes)
-- `src/integrations/supabase/*` (no query changes)
-- `src/routes/datasets.tsx`, `ai-analysis.tsx`, `runs.$runId.tsx`, `visualisation.tsx` (out of scope — Home + nav only)
-- `src/routeTree.gen.ts`
+- `src/routes/__root.tsx` — replace placeholder Settings Dialog body with the two-pane layout; replace dark-mode dropdown row with `<Switch>` + working hook.
 
----
+### Not touched
 
-### Net effect
-
-- Nav: thinner border + softer shadow + active-chip pattern reads premium, not marketing-y.
-- Home: one strong H1, three differentiated tool tiles with accent stripes, and a unified recent-files card. Hierarchy goes hero → tiles → table instead of three equally-weighted flat zones.
-
-Approve and I'll apply in one pass.
+- `src/styles.css` (tokens unchanged)
+- `src/components/ui/switch.tsx` (restyled via className only)
+- Any route, query, or the 13 functional fixes.
