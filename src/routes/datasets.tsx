@@ -905,7 +905,96 @@ function DatasetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetSlots, projectId, project?.name]);
 
-      <div className="flex gap-5">
+  const q = attrFilter.trim().toLowerCase();
+  const schemaBySlot: Record<string, Attr[]> = {
+    "Dataset_A.csv": datasetA,
+    "Dataset_B.csv": datasetB,
+    ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.attrs])),
+  };
+  const rowCountBySlot: Record<string, number | undefined> = Object.fromEntries(
+    Object.entries(importedDatasets).map(([k, v]) => [k, v.rowCount]),
+  );
+  const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
+  const groups = datasetSlots.map((slot) => {
+    const base = schemaBySlot[slot] ?? [];
+    const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
+    return { name: slot, items };
+  });
+  const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
+
+  const addSlot = () => {
+    const next = availableNames.find((d) => !datasetSlots.includes(d));
+    if (next) setDatasetSlots([...datasetSlots, next]);
+  };
+
+  const uniqueName = (base: string, taken: Set<string>) => {
+    if (!taken.has(base)) return base;
+    const dot = base.lastIndexOf(".");
+    const stem = dot > 0 ? base.slice(0, dot) : base;
+    const ext = dot > 0 ? base.slice(dot) : "";
+    let i = 1;
+    while (taken.has(`${stem} (${i})${ext}`)) i++;
+    return `${stem} (${i})${ext}`;
+  };
+
+  const onFilesPicked = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImporting(true);
+    const newEntries: Record<string, { attrs: Attr[]; rowCount: number }> = {};
+    const newSlotNames: string[] = [];
+    const taken = new Set<string>([...ALL_DATASETS, ...Object.keys(importedDatasets)]);
+    for (const file of Array.from(files)) {
+      try {
+        const parsed = await parseDatasetFile(file);
+        if (parsed.attrs.length === 0) throw new Error("No columns detected");
+        const name = uniqueName(file.name, taken);
+        taken.add(name);
+        newEntries[name] = parsed;
+        newSlotNames.push(name);
+        toast.success(`Imported ${name}`, {
+          description: `${parsed.attrs.length} columns · ${parsed.rowCount.toLocaleString()} rows`,
+        });
+      } catch (err) {
+        toast.error(`Couldn't import ${file.name}`, {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    if (Object.keys(newEntries).length > 0) {
+      setImportedDatasets((prev) => ({ ...prev, ...newEntries }));
+      setDatasetSlots((prev) => [...prev, ...newSlotNames]);
+    }
+    setImporting(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const effectiveName = project?.name?.trim()
+    ? project.name
+    : datasetSlots[0]
+      ? (() => {
+          const f = datasetSlots[0];
+          const dot = f.lastIndexOf(".");
+          return dot > 0 ? f.slice(0, dot) : f;
+        })()
+      : "";
+  const isUntitled = !project?.name?.trim();
+  const placeholder = datasetSlots[0]
+    ? (() => {
+        const f = datasetSlots[0];
+        const dot = f.lastIndexOf(".");
+        return dot > 0 ? f.slice(0, dot) : f;
+      })()
+    : "Untitled project";
+
+  return (
+    <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
+      <ProjectHeader
+        projectId={projectId}
+        effectiveName={effectiveName}
+        isUntitled={isUntitled}
+        placeholder={placeholder}
+      />
+
         {/* Sidebar */}
         <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
