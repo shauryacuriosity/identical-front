@@ -6,6 +6,7 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
+import lotusMarkActive from "@/assets/logo_lotus_active.svg";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -110,7 +111,7 @@ function AppHeader() {
               (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
           >
-            <img src={lotusMark} alt="" className="h-[18px] w-auto" />
+            <img src={homeActive ? lotusMarkActive : lotusMark} alt="" className="h-[18px] w-auto" />
             <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
           </Link>
 
