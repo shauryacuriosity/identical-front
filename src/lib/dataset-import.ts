@@ -45,7 +45,7 @@ async function parseSheetLike(file: File): Promise<ParsedDataset> {
     }
     return result.length ? result : Object.keys(rows[0] ?? {});
   })();
-  return { attrs: attrsFromRows(headers, rows), rowCount: rows.length };
+  return { attrs: attrsFromRows(headers, rows), rowCount: rows.length, rows, rowsAvailable: true };
 }
 
 async function parseJson(file: File): Promise<ParsedDataset> {
