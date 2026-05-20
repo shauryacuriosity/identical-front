@@ -168,7 +168,7 @@ function AppHeader() {
                   <Switch
                     checked={darkMode}
                     onCheckedChange={toggleDark}
-                    className="h-6 w-11 data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/30 border-transparent [&>span]:h-5 [&>span]:w-5 [&>span]:bg-white [&>span]:shadow-md [&>span]:data-[state=checked]:translate-x-5 [&>span]:data-[state=unchecked]:translate-x-0"
+                    className="data-[state=checked]:bg-coral data-[state=unchecked]:bg-coral-muted/40"
                   />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-hairline" />
