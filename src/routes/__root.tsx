@@ -136,7 +136,6 @@ function AppHeader() {
                     "h-10 px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink " +
                     (active ? "bg-coral" : "hover:bg-highlight/50")
                   }
-                  style={active ? { boxShadow: "var(--shadow-depth)" } : undefined}
                 >
                   <Icon size={18} strokeWidth={2.5} />
                   {t.label}
