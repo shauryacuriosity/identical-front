@@ -59,7 +59,7 @@ async function parseJson(file: File): Promise<ParsedDataset> {
       for (const k of Object.keys(row)) headerSet.add(k);
     }
   }
-  return { attrs: attrsFromRows([...headerSet], rows), rowCount: rows.length };
+  return { attrs: attrsFromRows([...headerSet], rows), rowCount: rows.length, rows, rowsAvailable: true };
 }
 
 /** Decode bytes as ASCII (XPORT uses EBCDIC-like trimmed ASCII for names). */
