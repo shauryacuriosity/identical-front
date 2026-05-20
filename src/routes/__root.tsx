@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Database, BarChart3, Sparkles, User, X, ExternalLink } from "lucide-react";
+import { FilePlusIcon, ShapesIcon, CodesandboxIcon } from "@/components/brand-icons";
 import * as React from "react";
 import { useEffect, useState } from "react";
 import appCss from "../styles.css?url";
@@ -86,9 +87,9 @@ function AppHeader() {
     }
   };
   const tabs = [
-    { to: "/datasets", label: "Datasets", icon: Database },
-    { to: "/visualisation", label: "Visualisation", icon: BarChart3 },
-    { to: "/ai-analysis", label: "AI Analysis", icon: Sparkles },
+    { to: "/datasets", label: "Datasets", icon: FilePlusIcon },
+    { to: "/visualisation", label: "Visualisation", icon: ShapesIcon },
+    { to: "/ai-analysis", label: "AI Analysis", icon: CodesandboxIcon },
   ];
   const homeActive = pathname === "/";
 
@@ -120,16 +121,18 @@ function AppHeader() {
           <div className="flex items-center gap-1 h-full">
             {tabs.map((t) => {
               const active = pathname.startsWith(t.to);
+              const Icon = t.icon;
               return (
                 <Link
                   key={t.to}
                   to={t.to}
                   aria-label={t.label}
                   className={
-                    "h-10 px-4 my-auto flex items-center justify-center text-[14px] font-semibold tracking-tight rounded-full transition-colors " +
-                    (active ? "bg-surface-hover/70 text-ink" : "text-ink-2 hover:text-ink hover:bg-surface-hover/40")
+                    "h-10 px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink " +
+                    (active ? "bg-coral" : "hover:bg-highlight/50")
                   }
                 >
+                  <Icon size={18} strokeWidth={2.5} />
                   {t.label}
                 </Link>
               );
