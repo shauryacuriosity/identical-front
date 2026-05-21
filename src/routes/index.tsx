@@ -132,9 +132,6 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
   );
 }
 
-function StatusDot(_: { active: boolean }) {
-  return <span className="inline-block h-[14px] w-[14px] rounded-[3px] border border-ink-2" />;
-}
 
 function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
