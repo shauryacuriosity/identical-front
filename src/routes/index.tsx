@@ -83,14 +83,9 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-surface-hover transition-colors overflow-hidden"
       style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: "var(--coral)" }}
-      />
       <div
         className="flex items-center justify-center h-10 w-10 rounded-lg"
         style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
@@ -137,13 +132,6 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
   );
 }
 
-function StatusDot({ active }: { active: boolean }) {
-  return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${active ? "bg-hairline-grey" : "bg-hairline-grey opacity-50"}`}
-    />
-  );
-}
 
 function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
@@ -304,7 +292,6 @@ function Index() {
               !error &&
               rows.map((f, i) => {
                 const isSelected = selected.has(f.id);
-                const showCheckbox = hasSelection || isSelected;
                 const isLast = i === rows.length - 1;
                 return (
                   <div
@@ -322,25 +309,12 @@ function Index() {
                       isLast ? "" : "border-b border-hairline"
                     } ${f.archived ? "opacity-75" : ""}`}
                   >
-                    <span className="flex items-center justify-center relative h-[14px] w-[14px]">
-                      <span
-                        className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                          showCheckbox ? "opacity-0" : "opacity-100 group-hover:opacity-0"
-                        }`}
-                      >
-                        <StatusDot active={!f.archived} />
-                      </span>
-                      <span
-                        className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                          showCheckbox ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                        }`}
-                      >
-                        <RowCheckbox
-                          checked={isSelected}
-                          onChange={() => toggleOne(f.id)}
-                          ariaLabel={`Select ${f.name}`}
-                        />
-                      </span>
+                    <span className="flex items-center justify-center h-[14px] w-[14px]">
+                      <RowCheckbox
+                        checked={isSelected}
+                        onChange={() => toggleOne(f.id)}
+                        ariaLabel={`Select ${f.name}`}
+                      />
                     </span>
 
                     <div className="flex items-center gap-3 min-w-0">
