@@ -932,6 +932,11 @@ const datasetARows = mockRowsFor("Dataset_A.csv", datasetA);
 const datasetBRows = mockRowsFor("Dataset_B.csv", datasetB);
 // Seed global registry so /visualisation works even if /datasets is never opened.
 registerDatasetTables({ "Dataset_A.csv": datasetARows, "Dataset_B.csv": datasetBRows });
+// Seed the API-layer mock schema registry so api.datasets.list/getSchema
+// return the canonical Dataset_A/B shapes in mock mode.
+__mockSeedSchema("Dataset_A.csv", datasetA, datasetARows.length);
+__mockSeedSchema("Dataset_B.csv", datasetB, datasetBRows.length);
+
 
 function PreviewTable({
   result,
