@@ -115,6 +115,14 @@ export function setProjectPipeline(
   );
 }
 
+export function setProjectCharts(id: string, charts: ChartConfig[]) {
+  update(
+    projects.map((p) =>
+      p.id === id ? { ...p, charts, modifiedAt: new Date().toISOString() } : p,
+    ),
+  );
+}
+
 export function formatRelative(iso: string | null): string {
   if (!iso) return "—";
   const then = new Date(iso).getTime();
