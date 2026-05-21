@@ -137,27 +137,13 @@ export function __mockRemoveProject(id: string) {
 // which in turn either hits the backend or the mock implementations above.
 
 export function createProject(seed?: Partial<Project>): string {
-  // Optimistic synchronous ID for callers that need to navigate immediately.
-  // Mock mode returns the real ID; real mode pre-generates a temp + reconciles
-  // when the server response arrives. For now we keep the sync-return contract
-  // and let real-mode callers refactor to await api.projects.create() directly.
-  if (typeof window === "undefined" || !navigatorHasFetch()) {
-    return __mockCreateProject(seed);
-  }
-  // Fire-and-forget through the seam; in mock mode this is synchronous.
-  let id = "";
-  void api.create(seed).then((newId) => {
-    id = newId;
-  });
-  // In mock mode api.create resolves synchronously-enough via microtask, but
-  // callers expect a sync return. Easiest: just do the mock op directly here
-  // when mock mode is active.
-  if (!id) id = __mockCreateProject(seed);
-  return id;
+  // Sync-return contract for callers that need to navigate immediately.
+  // Mock mode: mutate locally and return the new ID.
+  // Real mode: callers that need server-issued IDs should use
+  //   `await api.projects.create(seed)` directly and navigate on resolve.
+  return __mockCreateProject(seed);
 }
-function navigatorHasFetch() {
-  return typeof fetch === "function";
-}
+
 export function renameProject(id: string, name: string) {
   void api.rename(id, name);
 }
