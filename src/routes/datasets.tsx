@@ -1467,6 +1467,9 @@ function DatasetsPage() {
             <span className="font-mono text-ink">
               {previewResult.totalRows.toLocaleString()} rows × {previewResult.columns.length} cols
             </span>
+            {isPreviewFetching && (
+              <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-coral/70 animate-pulse align-middle" aria-label="Loading" />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:bg-surface-hover transition flex items-center gap-1.5">
