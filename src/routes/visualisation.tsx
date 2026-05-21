@@ -330,7 +330,7 @@ function VisualisationPage() {
         <div className="flex items-center gap-5">
           <div className="text-[12.5px] text-ink-3 tabular">
             {project
-              ? `${columns.length} columns · ${pipelineResult.totalRows.toLocaleString()} rows`
+              ? `${columns.length} columns · ${pipelineTotalRows.toLocaleString()} rows${isPipelineLoading ? " · loading…" : ""}`
               : "—"}
           </div>
           <Link
