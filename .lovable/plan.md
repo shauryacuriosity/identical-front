@@ -1,26 +1,24 @@
 ## Scope
-Two small visual tweaks to `src/routes/index.tsx`. No other files touched.
+Two small changes to the floating header in `src/routes/__root.tsx` plus a shadow-token update in `src/styles.css`.
 
 ## Changes
 
-### 1. Action tiles (New Dataset / New Visualisation / New AI Analysis)
-In `ActionTile`:
-- Remove the lift animation: drop `hover:-translate-y-0.5 transition-all duration-200` (keep a `transition-colors` for the background swap).
-- Remove the coral top border strip (the `<span aria-hidden ...>` with the coral background).
-- Add hover background using the existing highlight token: `hover:bg-surface-hover` (the same token used elsewhere for hover states).
-- Keep the icon tile, label, and description untouched.
+### 1. `src/routes/__root.tsx` — `AppHeader`
+- Remove the outer "banner" wrapper styling on the `<header>`. Currently: `sticky top-0 z-30 pt-4 pb-2 px-6 bg-canvas/85 backdrop-blur-md`. Drop `bg-canvas/85 backdrop-blur-md` so the page background shows through and the pill nav reads as a single floating element (no second band encapsulating it). Keep `sticky top-0 z-30` and the padding so layout doesn't shift.
+- Confirm the Lotus/Home brand link uses the same active treatment as the tab buttons. It maps to `bg-coral` on `homeActive` (same token as the other tabs' active state) and `hover:bg-highlight/50` on hover — verify className strings match exactly so highlight color, height (`h-10`), radius (`rounded-full`), and transitions are identical between Home and the other tabs.
 
-Net effect: tiles stay perfectly still on hover and simply tint to the highlight color.
+### 2. `src/styles.css` — shadow token
+Replace `--shadow-depth` with the spec values:
 
-### 2. Recent Projects row leading indicator
-In the row render block:
-- Replace the `StatusDot` (the small filled dot shown by default) with an always-visible empty `RowCheckbox` in the unchecked state.
-- Keep current behavior: clicking the checkbox toggles selection; clicking the row still navigates.
-- Remove the cross-fade between dot and checkbox — the checkbox is the single default state, and the checked state simply fills it (already handled by `RowCheckbox`).
-- Skeleton row dot can also be swapped to a faint empty checkbox square for visual consistency (small detail).
+```
+--shadow-depth:
+  0 10px 7px 0 var(--shadow-drop-color),
+  inset 0 10px 7px 0 var(--shadow-inner-color);
+```
 
-The `StatusDot` component itself can stay defined or be removed since it becomes unused — I'll remove it to keep the file clean.
+X:0, Y:10, blur:7, spread:0 — drop + inner using the existing `--shadow-drop-color` / `--shadow-inner-color` vars (already theme-aware light/dark). The pill nav already references `boxShadow: "var(--shadow-depth)"` so it picks this up immediately, and this becomes the canonical depth token to reuse on other prominent elements per your rule.
 
 ## Out of scope
-- No changes to other routes, tokens, or the checkbox component itself.
-- No layout/grid changes — column widths and spacing stay identical.
+- No changes to tab structure, dropdown, or settings dialog.
+- No retroactive application of the new shadow to other page elements yet — token is ready when you point me at specific elements.
+- No color-token changes; drop/inner shadow colors stay as their existing CSS variables.
