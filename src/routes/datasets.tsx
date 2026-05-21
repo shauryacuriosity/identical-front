@@ -1232,6 +1232,12 @@ function DatasetsPage() {
     ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rows])),
   }), [importedDatasets]);
 
+  // Mirror tables into the global registry so /visualisation can re-run the
+  // same pipeline without re-importing files.
+  useEffect(() => {
+    registerDatasetTables(tables);
+  }, [tables]);
+
   const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
   const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
