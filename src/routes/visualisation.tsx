@@ -40,8 +40,10 @@ import * as api from "@/lib/api";
 import { useDatasetTables } from "@/lib/dataset-tables";
 import {
   buildChartData,
-  numericColumns,
+  nonIdNumericColumns,
   isNumericColumn,
+  isIdColumn,
+  pickSmartDefaults,
   toCSV,
   type ChartConfig,
   type ChartType,
@@ -187,7 +189,46 @@ function VisualisationPage() {
   const [bins, setBins] = useState<number>(12);
   const [topN, setTopN] = useState<number>(10);
 
-  // Auto-pick sensible defaults when columns first appear or project changes.
+  const numCols = useMemo(() => nonIdNumericColumns(rows, columns), [rows, columns]);
+
+  // Compute whether the *current* encodings satisfy the active chart type's
+  // minimum requirements. When they don't, smart defaults are reapplied below.
+  const encodingsSatisfyChart = (
+    type: ChartType,
+    x: string,
+    y: string,
+    rs: typeof rows,
+    cs: string[],
+  ): boolean => {
+    if (!cs.length) return true;
+    const yIsNum = y !== "__count__" && cs.includes(y) && isNumericColumn(rs, y) && !isIdColumn(rs, y);
+    const yIsCountOrNum = y === "__count__" || yIsNum;
+    const xPresent = cs.includes(x);
+    const xIsNonIdNum = xPresent && isNumericColumn(rs, x) && !isIdColumn(rs, x);
+    const xIsCat = xPresent && !isIdColumn(rs, x);
+    switch (type) {
+      case "bar":
+        return xIsCat && yIsCountOrNum;
+      case "line":
+      case "area":
+        return xPresent && !isIdColumn(rs, x) && yIsCountOrNum;
+      case "scatter":
+        return xIsNonIdNum && yIsNum;
+      case "histogram":
+        return xIsNonIdNum;
+      case "box":
+        return xPresent && !isIdColumn(rs, x) && yIsNum;
+      case "heatmap":
+        return true;
+      case "kpi":
+        return y === "__count__" || yIsNum;
+    }
+  };
+
+  // Apply smart defaults when (a) columns become available for a new
+  // project, or (b) the user switches chart type and the current encodings
+  // don't satisfy the new type. This guarantees a meaningful chart on the
+  // very first render — never bars-of-height-1 or empty-state lectures.
   useEffect(() => {
     if (!columns.length) {
       setXCol("");
@@ -195,13 +236,21 @@ function VisualisationPage() {
       setSeriesCol("");
       return;
     }
-    if (!columns.includes(xCol)) setXCol(columns[0]);
-    if (yCol !== "__count__" && !columns.includes(yCol)) setYCol("__count__");
-    if (seriesCol && !columns.includes(seriesCol)) setSeriesCol("");
+    if (!encodingsSatisfyChart(chartType, xCol, yCol, rows, columns)) {
+      const picks = pickSmartDefaults(rows, columns, chartType);
+      if (picks.x !== undefined) setXCol(picks.x);
+      if (picks.y !== undefined) setYCol(picks.y);
+      if (picks.agg !== undefined) setAgg(picks.agg);
+      if (picks.bins !== undefined) setBins(picks.bins);
+      if (picks.topN !== undefined) setTopN(picks.topN);
+      if (seriesCol && (!columns.includes(seriesCol) || isIdColumn(rows, seriesCol))) {
+        setSeriesCol("");
+      }
+    } else {
+      if (seriesCol && !columns.includes(seriesCol)) setSeriesCol("");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columns.join("|"), projectId]);
-
-  const numCols = useMemo(() => numericColumns(rows, columns), [rows, columns]);
+  }, [columns.join("|"), projectId, chartType]);
 
   const config: ChartConfig = useMemo(
     () => ({
@@ -291,7 +340,17 @@ function VisualisationPage() {
   const showBins = chartType === "histogram";
   const showTopN = chartType === "bar";
 
-  const colOpts = columns.map((c) => ({ value: c, label: c }));
+  // Surface ID columns at the bottom (and labelled) so they stay reachable
+  // but won't be the first thing a researcher picks.
+  const colOpts = useMemo(() => {
+    const nonId: { value: string; label: string }[] = [];
+    const ids: { value: string; label: string }[] = [];
+    for (const c of columns) {
+      if (isIdColumn(rows, c)) ids.push({ value: c, label: `${c} · id` });
+      else nonId.push({ value: c, label: c });
+    }
+    return [...nonId, ...ids];
+  }, [columns, rows]);
   const yOpts = [
     { value: "__count__", label: "count(*)" },
     ...numCols.map((c) => ({ value: c, label: c })),

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useEffect, useState } from "react";
-import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, Copy, Archive } from "lucide-react";
+import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight } from "lucide-react";
 import { useProjects, formatRelative } from "@/lib/projects-store";
 import lotusMark from "@/assets/logo_lotus.png";
 
@@ -133,10 +133,18 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
 }
 
 
-function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+function RowAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+}) {
   return (
     <button
-      onClick={(e) => e.stopPropagation()}
+      onClick={onClick}
       aria-label={label}
       title={label}
       className="h-7 w-7 rounded-md flex items-center justify-center text-ink-2 hover:text-coral hover:bg-surface-hover/40 transition-colors"
@@ -251,7 +259,6 @@ function Index() {
               </span>
             )}
           </div>
-          <button className="text-[12.5px] text-ink-2 hover:text-ink transition">View all</button>
         </div>
 
         {/* Unified table card */}
@@ -336,9 +343,14 @@ function Index() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
                       style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
                     >
-                      <RowAction icon={SquareArrowOutUpRight} label="Open" />
-                      <RowAction icon={Copy} label="Duplicate" />
-                      <RowAction icon={Archive} label="Archive" />
+                      <RowAction
+                        icon={SquareArrowOutUpRight}
+                        label="Open"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate({ to: "/datasets", search: { projectId: f.id } });
+                        }}
+                      />
                     </div>
                   </div>
                 );

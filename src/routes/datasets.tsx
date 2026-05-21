@@ -1,12 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { parseDatasetFile, type Row } from "@/lib/dataset-import";
 import type { Step, StepKind, RunResult } from "@/lib/pipeline-exec";
 import * as api from "@/lib/api";
+import { USE_MOCK } from "@/lib/api/client";
 import { registerDatasetTables } from "@/lib/dataset-tables";
 import { __mockSeedSchema } from "@/lib/api/datasets";
 
@@ -197,7 +198,7 @@ function DatasetBar({
   rowCount?: number;
 }) {
   const [open, setOpen] = useState(value === "");
-  const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : "2,431 rows";
+  const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : null;
   const isEmpty = value === "";
   return (
     <div className="relative mb-2.5">
@@ -212,7 +213,7 @@ function DatasetBar({
           ) : (
             <>
               <span className="font-mono text-[13.5px] text-ink">{value}</span>
-              <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>
+              {rowLabel && <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>}
             </>
           )}
         </div>
@@ -1117,6 +1118,7 @@ function ExportMenu({
 function DatasetsPage() {
   const { projectId, focusName } = Route.useSearch();
   const project = useProject(projectId);
+  const queryClient = useQueryClient();
   const [attrFilter, setAttrFilter] = useState("");
   const [datasetSlots, setDatasetSlots] = useState<string[]>(
     project ? project.datasets : [],
@@ -1132,6 +1134,47 @@ function DatasetsPage() {
   const [selectedAttrs, setSelectedAttrs] = useState<Record<string, Set<string>>>({});
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const datasetsListQ = useQuery({
+    queryKey: ["datasets"],
+    queryFn: () => api.datasets.list(),
+    enabled: !USE_MOCK,
+    staleTime: 30_000,
+  });
+
+  const apiSlotIds = useMemo(
+    () =>
+      !USE_MOCK
+        ? datasetSlots.filter(
+            (slot) => Boolean(slot) && !ALL_DATASETS.includes(slot) && !importedDatasets[slot],
+          )
+        : [],
+    [datasetSlots, importedDatasets],
+  );
+
+  const apiSchemaQueries = useQueries({
+    queries: apiSlotIds.map((id) => ({
+      queryKey: ["datasets", "schema", id],
+      queryFn: () => api.datasets.getSchema(id),
+      staleTime: 60_000,
+    })),
+  });
+
+  const apiSchemaBySlot = useMemo(() => {
+    const out: Record<string, Attr[]> = {};
+    for (const q of apiSchemaQueries) {
+      if (q.data) out[q.data.id] = q.data.columns;
+    }
+    return out;
+  }, [apiSchemaQueries]);
+
+  const apiRowCountBySlot = useMemo(() => {
+    const out: Record<string, number | undefined> = {};
+    for (const ds of datasetsListQ.data ?? []) {
+      if (ds.rowCount != null) out[ds.id] = ds.rowCount;
+    }
+    return out;
+  }, [datasetsListQ.data]);
 
   // When switching projects, reseed slots + pipeline + selectedAttrs.
   useEffect(() => {
@@ -1180,18 +1223,20 @@ function DatasetsPage() {
       const next: Record<string, Set<string>> = {};
       for (const slot of datasetSlots) {
         if (!slot) continue;
-        if (prev[slot]) next[slot] = prev[slot];
+        if (prev[slot]?.size) next[slot] = prev[slot];
         else {
           const attrs =
             slot === "Dataset_A.csv" ? datasetA
             : slot === "Dataset_B.csv" ? datasetB
-            : importedDatasets[slot]?.attrs ?? [];
+            : importedDatasets[slot]?.attrs
+              ?? apiSchemaBySlot[slot]
+              ?? [];
           next[slot] = new Set(attrs.map((a) => a.name));
         }
       }
       return next;
     });
-  }, [datasetSlots, importedDatasets]);
+  }, [datasetSlots, importedDatasets, apiSchemaBySlot]);
 
   // Sweep stale references in pipeline steps when slots change.
   useEffect(() => {
@@ -1231,17 +1276,28 @@ function DatasetsPage() {
     "Dataset_A.csv": datasetA,
     "Dataset_B.csv": datasetB,
     ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.attrs])),
+    ...apiSchemaBySlot,
   };
   const rowCountBySlot: Record<string, number | undefined> = {
     "Dataset_A.csv": datasetARows.length,
     "Dataset_B.csv": datasetBRows.length,
     ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rowCount])),
+    ...apiRowCountBySlot,
   };
-  const tables: Record<string, Row[]> = useMemo(() => ({
-    "Dataset_A.csv": datasetARows,
-    "Dataset_B.csv": datasetBRows,
-    ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rows])),
-  }), [importedDatasets]);
+  const tables: Record<string, Row[]> = useMemo(() => {
+    if (!USE_MOCK) {
+      return Object.fromEntries(
+        Object.entries(importedDatasets)
+          .filter(([, v]) => v.rowsAvailable)
+          .map(([k, v]) => [k, v.rows]),
+      );
+    }
+    return {
+      "Dataset_A.csv": datasetARows,
+      "Dataset_B.csv": datasetBRows,
+      ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rows])),
+    };
+  }, [importedDatasets]);
 
   // Mirror tables into the global registry so /visualisation can re-run the
   // same pipeline without re-importing files.
@@ -1249,7 +1305,15 @@ function DatasetsPage() {
     registerDatasetTables(tables);
   }, [tables]);
 
-  const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
+  const availableNames = USE_MOCK
+    ? [...ALL_DATASETS, ...Object.keys(importedDatasets)]
+    : [
+        ...new Set([
+          ...datasetSlots.filter(Boolean),
+          ...Object.keys(importedDatasets),
+          ...(datasetsListQ.data?.map((d) => d.id) ?? []),
+        ]),
+      ];
   const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
@@ -1323,15 +1387,33 @@ function DatasetsPage() {
     const taken = new Set<string>([...ALL_DATASETS, ...Object.keys(importedDatasets)]);
     for (const file of Array.from(files)) {
       try {
-        const parsed = await parseDatasetFile(file);
-        if (parsed.attrs.length === 0) throw new Error("No columns detected");
-        const name = uniqueName(file.name, taken);
-        taken.add(name);
-        newEntries[name] = parsed;
-        newSlotNames.push(name);
-        toast.success(`Imported ${name}`, {
-          description: `${parsed.attrs.length} columns · ${parsed.rowCount.toLocaleString()} rows`,
-        });
+        if (!USE_MOCK) {
+          const uploaded = await api.datasets.upload(file);
+          const schema = await api.datasets.getSchema(uploaded.id);
+          if (schema.columns.length === 0) throw new Error("No columns detected");
+          const slotId = uploaded.id;
+          newEntries[slotId] = {
+            attrs: schema.columns,
+            rowCount: uploaded.rowCount ?? 0,
+            rows: [],
+            rowsAvailable: false,
+          };
+          newSlotNames.push(slotId);
+          toast.success(`Imported ${uploaded.name}`, {
+            description: `${schema.columns.length} columns · ${(uploaded.rowCount ?? 0).toLocaleString()} rows`,
+          });
+          void queryClient.invalidateQueries({ queryKey: ["datasets"] });
+        } else {
+          const parsed = await parseDatasetFile(file);
+          if (parsed.attrs.length === 0) throw new Error("No columns detected");
+          const name = uniqueName(file.name, taken);
+          taken.add(name);
+          newEntries[name] = parsed;
+          newSlotNames.push(name);
+          toast.success(`Imported ${name}`, {
+            description: `${parsed.attrs.length} columns · ${parsed.rowCount.toLocaleString()} rows`,
+          });
+        }
       } catch (err) {
         toast.error(`Couldn't import ${file.name}`, {
           description: err instanceof Error ? err.message : String(err),
@@ -1472,9 +1554,6 @@ function DatasetsPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:bg-surface-hover transition flex items-center gap-1.5">
-              <Save className="h-3.5 w-3.5" />Save
-            </button>
             <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
           </div>
         </div>

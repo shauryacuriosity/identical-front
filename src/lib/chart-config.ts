@@ -59,6 +59,123 @@ export function numericColumns(rows: Row[], columns: string[]): string[] {
   return columns.filter((c) => isNumericColumn(rows, c));
 }
 
+// ─── ID detection + smart defaults ───────────────────────────────────────
+// An ID column is detected by (a) name patterns common to public-health
+// datasets (SEQN, *_id, *Id) or (b) every non-empty value being a unique
+// integer — i.e. a primary key.
+
+const ID_NAME = /^(seqn|id)$/i;
+const ID_SUFFIX = /(_id|Id)$/;
+
+export function isIdColumn(rows: Row[], col: string): boolean {
+  if (ID_NAME.test(col) || ID_SUFFIX.test(col)) return true;
+  if (rows.length < 8) return false;
+  // Every non-empty value distinct and integral?
+  const seen = new Set<unknown>();
+  let nonEmpty = 0;
+  for (const r of rows) {
+    const v = r[col];
+    if (v === null || v === undefined || v === "") continue;
+    nonEmpty++;
+    const n = toNum(v);
+    if (n === null || !Number.isInteger(n)) return false;
+    if (seen.has(n)) return false;
+    seen.add(n);
+  }
+  // Need a decent sample of all-unique integers before calling it an ID.
+  return nonEmpty >= Math.min(rows.length, 50) && seen.size === nonEmpty;
+}
+
+export function nonIdNumericColumns(rows: Row[], columns: string[]): string[] {
+  return columns.filter((c) => isNumericColumn(rows, c) && !isIdColumn(rows, c));
+}
+
+/** Cardinality of a column, capped early for large datasets. */
+function distinctCount(rows: Row[], col: string, cap = 100): number {
+  const seen = new Set<unknown>();
+  for (const r of rows) {
+    const v = r[col];
+    if (v === null || v === undefined || v === "") continue;
+    seen.add(v);
+    if (seen.size > cap) return cap + 1;
+  }
+  return seen.size;
+}
+
+/**
+ * Columns that look like categories — either string-typed or low-cardinality
+ * integer-coded indicators (e.g. NHANES BMDSTATS/BMIWT). Excludes ID columns.
+ */
+export function categoricalCandidates(rows: Row[], columns: string[]): string[] {
+  const out: { col: string; n: number }[] = [];
+  for (const c of columns) {
+    if (isIdColumn(rows, c)) continue;
+    const n = distinctCount(rows, c, 30);
+    if (n < 2) continue;
+    if (n > 30) continue;
+    out.push({ col: c, n });
+  }
+  // Lower cardinality first — gives more useful bar buckets.
+  out.sort((a, b) => a.n - b.n);
+  return out.map((x) => x.col);
+}
+
+/**
+ * Pick chart-type-appropriate defaults given the current rows + columns.
+ * Returns the slots that need to change; callers should overlay this onto
+ * the existing config. Missing/empty fields mean "leave as-is".
+ */
+export function pickSmartDefaults(
+  rows: Row[],
+  columns: string[],
+  chartType: ChartType,
+): { x?: string; y?: string; agg?: Agg; bins?: number; topN?: number } {
+  if (!columns.length) return {};
+  const numNoId = nonIdNumericColumns(rows, columns);
+  const cats = categoricalCandidates(rows, columns);
+  // Prefer cats; otherwise fall back to any non-ID column.
+  const firstCat = cats[0] ?? columns.find((c) => !isIdColumn(rows, c));
+
+  switch (chartType) {
+    case "bar":
+      return {
+        x: firstCat ?? numNoId[0] ?? columns[0],
+        y: "__count__",
+        agg: "count",
+        topN: 10,
+      };
+    case "line":
+    case "area":
+      return {
+        x: numNoId[0] ?? firstCat ?? columns[0],
+        y: numNoId[1] ?? numNoId[0] ?? "__count__",
+        agg: "avg",
+      };
+    case "scatter":
+      return {
+        x: numNoId[0] ?? columns[0],
+        y: numNoId[1] ?? numNoId[0] ?? columns[0],
+      };
+    case "histogram":
+      return {
+        x: numNoId[0] ?? columns[0],
+        bins: 20,
+      };
+    case "box":
+      return {
+        x: firstCat ?? columns[0],
+        y: numNoId[0] ?? columns[0],
+      };
+    case "heatmap":
+      return {};
+    case "kpi":
+      return {
+        y: numNoId[0] ?? "__count__",
+        agg: "avg",
+      };
+  }
+}
+
 function aggregate(values: number[], agg: Agg): number {
   if (agg === "count") return values.length;
   if (values.length === 0) return 0;
@@ -118,9 +235,9 @@ export function buildChartData(
 
   // -- HEATMAP (correlation across numeric columns) --
   if (chartType === "heatmap") {
-    const nums = numericColumns(rows, columns);
+    const nums = nonIdNumericColumns(rows, columns);
     if (nums.length < 2) {
-      return { ...empty, error: "Need at least two numeric columns for a correlation heatmap." };
+      return { ...empty, error: "Need at least two numeric non-ID columns for a correlation heatmap." };
     }
     const series: Record<string, number[]> = {};
     for (const c of nums) series[c] = rows.map((r) => toNum(r[c])).filter((n): n is number => n !== null);
@@ -141,8 +258,12 @@ export function buildChartData(
     const vals = rows.map((r) => toNum(r[config.x!])).filter((n): n is number => n !== null);
     if (!vals.length) return { ...empty, error: "No numeric values to bin." };
     const bins = Math.max(2, Math.min(60, config.bins ?? 12));
-    const min = Math.min(...vals);
-    const max = Math.max(...vals);
+    let min = Infinity;
+    let max = -Infinity;
+    for (const v of vals) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
     const width = (max - min) / bins || 1;
     const counts = new Array(bins).fill(0);
     for (const v of vals) {
@@ -239,12 +360,49 @@ export function buildChartData(
   const xIsNumeric = isNumericColumn(rows, config.x);
   const agg = config.agg ?? (useCount ? "count" : "sum");
 
+  // Auto-bin a high-cardinality numeric X for bar charts so we never end up
+  // with thousands of 1-tall bars (e.g. SEQN, BMI, or any continuous value).
+  let binnedX: Map<unknown, string> | null = null;
+  if (chartType === "bar" && xIsNumeric && distinctCount(rows, config.x, 31) > 30) {
+    const xs: number[] = [];
+    for (const r of rows) {
+      const n = toNum(r[config.x]);
+      if (n !== null) xs.push(n);
+    }
+    if (xs.length) {
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (const v of xs) {
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      const B = 12;
+      const w = (hi - lo) / B || 1;
+      binnedX = new Map();
+      for (const r of rows) {
+        const v = r[config.x];
+        const n = toNum(v);
+        if (n === null) {
+          binnedX.set(v, "—");
+          continue;
+        }
+        let i = Math.floor((n - lo) / w);
+        if (i >= B) i = B - 1;
+        if (i < 0) i = 0;
+        const lbl = `${round(lo + i * w)}–${round(lo + (i + 1) * w)}`;
+        binnedX.set(v, lbl);
+      }
+    }
+  }
+  const xKeyOf = (r: Row): string =>
+    binnedX ? (binnedX.get(r[config.x]) ?? "—") : String(r[config.x] ?? "");
+
   // With a series field, pivot into wide format.
   if (config.series) {
     const seriesKeys = Array.from(new Set(rows.map((r) => String(r[config.series!] ?? ""))));
     const groups = new Map<string, Record<string, number[]>>();
     for (const r of rows) {
-      const xk = String(r[config.x] ?? "");
+      const xk = xKeyOf(r);
       const sk = String(r[config.series] ?? "");
       let g = groups.get(xk);
       if (!g) {
@@ -264,8 +422,16 @@ export function buildChartData(
       for (const s of seriesKeys) row[s] = round(aggregate(g[s], agg));
       data.push(row);
     }
-    if (xIsNumeric) data.sort((a, b) => Number(a[config.x!]) - Number(b[config.x!]));
-    if (chartType === "bar" && config.topN && config.topN > 0) {
+    if (xIsNumeric && !binnedX) {
+      data.sort((a, b) => Number(a[config.x!]) - Number(b[config.x!]));
+    } else if (binnedX) {
+      data.sort((a, b) => {
+        const al = Number(String(a[config.x!]).split("–")[0]);
+        const bl = Number(String(b[config.x!]).split("–")[0]);
+        return al - bl;
+      });
+    }
+    if (chartType === "bar" && config.topN && config.topN > 0 && !binnedX) {
       const totals = data.map((d) => ({
         d,
         total: seriesKeys.reduce((s, k) => s + Number(d[k] ?? 0), 0),
@@ -279,7 +445,7 @@ export function buildChartData(
   // No series: simple X → aggregated Y
   const groups = new Map<string, number[]>();
   for (const r of rows) {
-    const xk = String(r[config.x] ?? "");
+    const xk = xKeyOf(r);
     const arr = groups.get(xk) ?? [];
     if (useCount) arr.push(1);
     else {
@@ -293,8 +459,16 @@ export function buildChartData(
   for (const [xk, vals] of groups) {
     data.push({ [config.x]: xk, [yKey]: round(aggregate(vals, agg)) });
   }
-  if (xIsNumeric) data.sort((a, b) => Number(a[config.x!]) - Number(b[config.x!]));
-  if (chartType === "bar" && config.topN && config.topN > 0) {
+  if (xIsNumeric && !binnedX) {
+    data.sort((a, b) => Number(a[config.x!]) - Number(b[config.x!]));
+  } else if (binnedX) {
+    data.sort((a, b) => {
+      const al = Number(String(a[config.x!]).split("–")[0]);
+      const bl = Number(String(b[config.x!]).split("–")[0]);
+      return al - bl;
+    });
+  }
+  if (chartType === "bar" && config.topN && config.topN > 0 && !binnedX) {
     data = [...data].sort((a, b) => Number(b[yKey]) - Number(a[yKey])).slice(0, config.topN);
   }
   return { data, xKey: config.x, yKeys: [yKey] };

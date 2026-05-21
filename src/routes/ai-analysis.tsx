@@ -48,7 +48,7 @@ const DIETARY: MappingSuggestion[] = [
   { field: "Total energy", target: "kcal_total", column: "kcal_total", score: 0.97 },
 ];
 
-const TOTAL_ROWS = 2431;
+const FALLBACK_TOTAL_ROWS = 2431;
 
 // ---------- Utilities ----------
 
@@ -439,13 +439,14 @@ function AiAnalysisPage() {
 
 
   // Derived cohort numbers
+  const totalRows = selectedDataset?.row_count ?? FALLBACK_TOTAL_ROWS;
   const cohort = useMemo(() => {
     const ageBreadth = (ageMax - ageMin) / 100;
     const sexFactor = sex === "All" ? 1 : 0.51;
     const pregFactor = excludePregnant ? 0.96 : 1;
     const completeFactor = requireComplete ? 0.92 : 1;
-    const included = Math.round(TOTAL_ROWS * ageBreadth * sexFactor * pregFactor * completeFactor);
-    const pct = (included / TOTAL_ROWS) * 100;
+    const included = Math.round(totalRows * ageBreadth * sexFactor * pregFactor * completeFactor);
+    const pct = totalRows > 0 ? (included / totalRows) * 100 : 0;
     const prevalence = 18 + (ageMin + ageMax) / 20; // mock
     const meanAge = (ageMin + ageMax) / 2;
     return {
@@ -454,7 +455,7 @@ function AiAnalysisPage() {
       prevalence: Math.min(prevalence, 38),
       meanAge,
     };
-  }, [ageMin, ageMax, sex, excludePregnant, requireComplete]);
+  }, [ageMin, ageMax, sex, excludePregnant, requireComplete, totalRows]);
 
   const stepState = (key: StepKey): "locked" | "active" | "complete" => {
     if (completed.has(key)) return "complete";
@@ -462,7 +463,7 @@ function AiAnalysisPage() {
     return "locked";
   };
 
-  const cohortSummary = `${cohort.included.toLocaleString()} of ${TOTAL_ROWS.toLocaleString()} rows · age ${ageMin}–${ageMax} · ${sex === "All" ? "all sexes" : sex} · ${excludePregnant ? "pregnant excluded" : "pregnant included"}`;
+  const cohortSummary = `${cohort.included.toLocaleString()} of ${totalRows.toLocaleString()} rows · age ${ageMin}–${ageMax} · ${sex === "All" ? "all sexes" : sex} · ${excludePregnant ? "pregnant excluded" : "pregnant included"}`;
 
   const predictSummary = (() => {
     if (!showPredict || !predictOn) return null;
@@ -826,7 +827,7 @@ function AiAnalysisPage() {
               <div className="text-[11px] uppercase tracking-[0.12em] text-ink-3 font-medium">Cohort preview</div>
               <div className="mt-3 text-[26px] text-ink tabular leading-tight" style={{ letterSpacing: "-0.02em" }}>
                 {cohort.included.toLocaleString()}
-                <span className="text-[14px] text-ink-3 font-sans"> of {TOTAL_ROWS.toLocaleString()} rows</span>
+                <span className="text-[14px] text-ink-3 font-sans"> of {totalRows.toLocaleString()} rows</span>
               </div>
               <div className="text-[12.5px] text-ink-2 tabular">{cohort.pct.toFixed(1)}% of dataset</div>
 

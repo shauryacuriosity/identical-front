@@ -3,6 +3,10 @@ import type { Step } from "@/lib/pipeline-exec";
 import type { ChartConfig } from "@/lib/chart-config";
 import * as api from "@/lib/api/projects";
 
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const FORCE_MOCK = import.meta.env.VITE_USE_MOCK_API === "true";
+const REAL_API_MODE = !FORCE_MOCK && !!BASE_URL;
+
 export type Project = {
   id: string;
   name: string;
@@ -13,12 +17,7 @@ export type Project = {
   charts?: ChartConfig[];
 };
 
-// ─── Reactive cache ────────────────────────────────────────────────────────
-// In mock mode this IS the source of truth.
-// In real mode it's a write-through cache populated by api/projects.ts.
-
-const listeners = new Set<() => void>();
-let projects: Project[] = [
+const MOCK_SEED_PROJECTS: Project[] = [
   {
     id: "p1",
     name: "Project 1",
@@ -32,6 +31,35 @@ let projects: Project[] = [
     modifiedAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
   },
 ];
+
+let invalidateProjectsQuery: (() => void) | null = null;
+
+export function setProjectsQueryInvalidator(fn: () => void) {
+  invalidateProjectsQuery = fn;
+}
+
+function notifyProjectsQuery() {
+  invalidateProjectsQuery?.();
+}
+
+// ─── Reactive cache ────────────────────────────────────────────────────────
+// In mock mode this IS the source of truth.
+// In real mode it's a write-through cache populated by api/projects.ts.
+
+const listeners = new Set<() => void>();
+let projects: Project[] = REAL_API_MODE ? [] : [...MOCK_SEED_PROJECTS];
+
+async function hydrateProjectsFromApi() {
+  if (!REAL_API_MODE) return;
+  try {
+    await api.list();
+    notifyProjectsQuery();
+  } catch (err) {
+    console.error("[projects-store] Failed to hydrate projects from API:", err);
+  }
+}
+
+void hydrateProjectsFromApi();
 
 function emit() {
   for (const l of listeners) l();
@@ -68,14 +96,17 @@ export function getProject(id: string | undefined): Project | null {
 
 export function __cacheReplaceAll(next: Project[]) {
   commit(next);
+  notifyProjectsQuery();
 }
 export function __cacheUpsert(p: Project) {
   const idx = projects.findIndex((x) => x.id === p.id);
   if (idx === -1) commit([p, ...projects]);
   else commit(projects.map((x) => (x.id === p.id ? p : x)));
+  notifyProjectsQuery();
 }
 export function __cacheRemove(id: string) {
   commit(projects.filter((p) => p.id !== id));
+  notifyProjectsQuery();
 }
 
 // ─── Mock-mode action implementations ─────────────────────────────────────
