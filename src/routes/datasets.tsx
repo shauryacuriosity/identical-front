@@ -6,6 +6,8 @@ import * as XLSX from "xlsx";
 import { parseDatasetFile, type Row } from "@/lib/dataset-import";
 import { runPipeline, type Step, type StepKind } from "@/lib/pipeline-exec";
 import { registerDatasetTables } from "@/lib/dataset-tables";
+import { __mockSeedSchema } from "@/lib/api/datasets";
+
 import {
   useProjects,
   useProject,
