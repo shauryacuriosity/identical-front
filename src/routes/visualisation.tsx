@@ -501,6 +501,15 @@ function VisualisationPage() {
                   title="Select a project to begin"
                   body="Pick a project above. Charts use the same pipeline output as the Datasets page."
                 />
+              ) : isPipelineLoading ? (
+                <div className="h-full min-h-[340px] flex items-center justify-center">
+                  <div className="h-1.5 w-32 rounded-full bg-coral/30 animate-pulse" />
+                </div>
+              ) : pipelineError ? (
+                <EmptyState
+                  title="Couldn't load pipeline"
+                  body={pipelineError.message}
+                />
               ) : columns.length === 0 ? (
                 <EmptyState
                   title="No columns to chart"
@@ -510,7 +519,7 @@ function VisualisationPage() {
                 <ChartCanvas config={config} built={built} />
               )}
             </div>
-            {built.error && project && columns.length > 0 && (
+            {built.error && project && columns.length > 0 && !isPipelineLoading && !pipelineError && (
               <div className="mx-5 mb-5 rounded-lg border border-coral/30 bg-coral-tint px-3 py-2 text-[12.5px] text-coral">
                 {built.error}
               </div>
