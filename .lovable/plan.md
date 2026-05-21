@@ -1,121 +1,107 @@
-## Visualisation page — implementation plan
+# Wire-up Readiness Plan
 
-Rebuild `src/routes/visualisation.tsx` per the FINAL spec. Pure client view over `runPipeline(project)`. No backend, no AI, no new deps.
+Goal: get the frontend into a state where your backend team only edits **one folder** (`src/lib/api/`) to connect real endpoints. No UI changes, no behaviour changes today — only an integration seam so swapping mock → real is a config flip, not a refactor.
 
-### Files
+## Current state (audit)
 
-**New**
-- `src/lib/chart-config.ts` — `ChartConfig` type + `buildChartData(rows, columns, config)`.
-- `src/components/project-select.tsx` — extracted from `ai-analysis.tsx` (defaults to last-modified project, used by both pages).
+Two regimes coexist in the codebase today:
 
-**Edited**
-- `src/lib/projects-store.ts` — add `charts?: ChartConfig[]` to `Project` + `setProjectCharts(id, charts)`.
-- `src/routes/visualisation.tsx` — full rebuild.
-- `src/routes/ai-analysis.tsx` — swap inline project dropdown for `<ProjectSelect />` (no behaviour change).
+1. **Already backend-wired (Supabase client + React Query):**
+   - `src/routes/ai-analysis.tsx` — reads `datasets`, inserts into `analysis_runs`.
+   - `src/routes/runs.$runId.tsx` — polls `analysis_runs` + reads `eda_results`, `model_results`, `cluster_results`, `analysis_predictions`.
+   - `src/routes/ai-analysis.results.tsx` — same tables.
+   - Types in `src/integrations/supabase/db-types.ts`.
 
-**Untouched:** `/datasets`, `/runs/$runId`, `__root.tsx`, all design tokens, all chart/shadcn primitives.
+2. **Pure in-memory / client-side (no backend at all):**
+   - `src/lib/projects-store.ts` — projects list, pipeline steps, selected attrs, saved charts (module-level `let projects`, `useSyncExternalStore`).
+   - `src/lib/dataset-tables.ts` — uploaded dataset rows kept in a JS Map.
+   - `src/lib/pipeline-exec.ts` — pipeline runs entirely in the browser.
+   - `src/routes/datasets.tsx` — hardcoded `datasetA` / `datasetB` schemas, client-side CSV/XLSX parse via `parseDatasetFile`, mock seed rows.
+   - `src/routes/visualisation.tsx` — pulls from the in-memory stores above.
+   - `src/routes/index.tsx` — Recent Projects list from `useProjects()`.
 
-### `chart-config.ts` shape
+The first regime is roughly fine; the second is the blocker for "connect everything."
 
-```ts
-export type ChartType =
-  | "bar" | "line" | "area" | "scatter"
-  | "histogram" | "box" | "heatmap" | "kpi";
+## What I will change
 
-export type Agg = "sum" | "avg" | "min" | "max" | "count" | "median";
+### 1. New folder `src/lib/api/` — the only seam your backend touches
 
-export type ChartConfig = {
-  id: string;
-  chartType: ChartType;
-  x?: string;          // column
-  y?: string;          // column | "__count__"
-  series?: string;     // optional categorical
-  agg?: Agg;           // when Y numeric + X categorical
-  bins?: number;       // histogram
-  topN?: number;       // bar
-};
-
-export type BuiltChart = {
-  data: Array<Record<string, unknown>>;
-  xKey: string;
-  yKeys: string[];     // multiple when series is set
-  error?: string;      // populated for invalid encodings → renders inline hint
-};
-
-export function buildChartData(
-  rows: Row[],
-  columns: string[],   // currently-selected pipeline columns
-  config: ChartConfig,
-): BuiltChart;
+```text
+src/lib/api/
+├── index.ts          // re-exports + USE_MOCK flag
+├── client.ts         // fetch wrapper: baseURL, JSON, auth header hook, error normalisation
+├── types.ts          // shared DTOs (Project, Dataset, PipelinePreview, ChartConfig, etc.)
+├── projects.ts       // listProjects, getProject, createProject, renameProject,
+│                     //   setProjectDatasets, setProjectPipeline, setProjectCharts, deleteProject
+├── datasets.ts       // listDatasets, getDatasetSchema, uploadDataset (multipart),
+│                     //   getDatasetPreview, deleteDataset
+├── pipeline.ts       // runPipelinePreview(projectId | spec)  → { columns, rows, totalRows, notes }
+├── charts.ts         // (thin — charts live on project; helper for export-data if backend ever generates)
+└── mock/             // current in-memory implementations, moved verbatim
+    ├── projects.mock.ts
+    ├── datasets.mock.ts
+    └── pipeline.mock.ts
 ```
 
-Numeric detection: column is numeric when ≥80% non-null values parse as finite numbers (reuse `toNum` pattern from `pipeline-exec.ts`). Heatmap iterates all currently-selected numeric columns and emits Pearson correlation cells. KPI returns a single aggregated value (renders as big number, no axes).
+- `client.ts` reads `import.meta.env.VITE_API_BASE_URL`. When missing OR `VITE_USE_MOCK_API === "true"`, every function in `projects.ts`/`datasets.ts`/`pipeline.ts` delegates to `./mock/*`. Otherwise it hits real endpoints.
+- One-line auth hook: `setAuthTokenGetter(() => string | null)` called from `__root.tsx` once Supabase auth is in. Empty no-op today.
+- Errors normalise to `ApiError { status, code, message }` so UIs can keep using try/catch.
 
-### Layout (Tailwind, existing tokens only)
+### 2. Endpoint contract (documented in `types.ts`, ready for backend to implement)
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  [ProjectSelect ▾]            12 columns · 2,431 rows         │
-│                               Open in Datasets · Send to AI   │
-├────────────┬─────────────────────────────────────┬───────────┤
-│ CHART TYPE │                                     │           │
-│  • Bar     │         [ chart canvas card ]       │           │
-│  · Line    │      axis labels = text-primary     │           │
-│  · Area    │      gridlines  = text-muted        │           │
-│  · ...     │      top-right: ⬇ Export chart      │           │
-│            │                  ⬇ Export data      │           │
-│ ENCODINGS  │                                     │           │
-│ X axis  ▾  │                                     │           │
-│ Y axis  ▾  │   [inline error hint if invalid]    │           │
-│ Series  ▾  │                                     │           │
-│ Agg     ▾  │                                     │           │
-├────────────┴─────────────────────────────────────┴───────────┤
-│ Saved charts                              [+ Add to project] │
-│ [thumb] [thumb] [thumb] ...   (horizontal scroll, × on hover)│
-└──────────────────────────────────────────────────────────────┘
+```text
+GET    /projects                           → Project[]
+POST   /projects                           → Project              body: { name?, datasets?: string[] }
+GET    /projects/:id                       → Project
+PATCH  /projects/:id                       → Project              body: Partial<Project>
+DELETE /projects/:id                       → 204
+
+GET    /datasets                           → DatasetSummary[]
+POST   /datasets       (multipart: file)   → DatasetSummary
+GET    /datasets/:id/schema                → { columns: Attr[] }
+GET    /datasets/:id/preview?limit=200     → { columns, rows }
+DELETE /datasets/:id                       → 204
+
+POST   /pipeline/preview                   → RunResult           body: { steps: Step[], selectedCols?: string[], limit?: number }
 ```
 
-- Top bar uses same surface/hairline classes as `ai-analysis.tsx` header row.
-- Left rail width `w-[280px]`, sticky within the page section.
-- Empty state in canvas: centered "Select a project to begin" using existing muted-text style.
-- "Export chart" menu: PNG via `canvas.toDataURL` after rendering the SVG into a canvas (no new deps); SVG by serializing the live Recharts `<svg>` node.
-- "Export data" CSV: serializes `BuiltChart.data` directly — exactly the post-aggregation rows feeding the chart.
+`Project`, `Step`, `Attr`, `ChartConfig`, `RunResult` already exist — I will lift them into `api/types.ts` and re-export from current locations so nothing else needs renaming.
 
-### Column source
+### 3. Refactor existing call sites to use the seam (zero UI change)
 
-Columns shown in encoding dropdowns = `runPipeline(project).columns` (already respects `selectedAttrs` since the pipeline strips deselected attrs). Deselecting in Datasets → fewer columns here automatically. No new state needed.
+- `src/lib/projects-store.ts` → keep the `useProjects`/`useProject` reactive shell, but its actions (`createProject`, `renameProject`, `setProjectDatasets`, `setProjectPipeline`, `setProjectCharts`, `touchProject`) become thin wrappers that call `api/projects.ts` and update the local cache on success. With mock mode on, behaviour is identical to today.
+- `src/routes/datasets.tsx`:
+  - Replace hardcoded `datasetA` / `datasetB` constants with a `useQuery(['dataset-schema', name], () => api.datasets.getSchema(name))` (mock returns the current hardcoded shape).
+  - `parseDatasetFile` → `api.datasets.upload(file)` (mock keeps current client-side parse + `registerDatasetTables`).
+  - The "Run" preview button → `api.pipeline.preview({ steps, selectedCols })` (mock = current `runPipeline(...)`).
+- `src/routes/visualisation.tsx`: reads pipeline rows through `api.pipeline.preview(...)` instead of importing `runPipeline` directly. Mock mode = no behaviour change.
+- `src/routes/index.tsx`: already uses `useProjects()` — no edit needed; it'll just receive real data once `USE_MOCK` is off.
+- `src/routes/ai-analysis.tsx`, `runs.$runId.tsx`, `ai-analysis.results.tsx`: **untouched** — they're already on Supabase and presumably your backend keeps using those tables. If you'd rather route them through `api/` too, I can add `api/runs.ts` in a follow-up; flagging it as an option, not doing it now to keep this PR small.
 
-### Saved charts
+### 4. Env scaffolding
 
-- Stored on `Project.charts` via `setProjectCharts`.
-- Thumb card: tiny Recharts (`ChartContainer` at fixed `h-20 w-32`, axes hidden) + label `"{ChartType} · {y || "count"}"`.
-- Click → loads `ChartConfig` back into builder state.
-- Hover × → `setProjectCharts(id, charts.filter(c => c.id !== clicked))`.
+- Add `.env.example`:
+  ```
+  VITE_API_BASE_URL=
+  VITE_USE_MOCK_API=true
+  ```
+- README note (3 lines) at top of `src/lib/api/index.ts` explaining: set `VITE_API_BASE_URL`, flip `VITE_USE_MOCK_API=false`, done.
 
-### Encoding rules per chart type (drives conditional UI)
+### 5. React Query everywhere data crosses the seam
 
-| Type      | X | Y | Series | Agg | Bins | TopN |
-|-----------|---|---|--------|-----|------|------|
-| bar       | ✓ | ✓ | ✓      | ✓*  |      | ✓    |
-| line      | ✓ | ✓ | ✓      | ✓*  |      |      |
-| area      | ✓ | ✓ | ✓      | ✓*  |      |      |
-| scatter   | ✓ | ✓ | ✓      |     |      |      |
-| histogram | ✓ |   |        |     | ✓    |      |
-| box       | ✓ | ✓ | ✓      |     |      |      |
-| heatmap   |   |   |        |     |      |      |
-| kpi       |   | ✓ |        | ✓   |      |      |
+All `api/*` calls go through `useQuery` / `useMutation` with stable keys (`['projects']`, `['dataset-schema', id]`, `['pipeline-preview', projectId, hash(steps)]`). This gives you caching, retries, and invalidation for free the moment real endpoints land. The QueryClient already exists in `src/router.tsx`.
 
-`*Agg` only when Y is numeric and X is categorical.
+## Out of scope (so this stays small)
 
-### Error handling
+- No new UI, no design changes, no auth flow, no role system.
+- No changes to `ai-analysis` / `runs` data layer (they're already wired).
+- No backend code, no Supabase migrations.
+- No removing Supabase client — it stays for the already-wired flows.
 
-`buildChartData` never throws. Invalid combinations (e.g. avg on non-numeric Y) return `{ data:[], xKey:"", yKeys:[], error: "..." }`. Canvas renders inline hint card below chart area, no crash.
+## Verification after build
 
-### Verification — three states to show after build
+1. App runs identically in mock mode (default). Datasets page, Visualisation, Recent Projects, Pipeline preview all behave as today.
+2. Setting `VITE_USE_MOCK_API=false` + a fake `VITE_API_BASE_URL` produces network requests to the documented endpoints (visible in DevTools) and graceful `ApiError` toasts when they 404 — proving the seam works end-to-end.
+3. Grep confirms `runPipeline`, `registerDatasetTables`, `parseDatasetFile`, and the in-memory `projects` array are only referenced from `src/lib/api/mock/*` — nowhere else in routes/components.
 
-1. **No project** — top bar shows "Select a project", canvas shows empty state, left rail disabled.
-2. **Project with empty pipeline** — encoding dropdowns empty, canvas shows "No columns selected — choose attributes in Datasets".
-3. **Project with full pipeline + one saved chart** — default bar chart renders, saved-strip shows one thumbnail, click reloads, × removes.
-
-### Out of scope (per spec)
-No Pie/Donut, no LLM, no dashboard grid, no new routes, no token/style overhaul, no new deps.
+Once you approve, I'll implement in one pass and report back with the three checks above.
