@@ -207,13 +207,7 @@ function Index() {
   const hasSelection = selected.size > 0;
 
   return (
-    <div
-      className="relative"
-      style={{
-        backgroundImage:
-          "radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in oklab, var(--bg-surface) 45%, transparent), transparent 70%)",
-      }}
-    >
+    <div className="relative">
       <div className="mx-auto max-w-[1280px] px-6 pt-10 pb-16">
         {/* Greeting */}
         <div className="mb-14 flex items-start gap-4">

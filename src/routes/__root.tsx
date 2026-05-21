@@ -132,7 +132,7 @@ function AppHeader() {
   const homeActive = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-30 pt-4 pb-2 px-6">
+    <header className="sticky top-0 z-30 pt-4 pb-4 px-6 overflow-visible">
       <div className="mx-auto max-w-[1280px]">
         {/* Floating pill nav */}
         <nav

@@ -139,9 +139,7 @@
 
   --shadow-drop-color: rgba(0, 0, 0, 0.25);
   --shadow-inner-color: rgba(255, 255, 255, 0.25);
-  --shadow-depth:
-    0 10px 7px 0 var(--shadow-drop-color),
-    inset 0 10px 7px 0 var(--shadow-inner-color);
+  --shadow-depth: 0 8px 24px -12px var(--shadow-drop-color);
 }
 
 .dark {
