@@ -25,8 +25,6 @@ import {
   BarChart3,
   LineChart as LineIcon,
   AreaChart as AreaIcon,
-  Scatter3D,
-  Histogram,
   Box,
   Grid3x3,
   Hash,
