@@ -292,8 +292,6 @@ function Index() {
               !error &&
               rows.map((f, i) => {
                 const isSelected = selected.has(f.id);
-                const _showCheckbox = hasSelection || isSelected;
-                void _showCheckbox;
                 const isLast = i === rows.length - 1;
                 return (
                   <div
