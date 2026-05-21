@@ -1,10 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Save, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { parseDatasetFile, type Row } from "@/lib/dataset-import";
-import { runPipeline, type Step, type StepKind } from "@/lib/pipeline-exec";
+import type { Step, StepKind, RunResult } from "@/lib/pipeline-exec";
+import * as api from "@/lib/api";
 import { registerDatasetTables } from "@/lib/dataset-tables";
 import { __mockSeedSchema } from "@/lib/api/datasets";
 
@@ -941,7 +943,7 @@ __mockSeedSchema("Dataset_B.csv", datasetB, datasetBRows.length);
 function PreviewTable({
   result,
 }: {
-  result: ReturnType<typeof runPipeline>;
+  result: RunResult;
 }) {
   if (result.columns.length === 0 || result.rows.length === 0) {
     return (
@@ -1037,7 +1039,7 @@ function csvEscape(v: unknown, delim: string): string {
   return s;
 }
 
-function exportResult(result: ReturnType<typeof runPipeline>, baseName: string, ext: string) {
+function exportResult(result: RunResult, baseName: string, ext: string) {
   const cleanName = baseName.replace(/[^\w\- ]+/g, "").trim() || "dataset";
   const filename = `${cleanName}.${ext}`;
   if (ext === "csv" || ext === "tsv") {
@@ -1061,7 +1063,7 @@ function ExportMenu({
   result,
   baseName,
 }: {
-  result: ReturnType<typeof runPipeline>;
+  result: RunResult;
   baseName: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -1266,14 +1268,37 @@ function DatasetsPage() {
     return [...out];
   }, [datasetSlots, selectedAttrs]);
 
-  const previewResult = useMemo(
-    () => runPipeline(steps, tables, selectedCols, { limit: 200 }),
-    [steps, tables, selectedCols],
+  const tablesSig = useMemo(
+    () => Object.keys(tables).sort().map((k) => `${k}:${tables[k]?.length ?? 0}`).join("|"),
+    [tables],
   );
-  const fullResult = useMemo(
-    () => runPipeline(steps, tables, selectedCols, { limit: Number.POSITIVE_INFINITY }),
-    [steps, tables, selectedCols],
+
+  const EMPTY_RESULT: RunResult = useMemo(
+    () => ({ columns: [], rows: [], totalRows: 0, truncated: false, notes: [] }),
+    [],
   );
+
+  const previewQuery = useQuery({
+    queryKey: ["pipeline", "datasets-page", steps, selectedCols, tablesSig, "preview-200"],
+    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: 200 }),
+    enabled: steps.length > 0,
+    staleTime: 5_000,
+    placeholderData: (prev) => prev,
+  });
+  const fullQuery = useQuery({
+    queryKey: ["pipeline", "datasets-page", steps, selectedCols, tablesSig, "full"],
+    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: Number.POSITIVE_INFINITY }),
+    enabled: steps.length > 0,
+    staleTime: 5_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const previewBase = previewQuery.data ?? EMPTY_RESULT;
+  const previewResult: RunResult = previewQuery.error
+    ? { ...previewBase, notes: [...previewBase.notes, (previewQuery.error as Error).message] }
+    : previewBase;
+  const fullResult: RunResult = fullQuery.data ?? EMPTY_RESULT;
+  const isPreviewFetching = previewQuery.isFetching;
 
   const addSlot = () => {
     if (datasetSlots.includes("")) return;
