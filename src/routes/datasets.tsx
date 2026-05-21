@@ -928,6 +928,8 @@ function mockRowsFor(slot: string, attrs: Attr[], count = 25): Row[] {
 
 const datasetARows = mockRowsFor("Dataset_A.csv", datasetA);
 const datasetBRows = mockRowsFor("Dataset_B.csv", datasetB);
+// Seed global registry so /visualisation works even if /datasets is never opened.
+registerDatasetTables({ "Dataset_A.csv": datasetARows, "Dataset_B.csv": datasetBRows });
 
 function PreviewTable({
   result,
