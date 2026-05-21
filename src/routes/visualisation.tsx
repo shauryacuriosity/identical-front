@@ -164,7 +164,7 @@ function VisualisationPage() {
     queryKey: ["pipeline", projectId, project?.pipelineSteps, selectedCols, tablesSig, "full"],
     queryFn: () =>
       api.pipeline.preview({
-        steps: project!.pipelineSteps,
+        steps: project?.pipelineSteps ?? [],
         selectedCols,
         limit: Number.POSITIVE_INFINITY,
       }),
