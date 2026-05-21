@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Step } from "@/lib/pipeline-exec";
+import type { ChartConfig } from "@/lib/chart-config";
 
 export type Project = {
   id: string;
@@ -8,6 +9,7 @@ export type Project = {
   modifiedAt: string;
   pipelineSteps?: Step[];
   selectedAttrs?: Record<string, string[]>;
+  charts?: ChartConfig[];
 };
 
 const listeners = new Set<() => void>();
@@ -109,6 +111,14 @@ export function setProjectPipeline(
       p.id === id
         ? { ...p, pipelineSteps, selectedAttrs, modifiedAt: new Date().toISOString() }
         : p,
+    ),
+  );
+}
+
+export function setProjectCharts(id: string, charts: ChartConfig[]) {
+  update(
+    projects.map((p) =>
+      p.id === id ? { ...p, charts, modifiedAt: new Date().toISOString() } : p,
     ),
   );
 }

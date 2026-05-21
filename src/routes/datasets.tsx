@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { parseDatasetFile, type Row } from "@/lib/dataset-import";
 import { runPipeline, type Step, type StepKind } from "@/lib/pipeline-exec";
+import { registerDatasetTables } from "@/lib/dataset-tables";
 import {
   useProjects,
   useProject,
@@ -927,6 +928,8 @@ function mockRowsFor(slot: string, attrs: Attr[], count = 25): Row[] {
 
 const datasetARows = mockRowsFor("Dataset_A.csv", datasetA);
 const datasetBRows = mockRowsFor("Dataset_B.csv", datasetB);
+// Seed global registry so /visualisation works even if /datasets is never opened.
+registerDatasetTables({ "Dataset_A.csv": datasetARows, "Dataset_B.csv": datasetBRows });
 
 function PreviewTable({
   result,
@@ -1230,6 +1233,12 @@ function DatasetsPage() {
     "Dataset_B.csv": datasetBRows,
     ...Object.fromEntries(Object.entries(importedDatasets).map(([k, v]) => [k, v.rows])),
   }), [importedDatasets]);
+
+  // Mirror tables into the global registry so /visualisation can re-run the
+  // same pipeline without re-importing files.
+  useEffect(() => {
+    registerDatasetTables(tables);
+  }, [tables]);
 
   const availableNames = [...ALL_DATASETS, ...Object.keys(importedDatasets)];
   const groups = datasetSlots.filter(Boolean).map((slot) => {
