@@ -132,12 +132,8 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
   );
 }
 
-function StatusDot({ active }: { active: boolean }) {
-  return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full ${active ? "bg-hairline-grey" : "bg-hairline-grey opacity-50"}`}
-    />
-  );
+function StatusDot(_: { active: boolean }) {
+  return <span className="inline-block h-[14px] w-[14px] rounded-[3px] border border-ink-2" />;
 }
 
 function RowAction({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
