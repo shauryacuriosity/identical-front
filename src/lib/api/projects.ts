@@ -2,6 +2,7 @@ import { apiFetch, USE_MOCK } from "./client";
 import type { Project } from "./types";
 import type { Step } from "@/lib/pipeline-exec";
 import type { ChartConfig } from "@/lib/chart-config";
+import type { ProjectWorkPatch } from "@/lib/project-work";
 import * as store from "@/lib/projects-store";
 
 // Mock mode: delegate to the in-memory reactive store (the source of truth
@@ -70,4 +71,17 @@ export async function remove(id: string): Promise<void> {
   if (USE_MOCK) return store.__mockRemoveProject(id);
   await apiFetch<void>(`/projects/${id}`, { method: "DELETE" });
   store.__cacheRemove(id);
+}
+
+/** Single PATCH for datasets, pipeline stages, charts, and page drafts. */
+export async function patchProject(id: string, patch: ProjectWorkPatch): Promise<Project> {
+  if (USE_MOCK) {
+    store.__mockPatchProject(id, patch);
+    const p = store.getProject(id);
+    if (!p) throw new Error("Project not found");
+    return p;
+  }
+  const data = await apiFetch<Project>(`/projects/${id}`, { method: "PATCH", body: patch });
+  store.__cacheUpsert(data);
+  return data;
 }

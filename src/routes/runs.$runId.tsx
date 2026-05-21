@@ -1,8 +1,17 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CodesandboxIcon } from "@/components/brand-icons";
+import { processRun } from "@/lib/api/runs";
+import { USE_MOCK } from "@/lib/api/client";
+import {
+  isRunComplete,
+  isRunFailed,
+  isRunInProgress,
+  canTriggerProcess,
+  parseRunProgress,
+} from "@/lib/run-status";
 
 export const Route = createFileRoute("/runs/$runId")({
   component: RunPage,
@@ -69,7 +78,7 @@ type RunRow = {
   id: string;
   name: string | null;
   status: string | null;
-  progress: number | null;
+  progress: unknown;
   error_message: string | null;
   started_at: string | null;
   finished_at: string | null;
@@ -103,13 +112,31 @@ function RunPage() {
     },
     refetchInterval: (q) => {
       const s = (q.state.data as RunRow | null | undefined)?.status;
-      return s === "complete" || s === "failed" ? false : 2000;
+      return isRunComplete(s) || isRunFailed(s) ? false : 1500;
+    },
+  });
+
+  const queryClient = useQueryClient();
+  const processMutation = useMutation({
+    mutationFn: () => processRun(runId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["analysis_runs", runId] });
     },
   });
 
   const run = runQ.data;
   const status = run?.status ?? null;
-  const isComplete = status === "complete";
+  const isComplete = isRunComplete(status);
+  const canStartProcessing = !USE_MOCK && run != null && canTriggerProcess(status);
+
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!canStartProcessing || autoStarted.current) return;
+    if ((status ?? "").toLowerCase() !== "pending") return;
+    autoStarted.current = true;
+    processMutation.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per run when status is pending
+  }, [canStartProcessing, status, runId]);
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 pb-24 pt-6">
@@ -142,7 +169,13 @@ function RunPage() {
       )}
 
       {run && !isComplete && (
-        <RunProgressCard run={run} />
+        <RunProgressCard
+          run={run}
+          canStart={canStartProcessing}
+          onStart={() => processMutation.mutate()}
+          starting={processMutation.isPending}
+          startError={processMutation.error as Error | null}
+        />
       )}
 
       {run && isComplete && (
@@ -165,6 +198,9 @@ function StatusPill({ status }: { status: string }) {
     running: { bg: "var(--coral-tint)", fg: "var(--coral)" },
     complete: { bg: "color-mix(in oklab, var(--data-sage) 18%, transparent)", fg: "color-mix(in oklab, var(--data-sage) 60%, var(--ink))" },
     failed: { bg: "var(--coral-tint)", fg: "var(--coral)" },
+    error: { bg: "var(--coral-tint)", fg: "var(--coral)" },
+    pending: { bg: "var(--surface-hover)", fg: "var(--ink-2)" },
+    queued: { bg: "var(--coral-tint)", fg: "var(--coral)" },
   };
   const style = map[status] ?? map.pending;
   return (
@@ -177,26 +213,69 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function RunProgressCard({ run }: { run: RunRow }) {
-  const progress = Math.max(0, Math.min(100, run.progress ?? 0));
-  const failed = run.status === "failed";
+function RunProgressCard({
+  run,
+  canStart,
+  onStart,
+  starting,
+  startError,
+}: {
+  run: RunRow;
+  canStart?: boolean;
+  onStart?: () => void;
+  starting?: boolean;
+  startError?: Error | null;
+}) {
+  const { percent, step } = parseRunProgress(run.progress);
+  const failed = isRunFailed(run.status);
+  const pending = (run.status ?? "").toLowerCase() === "pending";
+
   return (
     <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6 flex flex-col items-center text-center">
       <CodesandboxIcon size={120} strokeWidth={2} className={failed ? "text-coral" : "text-highlight"} />
       <div className="mt-4">
         <PanelHeader
-          title={failed ? "Run failed" : "Running analysis…"}
-          subtitle={failed ? "Check the message below." : "This page will update automatically when results are ready."}
+          title={failed ? "Run failed" : pending ? "Waiting to start" : "Running analysis…"}
+          subtitle={
+            failed
+              ? "Check the message below. You can retry if the issue was temporary."
+              : pending
+                ? "Start processing to run the pipeline on your dataset."
+                : "This page updates automatically when results are ready."
+          }
         />
       </div>
-      <div className="mt-4 w-full max-w-md">
-        <div className="h-2 w-full rounded-full bg-hairline overflow-hidden">
-          <div className="h-full bg-coral transition-all" style={{ width: `${progress}%` }} />
+      {!failed && (
+        <div className="mt-4 w-full max-w-md">
+          <div className="h-2 w-full rounded-full bg-hairline overflow-hidden">
+            <div className="h-full bg-coral transition-all" style={{ width: `${percent}%` }} />
+          </div>
+          <div className="mt-2 text-[12px] text-ink-3 tabular">
+            {percent.toFixed(0)}%
+            {step ? <span className="ml-2 normal-case tracking-normal text-ink-2">· {step.replace(/_/g, " ")}</span> : null}
+          </div>
         </div>
-        <div className="mt-2 text-[12px] text-ink-3 tabular">{progress.toFixed(0)}%</div>
-      </div>
+      )}
       {run.error_message && (
-        <p className="mt-3 text-[13px] text-coral">{run.error_message}</p>
+        <p className="mt-3 text-[13px] text-coral max-w-md">{run.error_message}</p>
+      )}
+      {canStart && onStart && (
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={starting}
+          className="mt-4 h-9 px-5 rounded-lg bg-coral text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
+        >
+          {starting ? "Starting…" : failed ? "Retry analysis" : "Start analysis"}
+        </button>
+      )}
+      {startError && (
+        <p className="mt-2 text-[12px] text-coral max-w-md">{startError.message}</p>
+      )}
+      {USE_MOCK && (
+        <p className="mt-3 text-[12px] text-ink-3 max-w-md">
+          Set <span className="mono">VITE_API_BASE_URL</span> and run the API server to process analyses.
+        </p>
       )}
     </section>
   );

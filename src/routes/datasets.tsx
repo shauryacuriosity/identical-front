@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Search, Hash, Type, Key, Download, Plus, X, ArrowRight, Upload } from "lucide-react";
@@ -10,14 +10,13 @@ import * as api from "@/lib/api";
 import { USE_MOCK } from "@/lib/api/client";
 import { registerDatasetTables } from "@/lib/dataset-tables";
 import { __mockSeedSchema } from "@/lib/api/datasets";
+import { ProjectSaveBar } from "@/components/project-save-bar";
+import { saveProjectWork } from "@/lib/project-work";
 
 import {
   useProjects,
   useProject,
   createProject,
-  renameProject,
-  setProjectDatasets,
-  setProjectPipeline,
 } from "@/lib/projects-store";
 
 export const Route = createFileRoute("/datasets")({
@@ -796,17 +795,20 @@ function ProjectHeader({
   isUntitled,
   placeholder,
   autoFocus,
+  nameDraft,
+  onNameDraftChange,
 }: {
   projectId: string | undefined;
   effectiveName: string;
   isUntitled: boolean;
   placeholder: string;
   autoFocus?: boolean;
+  nameDraft: string;
+  onNameDraftChange: (value: string) => void;
 }) {
   const navigate = useNavigate();
   const projects = useProjects();
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(effectiveName);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -818,10 +820,6 @@ function ProjectHeader({
   }, [autoFocus, projectId]);
 
   useEffect(() => {
-    setDraft(isUntitled ? "" : effectiveName);
-  }, [effectiveName, isUntitled, projectId]);
-
-  useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
@@ -830,25 +828,16 @@ function ProjectHeader({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  const commit = (next: string) => {
-    if (!projectId) return;
-    const trimmed = next.trim();
-    if (trimmed === effectiveName) return;
-    renameProject(projectId, trimmed);
-  };
-
   return (
     <div className="mb-4 flex items-center gap-2">
       {projectId ? (
         <input
           ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={(e) => commit(e.target.value)}
+          value={nameDraft}
+          onChange={(e) => onNameDraftChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             if (e.key === "Escape") {
-              setDraft(isUntitled ? "" : effectiveName);
+              onNameDraftChange(isUntitled ? "" : effectiveName);
               (e.target as HTMLInputElement).blur();
             }
           }}
@@ -1133,6 +1122,8 @@ function DatasetsPage() {
   );
   const [selectedAttrs, setSelectedAttrs] = useState<Record<string, Set<string>>>({});
   const [importing, setImporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [projectNameDraft, setProjectNameDraft] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const datasetsListQ = useQuery({
@@ -1160,13 +1151,22 @@ function DatasetsPage() {
     })),
   });
 
+  const apiSchemaDataKey = apiSlotIds
+    .map((id, i) => {
+      const q = apiSchemaQueries[i];
+      if (!q?.data) return `${id}:pending:${q?.dataUpdatedAt ?? 0}`;
+      return `${id}:${q.dataUpdatedAt ?? 0}:${q.data.columns.map((c) => `${c.name}:${c.type}`).join(",")}`;
+    })
+    .join("|");
+
   const apiSchemaBySlot = useMemo(() => {
     const out: Record<string, Attr[]> = {};
-    for (const q of apiSchemaQueries) {
-      if (q.data) out[q.data.id] = q.data.columns;
+    for (let i = 0; i < apiSlotIds.length; i++) {
+      const q = apiSchemaQueries[i];
+      if (q?.data) out[q.data.id] = q.data.columns;
     }
     return out;
-  }, [apiSchemaQueries]);
+  }, [apiSchemaDataKey]);
 
   const apiRowCountBySlot = useMemo(() => {
     const out: Record<string, number | undefined> = {};
@@ -1189,33 +1189,10 @@ function DatasetsPage() {
         setSelectedAttrs(map);
       }
     } else {
-      setDatasetSlots([]);
+      setDatasetSlots((prev) => (prev.length === 0 ? prev : []));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
-
-  // Sync slot changes back to project store.
-  useEffect(() => {
-    if (!projectId) return;
-    const current = project?.datasets ?? [];
-    const same =
-      current.length === datasetSlots.length &&
-      current.every((v, i) => v === datasetSlots[i]);
-    if (!same) setProjectDatasets(projectId, datasetSlots);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetSlots, projectId]);
-
-  // Auto-name from first dataset stem.
-  useEffect(() => {
-    if (!projectId || !project) return;
-    if (project.name.trim() !== "") return;
-    const first = datasetSlots[0];
-    if (!first) return;
-    const dot = first.lastIndexOf(".");
-    const stem = dot > 0 ? first.slice(0, dot) : first;
-    renameProject(projectId, stem);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetSlots, projectId, project?.name]);
 
   // Default-select all attrs for newly added slots; drop selections for removed slots.
   useEffect(() => {
@@ -1234,9 +1211,24 @@ function DatasetsPage() {
           next[slot] = new Set(attrs.map((a) => a.name));
         }
       }
+      const prevKeys = Object.keys(prev).sort();
+      const nextKeys = Object.keys(next).sort();
+      if (
+        prevKeys.length === nextKeys.length &&
+        prevKeys.every((k, i) => k === nextKeys[i]) &&
+        prevKeys.every((k) => {
+          const a = prev[k];
+          const b = next[k];
+          if (!a || !b || a.size !== b.size) return false;
+          for (const v of a) if (!b.has(v)) return false;
+          return true;
+        })
+      ) {
+        return prev;
+      }
       return next;
     });
-  }, [datasetSlots, importedDatasets, apiSchemaBySlot]);
+  }, [datasetSlots, importedDatasets, apiSchemaDataKey]);
 
   // Sweep stale references in pipeline steps when slots change.
   useEffect(() => {
@@ -1258,18 +1250,11 @@ function DatasetsPage() {
         }
         return s;
       });
-      return swept.filter(Boolean) as Step[];
+      const next = swept.filter(Boolean) as Step[];
+      if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+      return next;
     });
   }, [datasetSlots]);
-
-  // Persist pipeline + attr selection to project store.
-  useEffect(() => {
-    if (!projectId) return;
-    const selObj: Record<string, string[]> = {};
-    for (const [k, v] of Object.entries(selectedAttrs)) selObj[k] = [...v];
-    setProjectPipeline(projectId, steps, selObj);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps, selectedAttrs, projectId]);
 
   const q = attrFilter.trim().toLowerCase();
   const schemaBySlot: Record<string, Attr[]> = {
@@ -1438,12 +1423,66 @@ function DatasetsPage() {
         })()
       : "";
   const isUntitled = !project?.name?.trim();
+  const canVisualise =
+    !!projectId && previewResult.columns.length > 0 && previewResult.totalRows > 0;
   const placeholder = firstNamedSlot
     ? (() => {
         const dot = firstNamedSlot.lastIndexOf(".");
         return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
       })()
     : "Untitled project";
+
+  useEffect(() => {
+    setProjectNameDraft(isUntitled ? "" : effectiveName);
+  }, [effectiveName, isUntitled, projectId]);
+
+  const handleSaveProject = async () => {
+    if (!projectId) {
+      toast.error("Associate a project first", {
+        description: "Use “Associate project” above the pipeline to link your work.",
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const selObj: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(selectedAttrs)) selObj[k] = [...v];
+      const trimmedName = projectNameDraft.trim() || effectiveName.trim();
+      await saveProjectWork(projectId, {
+        name: trimmedName || undefined,
+        datasets: datasetSlots,
+        pipelineSteps: steps,
+        selectedAttrs: selObj,
+      });
+      if (trimmedName) setProjectNameDraft(trimmedName);
+      toast.success("Project saved", {
+        description: "Datasets, pipeline stages, and attribute selections.",
+      });
+    } catch (err) {
+      toast.error("Couldn't save project", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveSummary = (
+    <>
+      <span className="text-ink-3">Preview:</span>{" "}
+      <span className="font-mono text-ink">
+        {previewResult.totalRows.toLocaleString()} rows × {previewResult.columns.length} cols
+      </span>
+      {isPreviewFetching && (
+        <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-coral/70 animate-pulse align-middle" aria-label="Loading" />
+      )}
+      <span className="mx-2 text-ink-3">·</span>
+      <span className="text-ink-3">Pending save:</span>{" "}
+      <span className="font-mono text-ink">
+        {datasetSlots.filter(Boolean).length} datasets · {steps.length} stages
+      </span>
+    </>
+  );
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
@@ -1453,6 +1492,8 @@ function DatasetsPage() {
         isUntitled={isUntitled}
         placeholder={placeholder}
         autoFocus={focusName}
+        nameDraft={projectNameDraft}
+        onNameDraftChange={setProjectNameDraft}
       />
 
       <div className="flex gap-5">
@@ -1541,23 +1582,37 @@ function DatasetsPage() {
         </section>
       </div>
 
-      {/* Sticky footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas/85 backdrop-blur-md">
-        <div className="mx-auto max-w-[1280px] px-6 h-14 flex items-center justify-between">
-          <div className="text-[12.5px] text-ink-2 tabular">
-            <span className="text-ink-3">Result:</span>{" "}
-            <span className="font-mono text-ink">
-              {previewResult.totalRows.toLocaleString()} rows × {previewResult.columns.length} cols
-            </span>
-            {isPreviewFetching && (
-              <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-coral/70 animate-pulse align-middle" aria-label="Loading" />
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
-          </div>
-        </div>
-      </div>
+      <ProjectSaveBar
+        summary={saveSummary}
+        disabled={!projectId}
+        disabledReason="Associate a project to save"
+        saving={saving}
+        onSave={() => void handleSaveProject()}
+      >
+        {canVisualise ? (
+          <Link
+            to="/visualisation"
+            search={{ projectId }}
+            className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:text-coral hover:border-coral/35 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)]"
+          >
+            Visualise
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : (
+          <span
+            title={
+              !projectId
+                ? "Associate a project to visualise"
+                : "Add columns and run the pipeline first"
+            }
+            className="h-9 px-4 rounded-lg border border-hairline bg-surface/60 text-[13px] font-medium text-ink-3 flex items-center gap-1.5 cursor-not-allowed"
+          >
+            Visualise
+            <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        )}
+        <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
+      </ProjectSaveBar>
     </div>
   );
 }

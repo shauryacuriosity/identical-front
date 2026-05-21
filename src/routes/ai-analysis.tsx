@@ -1,6 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Check,
   ChevronDown,
@@ -13,8 +14,24 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import * as apiDatasets from "@/lib/api/datasets";
+import { processRun } from "@/lib/api/runs";
+import { USE_MOCK } from "@/lib/api/client";
+import { ProjectSaveBar } from "@/components/project-save-bar";
+import { useProjects, useProject, formatRelative } from "@/lib/projects-store";
+import { saveProjectWork, type AnalysisDraft } from "@/lib/project-work";
+import {
+  autoMapAnalysisFields,
+  CLINICAL_FIELDS,
+  DIETARY_FIELDS,
+  emptyMappings,
+  type MappingSuggestion,
+} from "@/lib/column-mapping";
 
 export const Route = createFileRoute("/ai-analysis")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    projectId: typeof s.projectId === "string" ? s.projectId : undefined,
+  }),
   component: AiAnalysisPage,
 });
 
@@ -22,33 +39,11 @@ export const Route = createFileRoute("/ai-analysis")({
 
 type Confidence = "auto" | "review" | "needs" | "manual" | "unmapped";
 
-type MappingSuggestion = {
-  field: string;
-  target: string; // canonical name we need
-  column: string | null; // mapped dataset column
-  score: number | null;
-};
-
-const CLINICAL: MappingSuggestion[] = [
-  { field: "Waist circumference", target: "waist_circ", column: "waist_circ", score: 0.94 },
-  { field: "Triglycerides", target: "trig_mg_dl", column: "trig_mg_dl", score: 0.89 },
-  { field: "HDL Cholesterol", target: "hdl_chol", column: "hdl_chol", score: 0.91 },
-  { field: "Systolic BP", target: "bp_sys", column: "bp_sys", score: 0.96 },
-  { field: "Diastolic BP", target: "bp_dia", column: "bp_dia", score: 0.96 },
-  { field: "Fasting Glucose", target: "glucose_fasting", column: "glucose_fasting", score: 0.87 },
-];
-
-const DIETARY: MappingSuggestion[] = [
-  { field: "Age", target: "age_years", column: "age_years", score: 0.98 },
-  { field: "Sex", target: "sex", column: "sex", score: 0.99 },
-  { field: "Dietary sodium", target: "diet_sodium_mg", column: "diet_sodium_mg", score: 0.93 },
-  { field: "Dietary fibre", target: "fibre_g", column: "fibre_g", score: 0.71 },
-  { field: "Added sugar", target: "added_sugar_g", column: "added_sugar_g", score: 0.88 },
-  { field: "Saturated fat", target: "sat_fat_g", column: "sat_fat_g", score: 0.85 },
-  { field: "Total energy", target: "kcal_total", column: "kcal_total", score: 0.97 },
-];
-
 const FALLBACK_TOTAL_ROWS = 2431;
+
+function compactColumn(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
 
 // ---------- Utilities ----------
 
@@ -196,21 +191,14 @@ function StepIndicator({
 
 function MappingRow({
   row,
+  columns,
   onChange,
 }: {
   row: MappingSuggestion;
+  columns: string[];
   onChange: (column: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // Mock dataset columns to choose from
-  const columns = useMemo(
-    () => [
-      "waist_circ", "trig_mg_dl", "hdl_chol", "bp_sys", "bp_dia", "glucose_fasting",
-      "age_years", "sex", "diet_sodium_mg", "fibre_g", "added_sugar_g", "sat_fat_g",
-      "kcal_total", "SEQN", "RIDAGEYR", "DR1TKCAL",
-    ],
-    [],
-  );
   return (
     <div className="grid grid-cols-[1fr_16px_1fr_auto] items-center gap-3 py-2.5 border-b border-hairline/60 last:border-b-0">
       <span className="text-[13.5px] text-ink font-medium">{row.field}</span>
@@ -229,6 +217,18 @@ function MappingRow({
         </button>
         {open && (
           <div className="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-lg border border-hairline bg-surface shadow-[var(--shadow-md)] p-1">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+              className={`mono w-full text-left text-[12px] px-2 py-1.5 rounded hover:bg-surface-hover ${
+                row.column == null ? "text-coral" : "text-ink-3"
+              }`}
+            >
+              — unmapped
+            </button>
             {columns.map((c) => (
               <button
                 key={c}
@@ -305,8 +305,14 @@ function StepShell({
         </div>
         {complete && <ChevronRight className="h-4 w-4 text-ink-3 rotate-90" />}
       </button>
-      {state === "active" && (
-        <div className="px-6 pb-6 pt-1 border-t border-hairline/60">{children}</div>
+      {state !== "locked" && (
+        <div
+          className={`px-6 pb-6 pt-1 border-t border-hairline/60 ${
+            complete && state !== "active" ? "opacity-90" : ""
+          }`}
+        >
+          {children}
+        </div>
       )}
     </section>
   );
@@ -316,6 +322,17 @@ function StepShell({
 
 function AiAnalysisPage() {
   const navigate = useNavigate();
+  const { projectId } = Route.useSearch();
+  const projects = useProjects();
+  const project = useProject(projectId);
+  const sortedProjects = useMemo(
+    () => [...projects].sort((a, b) => (a.modifiedAt < b.modifiedAt ? 1 : -1)),
+    [projects],
+  );
+  const [saving, setSaving] = useState(false);
+  const draftRestoredFor = useRef<string | null>(null);
+  const skipAutoMapOnce = useRef(false);
+
   const [runName, setRunName] = useState(
     () => `Untitled run · ${new Date().toISOString().slice(0, 16)}`,
   );
@@ -332,20 +349,30 @@ function AiAnalysisPage() {
   const datasetsQ = useQuery({
     queryKey: ["datasets", "ready"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("datasets")
-        .select("id,name,row_count,status,archived,uploaded_at")
-        .eq("archived", false)
-        .eq("status", "ready")
-        .order("uploaded_at", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as DatasetOption[];
+      const all = await apiDatasets.list();
+      return all
+        .filter((d) => (d.status ?? "ready") === "ready")
+        .map(
+          (d): DatasetOption => ({
+            id: d.id,
+            name: d.name,
+            row_count: d.rowCount,
+          }),
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
     },
   });
   const selectedDataset = datasetsQ.data?.find((d) => d.id === selectedDatasetId) ?? null;
 
-  const [clinical, setClinical] = useState(CLINICAL);
-  const [dietary, setDietary] = useState(DIETARY);
+  const previewQ = useQuery({
+    queryKey: ["datasets", "preview", selectedDatasetId],
+    queryFn: () => apiDatasets.preview(selectedDatasetId!, 200),
+    enabled: !!selectedDatasetId,
+  });
+  const datasetColumns = previewQ.data?.columns ?? [];
+
+  const [clinical, setClinical] = useState(() => emptyMappings(CLINICAL_FIELDS));
+  const [dietary, setDietary] = useState(() => emptyMappings(DIETARY_FIELDS));
 
   const [ageMin, setAgeMin] = useState(20);
   const [ageMax, setAgeMax] = useState(65);
@@ -370,26 +397,6 @@ function AiAnalysisPage() {
   const showPredict = fnMode === "full" || fnMode === "predict";
   const showSubgroup = fnMode === "full" || fnMode === "discover";
   const methodSkipped = fnMode === "labels";
-
-  // Run state
-  const RUN_STEPS = useMemo(() => {
-    const steps: string[] = ["Computing MetS labels…", "Filtering cohort…"];
-    if (!methodSkipped) {
-      if (showPredict && predictOn) {
-        if (predictModel === "xgb") steps.push("Training XGBoost…");
-        else if (predictModel === "logreg") steps.push("Fitting Logistic Regression…");
-        else steps.push("Training XGBoost + Logistic Regression…");
-        steps.push("Computing SHAP values…");
-      }
-      if (showSubgroup && subgroupOn) steps.push("Running K-Means clustering…");
-    } else {
-      steps.push("Writing labelled dataset…");
-    }
-    return steps;
-  }, [methodSkipped, showPredict, predictOn, predictModel, showSubgroup, subgroupOn]);
-
-  const [runProgress, setRunProgress] = useState(-1); // -1 = not started, 0 = submitting (then navigation occurs)
-  const runStarted = runProgress >= 0;
 
   // Map UI fnMode -> canonical function_mode enum
   const fnModeEnum = (m: FnMode): "full" | "prediction_only" | "subgroup_only" | "labels_only" =>
@@ -429,14 +436,18 @@ function AiAnalysisPage() {
         .select("id")
         .single();
       if (error) throw error;
-      return data as { id: string };
+      const run = data as { id: string };
+      if (!USE_MOCK) {
+        await processRun(run.id);
+      }
+      return run;
     },
     onSuccess: (data) => {
       navigate({ to: "/runs/$runId", params: { runId: data.id } });
     },
   });
-  const runComplete = false; // navigation occurs on success; panel only shows submitting state
 
+  const runSubmitting = runMutation.isPending;
 
   // Derived cohort numbers
   const totalRows = selectedDataset?.row_count ?? FALLBACK_TOTAL_ROWS;
@@ -493,7 +504,6 @@ function AiAnalysisPage() {
       });
       setSkipped((s) => new Set(s).add("method"));
       setCurrentStep("run");
-      setRunProgress(0);
     } else {
       setSkipped((s) => {
         const next = new Set(s);
@@ -516,14 +526,131 @@ function AiAnalysisPage() {
       return next;
     });
     setCurrentStep(key);
-    setRunProgress(-1);
+  };
+
+  useEffect(() => {
+    draftRestoredFor.current = null;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!selectedDatasetId) {
+      setClinical(emptyMappings(CLINICAL_FIELDS));
+      setDietary(emptyMappings(DIETARY_FIELDS));
+      setMetsLabelCol(null);
+      return;
+    }
+    if (!previewQ.data || previewQ.data.id !== selectedDatasetId) return;
+    if (skipAutoMapOnce.current) {
+      skipAutoMapOnce.current = false;
+      return;
+    }
+    const mapped = autoMapAnalysisFields(previewQ.data.columns, previewQ.data.rows);
+    setClinical(mapped.clinical);
+    setDietary(mapped.dietary);
+    const metsCol =
+      previewQ.data.columns.find((c) => compactColumn(c) === "mets") ??
+      previewQ.data.columns.find((c) => compactColumn(c).includes("mets")) ??
+      null;
+    setMetsLabelCol(metsCol);
+  }, [selectedDatasetId, previewQ.data]);
+
+  useEffect(() => {
+    if (!projectId || !project?.analysisDraft) return;
+    if (draftRestoredFor.current === projectId) return;
+    draftRestoredFor.current = projectId;
+    skipAutoMapOnce.current = true;
+    const d = project.analysisDraft;
+    setRunName(d.runName);
+    setFnMode(d.fnMode);
+    setSelectedDatasetId(d.selectedDatasetId);
+    setClinical(d.clinical);
+    setDietary(d.dietary);
+    setAgeMin(d.ageMin);
+    setAgeMax(d.ageMax);
+    setSex(d.sex);
+    setExcludePregnant(d.excludePregnant);
+    setRequireComplete(d.requireComplete);
+    setPredictOn(d.predictOn);
+    setPredictModel(d.predictModel);
+    setSubgroupOn(d.subgroupOn);
+    setClusterAlg(d.clusterAlg);
+    setDimRed(d.dimRed);
+    setCurrentStep(d.currentStep);
+    setCompleted(new Set(d.completed));
+    setSkipped(new Set(d.skipped));
+  }, [projectId, project?.analysisDraft]);
+
+  const buildAnalysisDraft = (): AnalysisDraft => ({
+    runName,
+    fnMode,
+    selectedDatasetId,
+    clinical,
+    dietary,
+    ageMin,
+    ageMax,
+    sex,
+    excludePregnant,
+    requireComplete,
+    predictOn,
+    predictModel,
+    subgroupOn,
+    clusterAlg,
+    dimRed,
+    currentStep,
+    completed: [...completed],
+    skipped: [...skipped],
+  });
+
+  const handleSaveDraft = async () => {
+    if (!projectId) {
+      toast.error("Link a project first", {
+        description: "Choose a project below to save your analysis setup.",
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveProjectWork(projectId, { analysisDraft: buildAnalysisDraft() });
+      toast.success("Analysis draft saved", {
+        description: "Mappings, cohort filters, and method settings.",
+      });
+    } catch (err) {
+      toast.error("Couldn't save draft", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="mx-auto max-w-[1280px] px-6 pb-24">
-      {/* Breadcrumb */}
-      <div className="pt-6 pb-3 flex items-center gap-2 text-[13px] text-ink-2">
-        <span>Analysis</span>
+      {/* Breadcrumb + project link */}
+      <div className="pt-6 pb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[13px] text-ink-2">
+          <span>Analysis</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] uppercase tracking-[0.08em] text-ink-3">Project</span>
+          <div className="relative">
+            <select
+              value={projectId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || undefined;
+                navigate({ to: "/ai-analysis", search: { projectId: id } });
+              }}
+              className="appearance-none h-9 pl-3 pr-8 text-[13px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral min-w-[220px]"
+            >
+              <option value="">No project linked</option>
+              {sortedProjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name || "Untitled project"} · {formatRelative(p.modifiedAt)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-3 pointer-events-none" />
+          </div>
+        </div>
       </div>
 
       {/* Run name */}
@@ -544,7 +671,7 @@ function AiAnalysisPage() {
       </div>
 
 
-      <StepIndicator current={currentStep} completed={completed} running={runStarted && !runComplete} skipped={skipped} />
+      <StepIndicator current={currentStep} completed={completed} running={runSubmitting} skipped={skipped} />
 
       <div className="mt-6 flex flex-col gap-4">
         {/* STEP 1 — Map */}
@@ -606,6 +733,17 @@ function AiAnalysisPage() {
                 value={selectedDatasetId}
                 onChange={setSelectedDatasetId}
               />
+              {selectedDatasetId && previewQ.isLoading && (
+                <p className="mt-2 text-[12px] text-ink-3 flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Auto-mapping columns…
+                </p>
+              )}
+              {selectedDatasetId && !previewQ.isLoading && previewQ.data && (
+                <p className="mt-2 text-[12px] text-ink-3">
+                  Mapped from {previewQ.data.columns.length} columns · scores reflect name + value checks
+                </p>
+              )}
             </div>
 
             {/* Group A — MetS Clinical */}
@@ -657,6 +795,7 @@ function AiAnalysisPage() {
                   <MappingRow
                     key={r.target}
                     row={r}
+                    columns={datasetColumns}
                     onChange={(col) =>
                       setClinical((rows) => {
                         const next = [...rows];
@@ -680,6 +819,7 @@ function AiAnalysisPage() {
                     <MappingRow
                       key={r.target}
                       row={r}
+                      columns={datasetColumns}
                       onChange={(col) =>
                         setDietary((rows) => {
                           const next = [...rows];
@@ -716,13 +856,17 @@ function AiAnalysisPage() {
               </p>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex flex-col items-end gap-2">
               <button
                 onClick={() => advanceFrom("map", "cohort")}
-                className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
+                disabled={!selectedDatasetId || previewQ.isLoading}
+                className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continue to Cohort →
               </button>
+              {!selectedDatasetId && (
+                <span className="text-[12px] text-ink-3">Select a dataset to auto-map columns.</span>
+              )}
             </div>
           </div>
         </StepShell>
@@ -1001,7 +1145,6 @@ function AiAnalysisPage() {
               <button
                 onClick={() => {
                   advanceFrom("method", "run");
-                  setRunProgress(0);
                   runMutation.mutate();
                 }}
                 disabled={
@@ -1016,6 +1159,9 @@ function AiAnalysisPage() {
               {!selectedDatasetId && (
                 <span className="text-[12px] text-ink-3">Select a dataset in Step 1 to run.</span>
               )}
+              {USE_MOCK && (
+                <span className="text-[12px] text-ink-3">Analysis runs require the API (set VITE_API_BASE_URL).</span>
+              )}
               {runMutation.error && (
                 <span className="text-[12px] text-ink-3">Failed to start — {(runMutation.error as Error).message}</span>
               )}
@@ -1024,69 +1170,50 @@ function AiAnalysisPage() {
         )}
 
 
-        {/* STEP 4 — Run */}
+        {/* STEP 4 — Run (brief state before redirect to /runs/:id) */}
         {(currentStep === "run" || completed.has("run")) && (
           <section className="rounded-2xl border border-hairline bg-surface p-6">
-            <div className="flex items-center gap-3 mb-1">
-              <span
-                className={`h-7 w-7 rounded-full flex items-center justify-center border ${
-                  runComplete
-                    ? "bg-coral text-white border-coral"
-                    : "bg-coral-tint text-coral border-coral/40"
-                }`}
-              >
-                {runComplete ? (
-                  <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-                ) : (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
+            <div className="flex items-center gap-3">
+              <span className="h-7 w-7 rounded-full flex items-center justify-center border bg-coral-tint text-coral border-coral/40">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               </span>
-              <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
-                {runComplete ? "Run complete" : "Running analysis…"}
-              </h2>
-            </div>
-
-            <div className="mt-5 pl-10 space-y-2.5">
-              {RUN_STEPS.map((label, i) => {
-                const done = i < runProgress;
-                const active = i === runProgress;
-                return (
-                  <div key={label} className="flex items-center gap-3 text-[13px]">
-                    <span className="h-5 w-5 flex items-center justify-center">
-                      {done ? (
-                        <span className="h-5 w-5 rounded-full bg-coral/10 flex items-center justify-center">
-                          <Check className="h-3 w-3 text-coral" strokeWidth={2.5} />
-                        </span>
-                      ) : active ? (
-                        <Loader2 className="h-3.5 w-3.5 text-coral animate-spin" />
-                      ) : (
-                        <span className="h-1.5 w-1.5 rounded-full bg-hairline" />
-                      )}
-                    </span>
-                    <span className={done ? "text-ink" : active ? "text-ink" : "text-ink-3"}>
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="mt-5 text-[12.5px] text-ink-3 pl-10">
-              {runComplete
-                ? "Results are ready to inspect."
-                : "Training the model on your cohort. Typically under a minute for datasets this size."}
-            </p>
-
-            {runComplete && (
-              <div className="mt-5 pl-10">
-                <Link to="/ai-analysis/results" className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition inline-flex items-center gap-2">
-                  View Results <ArrowRight className="h-4 w-4" />
-                </Link>
+              <div>
+                <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+                  {runMutation.isError ? "Could not start run" : "Starting analysis…"}
+                </h2>
+                <p className="mt-1 text-[12.5px] text-ink-3">
+                  {runMutation.isError
+                    ? (runMutation.error as Error).message
+                    : "Opening your results page. Progress updates automatically while the pipeline runs."}
+                </p>
               </div>
-            )}
+            </div>
           </section>
         )}
       </div>
+
+      <ProjectSaveBar
+        summary={
+          <>
+            <span className="text-ink-3">Draft:</span>{" "}
+            <span className="text-ink">{runName}</span>
+            <span className="mx-2 text-ink-3">·</span>
+            <span className="text-ink-3">Step</span>{" "}
+            <span className="font-mono text-ink">{currentStep}</span>
+            {projectId ? (
+              <>
+                <span className="mx-2 text-ink-3">·</span>
+                <span className="text-ink-3">Project</span>{" "}
+                <span className="text-ink">{project?.name || "Untitled"}</span>
+              </>
+            ) : null}
+          </>
+        }
+        disabled={!projectId}
+        disabledReason="Link a project to save your analysis setup"
+        saving={saving}
+        onSave={() => void handleSaveDraft()}
+      />
     </div>
   );
 }

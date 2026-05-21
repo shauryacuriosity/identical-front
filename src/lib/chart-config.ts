@@ -105,18 +105,78 @@ function distinctCount(rows: Row[], col: string, cap = 100): number {
 /**
  * Columns that look like categories — either string-typed or low-cardinality
  * integer-coded indicators (e.g. NHANES BMDSTATS/BMIWT). Excludes ID columns.
+ * Requires reasonable non-null coverage so we don't pick "indicator" columns
+ * that are 95 % missing on public health datasets.
  */
 export function categoricalCandidates(rows: Row[], columns: string[]): string[] {
-  const out: { col: string; n: number }[] = [];
+  const out: { col: string; n: number; cov: number; balance: number }[] = [];
+  const total = rows.length;
   for (const c of columns) {
     if (isIdColumn(rows, c)) continue;
-    const n = distinctCount(rows, c, 30);
-    if (n < 2) continue;
-    if (n > 30) continue;
-    out.push({ col: c, n });
+    const counts = new Map<unknown, number>();
+    let nonEmpty = 0;
+    for (const r of rows) {
+      const v = r[c];
+      if (v === null || v === undefined || v === "") continue;
+      nonEmpty++;
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+      if (counts.size > 31) break;
+    }
+    if (counts.size < 2 || counts.size > 30) continue;
+    const cov = total === 0 ? 0 : nonEmpty / total;
+    if (cov < 0.3) continue;
+    // Reject "dominated" columns where >85 % of non-empty rows share one
+    // value (e.g. NHANES BMDSTATS, RIDEXMON status flags) — they render as
+    // a single tall bar and one toothpick.
+    let topShare = 0;
+    for (const n of counts.values()) {
+      const share = n / nonEmpty;
+      if (share > topShare) topShare = share;
+    }
+    if (topShare > 0.85) continue;
+    out.push({ col: c, n: counts.size, cov, balance: 1 - topShare });
   }
-  // Lower cardinality first — gives more useful bar buckets.
-  out.sort((a, b) => a.n - b.n);
+  // Prefer well-balanced, well-covered columns first.
+  out.sort((a, b) => b.balance - a.balance || b.cov - a.cov || a.n - b.n);
+  return out.map((x) => x.col);
+}
+
+/**
+ * Numeric non-ID columns ranked for "smart default" picking. Skips:
+ *  - near-constant columns (distinct < 5) — they're really indicators,
+ *    not continuous measurements;
+ *  - dominated columns where one value covers > 85 % of rows (e.g. NHANES
+ *    BMDSTATS where ~95 % of rows are 1.0);
+ *  - sparse columns where < 20 % of rows have a value.
+ * The rest are ranked by coverage, then by variation (distinct count).
+ */
+function rankedNumericForDefaults(rows: Row[], columns: string[]): string[] {
+  const total = rows.length;
+  const out: { col: string; distinct: number; cov: number }[] = [];
+  for (const c of columns) {
+    if (!isNumericColumn(rows, c) || isIdColumn(rows, c)) continue;
+    const counts = new Map<unknown, number>();
+    let nonEmpty = 0;
+    for (const r of rows) {
+      const v = r[c];
+      if (v === null || v === undefined || v === "") continue;
+      nonEmpty++;
+      counts.set(v, (counts.get(v) ?? 0) + 1);
+      if (counts.size > 50) break;
+    }
+    if (counts.size < 5) continue;
+    const cov = total === 0 ? 0 : nonEmpty / total;
+    if (cov < 0.2) continue;
+    let topShare = 0;
+    for (const n of counts.values()) {
+      const share = n / nonEmpty;
+      if (share > topShare) topShare = share;
+    }
+    if (topShare > 0.85) continue;
+    out.push({ col: c, distinct: counts.size, cov });
+  }
+  // Higher coverage first, then higher cardinality (more interesting distribution).
+  out.sort((a, b) => b.cov - a.cov || b.distinct - a.distinct);
   return out.map((x) => x.col);
 }
 
@@ -131,46 +191,48 @@ export function pickSmartDefaults(
   chartType: ChartType,
 ): { x?: string; y?: string; agg?: Agg; bins?: number; topN?: number } {
   if (!columns.length) return {};
-  const numNoId = nonIdNumericColumns(rows, columns);
+  const ranked = rankedNumericForDefaults(rows, columns);
   const cats = categoricalCandidates(rows, columns);
-  // Prefer cats; otherwise fall back to any non-ID column.
-  const firstCat = cats[0] ?? columns.find((c) => !isIdColumn(rows, c));
+  // Prefer good cats; otherwise fall back to ranked numerics (which will
+  // auto-bin for bar) or any non-ID column.
+  const firstCat = cats[0];
+  const fallbackX = ranked[0] ?? columns.find((c) => !isIdColumn(rows, c)) ?? columns[0];
 
   switch (chartType) {
     case "bar":
       return {
-        x: firstCat ?? numNoId[0] ?? columns[0],
+        x: firstCat ?? fallbackX,
         y: "__count__",
         agg: "count",
-        topN: 10,
+        topN: 0,
       };
     case "line":
     case "area":
       return {
-        x: numNoId[0] ?? firstCat ?? columns[0],
-        y: numNoId[1] ?? numNoId[0] ?? "__count__",
+        x: ranked[0] ?? firstCat ?? fallbackX,
+        y: ranked[1] ?? ranked[0] ?? "__count__",
         agg: "avg",
       };
     case "scatter":
       return {
-        x: numNoId[0] ?? columns[0],
-        y: numNoId[1] ?? numNoId[0] ?? columns[0],
+        x: ranked[0] ?? fallbackX,
+        y: ranked[1] ?? ranked[0] ?? fallbackX,
       };
     case "histogram":
       return {
-        x: numNoId[0] ?? columns[0],
+        x: ranked[0] ?? fallbackX,
         bins: 20,
       };
     case "box":
       return {
-        x: firstCat ?? columns[0],
-        y: numNoId[0] ?? columns[0],
+        x: firstCat ?? fallbackX,
+        y: ranked[0] ?? fallbackX,
       };
     case "heatmap":
       return {};
     case "kpi":
       return {
-        y: numNoId[0] ?? "__count__",
+        y: ranked[0] ?? "__count__",
         agg: "avg",
       };
   }
@@ -360,10 +422,15 @@ export function buildChartData(
   const xIsNumeric = isNumericColumn(rows, config.x);
   const agg = config.agg ?? (useCount ? "count" : "sum");
 
-  // Auto-bin a high-cardinality numeric X for bar charts so we never end up
-  // with thousands of 1-tall bars (e.g. SEQN, BMI, or any continuous value).
+  // Auto-bin a high-cardinality numeric X for bar/line/area so we never end
+  // up with thousands of 1-tall bars (or a 8 000-point sawtooth line) on
+  // continuous columns like weight, BMI, or age.
+  const shouldAutoBin =
+    (chartType === "bar" || chartType === "line" || chartType === "area") &&
+    xIsNumeric &&
+    distinctCount(rows, config.x, 31) > 30;
   let binnedX: Map<unknown, string> | null = null;
-  if (chartType === "bar" && xIsNumeric && distinctCount(rows, config.x, 31) > 30) {
+  if (shouldAutoBin) {
     const xs: number[] = [];
     for (const r of rows) {
       const n = toNum(r[config.x]);
@@ -403,6 +470,7 @@ export function buildChartData(
     const groups = new Map<string, Record<string, number[]>>();
     for (const r of rows) {
       const xk = xKeyOf(r);
+      if (chartType === "bar" && (xk === "" || xk === "—")) continue;
       const sk = String(r[config.series] ?? "");
       let g = groups.get(xk);
       if (!g) {
@@ -446,6 +514,9 @@ export function buildChartData(
   const groups = new Map<string, number[]>();
   for (const r of rows) {
     const xk = xKeyOf(r);
+    // For bar charts, drop rows with empty X — they dominate the chart with
+    // an "" or "—" bucket on datasets with sparse indicator columns.
+    if (chartType === "bar" && (xk === "" || xk === "—")) continue;
     const arr = groups.get(xk) ?? [];
     if (useCount) arr.push(1);
     else {

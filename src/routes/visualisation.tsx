@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Bar,
   BarChart,
@@ -31,11 +32,12 @@ import {
   Hash,
 } from "lucide-react";
 import { ChartContainer } from "@/components/ui/chart";
+import { ProjectSaveBar } from "@/components/project-save-bar";
 import {
   useProjects,
-  setProjectCharts,
   formatRelative,
 } from "@/lib/projects-store";
+import { saveProjectWork, type ChartDraft } from "@/lib/project-work";
 import * as api from "@/lib/api";
 import { useDatasetTables } from "@/lib/dataset-tables";
 import {
@@ -51,6 +53,9 @@ import {
 } from "@/lib/chart-config";
 
 export const Route = createFileRoute("/visualisation")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    projectId: typeof s.projectId === "string" ? s.projectId : undefined,
+  }),
   component: VisualisationPage,
 });
 
@@ -132,6 +137,7 @@ function NativeSelect({
 }
 
 function VisualisationPage() {
+  const { projectId: searchProjectId } = Route.useSearch();
   const projects = useProjects();
   const tables = useDatasetTables();
 
@@ -142,8 +148,12 @@ function VisualisationPage() {
   );
   const [projectId, setProjectId] = useState<string | null>(null);
   useEffect(() => {
+    if (searchProjectId && projects.some((p) => p.id === searchProjectId)) {
+      setProjectId(searchProjectId);
+      return;
+    }
     if (!projectId && sortedProjects[0]) setProjectId(sortedProjects[0].id);
-  }, [projectId, sortedProjects]);
+  }, [searchProjectId, projectId, sortedProjects, projects]);
   const project = projects.find((p) => p.id === projectId) ?? null;
 
   // Selected columns flattened across slots.
@@ -188,6 +198,32 @@ function VisualisationPage() {
   const [agg, setAgg] = useState<Agg>("sum");
   const [bins, setBins] = useState<number>(12);
   const [topN, setTopN] = useState<number>(10);
+  const [savedCharts, setSavedCharts] = useState<ChartConfig[]>([]);
+  const [saving, setSaving] = useState(false);
+  const draftRestoredFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    draftRestoredFor.current = null;
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || !project) {
+      setSavedCharts([]);
+      return;
+    }
+    setSavedCharts(project.charts ?? []);
+    if (draftRestoredFor.current === projectId) return;
+    draftRestoredFor.current = projectId;
+    const d = project.chartDraft;
+    if (!d) return;
+    setChartType(d.chartType);
+    setXCol(d.x ?? "");
+    setYCol(d.y ?? "__count__");
+    setSeriesCol(d.series ?? "");
+    if (d.agg) setAgg(d.agg);
+    if (d.bins != null) setBins(d.bins);
+    if (d.topN != null) setTopN(d.topN);
+  }, [projectId, project]);
 
   const numCols = useMemo(() => nonIdNumericColumns(rows, columns), [rows, columns]);
 
@@ -236,6 +272,7 @@ function VisualisationPage() {
       setSeriesCol("");
       return;
     }
+    if (project?.chartDraft && draftRestoredFor.current === projectId) return;
     if (!encodingsSatisfyChart(chartType, xCol, yCol, rows, columns)) {
       const picks = pickSmartDefaults(rows, columns, chartType);
       if (picks.x !== undefined) setXCol(picks.x);
@@ -267,6 +304,42 @@ function VisualisationPage() {
   );
 
   const built = useMemo(() => buildChartData(rows, columns, config), [rows, columns, config]);
+
+  const chartDraft: ChartDraft = useMemo(
+    () => ({
+      chartType,
+      x: xCol || undefined,
+      y: yCol || undefined,
+      series: seriesCol || undefined,
+      agg,
+      bins,
+      topN,
+    }),
+    [chartType, xCol, yCol, seriesCol, agg, bins, topN],
+  );
+
+  const handleSaveVisualisation = async () => {
+    if (!projectId) {
+      toast.error("Select a project first");
+      return;
+    }
+    setSaving(true);
+    try {
+      await saveProjectWork(projectId, {
+        chartDraft,
+        charts: savedCharts,
+      });
+      toast.success("Visualisation saved", {
+        description: "Chart setup and saved charts.",
+      });
+    } catch (err) {
+      toast.error("Couldn't save visualisation", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Chart export refs
   const chartHostRef = useRef<HTMLDivElement>(null);
@@ -310,16 +383,13 @@ function VisualisationPage() {
     triggerDownload(URL.createObjectURL(blob), `${chartType}-data.csv`);
   };
 
-  // Saved charts persistence
-  const savedCharts = project?.charts ?? [];
   const addCurrentToProject = () => {
     if (!project) return;
     const next: ChartConfig = { ...config, id: `c${Date.now().toString(36)}` };
-    setProjectCharts(project.id, [...savedCharts, next]);
+    setSavedCharts((prev) => [...prev, next]);
   };
   const removeSaved = (id: string) => {
-    if (!project) return;
-    setProjectCharts(project.id, savedCharts.filter((c) => c.id !== id));
+    setSavedCharts((prev) => prev.filter((c) => c.id !== id));
   };
   const loadSaved = (c: ChartConfig) => {
     setChartType(c.chartType);
@@ -360,7 +430,7 @@ function VisualisationPage() {
   const builderDisabled = !project || columns.length === 0;
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pt-8 pb-16">
+    <div className="mx-auto max-w-[1280px] px-6 pt-8 pb-24">
       {/* Top bar */}
       <header className="flex flex-wrap items-end justify-between gap-4 pb-5 border-b border-hairline">
         <div className="flex items-end gap-4">
@@ -394,13 +464,14 @@ function VisualisationPage() {
           </div>
           <Link
             to="/datasets"
-            search={projectId ? { projectId } : {}}
+            search={projectId ? { projectId, focusName: undefined } : { projectId: undefined, focusName: undefined }}
             className="text-[12.5px] text-ink-2 hover:text-coral transition-colors"
           >
             Open in Datasets
           </Link>
           <Link
             to="/ai-analysis"
+            search={projectId ? { projectId } : { projectId: undefined }}
             className="text-[12.5px] text-ink-2 hover:text-coral transition-colors"
           >
             Send to AI Analysis
@@ -622,6 +693,22 @@ function VisualisationPage() {
           )}
         </main>
       </div>
+
+      <ProjectSaveBar
+        summary={
+          <>
+            <span className="text-ink-3">Chart:</span>{" "}
+            <span className="text-ink">{chartTitle(config)}</span>
+            <span className="mx-2 text-ink-3">·</span>
+            <span className="text-ink-3">Saved charts:</span>{" "}
+            <span className="font-mono text-ink">{savedCharts.length}</span>
+          </>
+        }
+        disabled={!projectId}
+        disabledReason="Select a project to save"
+        saving={saving}
+        onSave={() => void handleSaveVisualisation()}
+      />
     </div>
   );
 }

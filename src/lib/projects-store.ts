@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { Step } from "@/lib/pipeline-exec";
 import type { ChartConfig } from "@/lib/chart-config";
+import type { AnalysisDraft, ChartDraft } from "@/lib/project-work";
 import * as api from "@/lib/api/projects";
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
@@ -15,6 +16,8 @@ export type Project = {
   pipelineSteps?: Step[];
   selectedAttrs?: Record<string, string[]>;
   charts?: ChartConfig[];
+  chartDraft?: ChartDraft | null;
+  analysisDraft?: AnalysisDraft | null;
 };
 
 const MOCK_SEED_PROJECTS: Project[] = [
@@ -161,6 +164,13 @@ export function __mockSetProjectCharts(id: string, charts: ChartConfig[]) {
 }
 export function __mockRemoveProject(id: string) {
   commit(projects.filter((p) => p.id !== id));
+}
+export function __mockPatchProject(id: string, patch: Partial<Project>) {
+  commit(
+    projects.map((p) =>
+      p.id === id ? { ...p, ...patch, modifiedAt: new Date().toISOString() } : p,
+    ),
+  );
 }
 
 // ─── Public action API (thin wrappers around api/projects.ts) ─────────────

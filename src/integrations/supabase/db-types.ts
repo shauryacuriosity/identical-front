@@ -33,7 +33,7 @@ export interface Database {
           cohort_filter: Json | null;
           method_config: Json | null;
           status: string | null;
-          progress: number | null;
+          progress: Json | null;
           started_at: string | null;
           finished_at: string | null;
           error_message: string | null;
@@ -47,7 +47,7 @@ export interface Database {
           cohort_filter?: Json | null;
           method_config?: Json | null;
           status?: string | null;
-          progress?: number | null;
+          progress?: Json | null;
           started_at?: string | null;
           finished_at?: string | null;
           error_message?: string | null;

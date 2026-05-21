@@ -28,6 +28,7 @@
 export * as projects from "./projects";
 export * as datasets from "./datasets";
 export * as pipeline from "./pipeline";
+export * as runs from "./runs";
 export { USE_MOCK, setAuthTokenGetter } from "./client";
 export { ApiError } from "./types";
 export type {
