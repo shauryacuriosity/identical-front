@@ -29,6 +29,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "Join, aggregate, and analyse public health datasets." },
     ],
     links: [
+      { rel: "icon", href: "/favicon.ico", type: "image/png" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
@@ -220,12 +221,19 @@ function AppHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-hairline" />
                 <DropdownMenuItem
-                  className="text-ink-3 cursor-not-allowed opacity-60 flex items-center justify-between gap-3"
-                  onSelect={(e) => e.preventDefault()}
-                  disabled
+                  className="text-ink cursor-pointer"
+                  onSelect={() => {
+                    if (typeof window !== "undefined") {
+                      localStorage.removeItem("lotus-profile");
+                      localStorage.removeItem("lotus-theme");
+                      document.documentElement.classList.remove("dark");
+                    }
+                    setProfile(DEFAULT_PROFILE);
+                    setDarkMode(false);
+                    toast.success("Signed out locally");
+                  }}
                 >
-                  <span>Sign out</span>
-                  <span className="text-[10px] uppercase tracking-[0.08em] text-ink-3">soon</span>
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
