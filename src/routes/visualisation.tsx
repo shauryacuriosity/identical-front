@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
   BarChart,
@@ -35,7 +36,7 @@ import {
   setProjectCharts,
   formatRelative,
 } from "@/lib/projects-store";
-import { runPipeline } from "@/lib/pipeline-exec";
+import * as api from "@/lib/api";
 import { useDatasetTables } from "@/lib/dataset-tables";
 import {
   buildChartData,
@@ -143,23 +144,39 @@ function VisualisationPage() {
   }, [projectId, sortedProjects]);
   const project = projects.find((p) => p.id === projectId) ?? null;
 
-  // Run the pipeline (full rows) for charting.
-  const pipelineResult = useMemo(() => {
-    if (!project?.pipelineSteps?.length) {
-      return { columns: [] as string[], rows: [] as Record<string, unknown>[], totalRows: 0 };
+  // Selected columns flattened across slots.
+  const selectedCols = useMemo(() => {
+    const out: string[] = [];
+    for (const arr of Object.values(project?.selectedAttrs ?? {})) {
+      for (const c of arr) if (!out.includes(c)) out.push(c);
     }
-    const selectedCols: string[] = [];
-    for (const arr of Object.values(project.selectedAttrs ?? {})) {
-      for (const c of arr) if (!selectedCols.includes(c)) selectedCols.push(c);
-    }
-    const r = runPipeline(project.pipelineSteps, tables, selectedCols, {
-      limit: Number.POSITIVE_INFINITY,
-    });
-    return r;
-  }, [project, tables]);
+    return out;
+  }, [project]);
 
-  const columns = pipelineResult.columns;
-  const rows = pipelineResult.rows;
+  // Dataset registry signature — invalidates the query when tables change.
+  const tablesSig = useMemo(
+    () => Object.keys(tables).sort().map((k) => `${k}:${tables[k]?.length ?? 0}`).join("|"),
+    [tables],
+  );
+
+  // Run the pipeline (full rows) for charting via the API seam.
+  const pipelineQuery = useQuery({
+    queryKey: ["pipeline", projectId, project?.pipelineSteps, selectedCols, tablesSig, "full"],
+    queryFn: () =>
+      api.pipeline.preview({
+        steps: project?.pipelineSteps ?? [],
+        selectedCols,
+        limit: Number.POSITIVE_INFINITY,
+      }),
+    enabled: !!project?.pipelineSteps?.length,
+    staleTime: 5_000,
+  });
+
+  const columns = pipelineQuery.data?.columns ?? [];
+  const rows = pipelineQuery.data?.rows ?? [];
+  const pipelineTotalRows = pipelineQuery.data?.totalRows ?? 0;
+  const isPipelineLoading = pipelineQuery.isFetching && !pipelineQuery.data;
+  const pipelineError = pipelineQuery.error as Error | null;
 
   // Builder state.
   const [chartType, setChartType] = useState<ChartType>("bar");
@@ -313,7 +330,7 @@ function VisualisationPage() {
         <div className="flex items-center gap-5">
           <div className="text-[12.5px] text-ink-3 tabular">
             {project
-              ? `${columns.length} columns · ${pipelineResult.totalRows.toLocaleString()} rows`
+              ? `${columns.length} columns · ${pipelineTotalRows.toLocaleString()} rows${isPipelineLoading ? " · loading…" : ""}`
               : "—"}
           </div>
           <Link
@@ -484,6 +501,15 @@ function VisualisationPage() {
                   title="Select a project to begin"
                   body="Pick a project above. Charts use the same pipeline output as the Datasets page."
                 />
+              ) : isPipelineLoading ? (
+                <div className="h-full min-h-[340px] flex items-center justify-center">
+                  <div className="h-1.5 w-32 rounded-full bg-coral/30 animate-pulse" />
+                </div>
+              ) : pipelineError ? (
+                <EmptyState
+                  title="Couldn't load pipeline"
+                  body={pipelineError.message}
+                />
               ) : columns.length === 0 ? (
                 <EmptyState
                   title="No columns to chart"
@@ -493,7 +519,7 @@ function VisualisationPage() {
                 <ChartCanvas config={config} built={built} />
               )}
             </div>
-            {built.error && project && columns.length > 0 && (
+            {built.error && project && columns.length > 0 && !isPipelineLoading && !pipelineError && (
               <div className="mx-5 mb-5 rounded-lg border border-coral/30 bg-coral-tint px-3 py-2 text-[12.5px] text-coral">
                 {built.error}
               </div>

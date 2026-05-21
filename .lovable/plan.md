@@ -1,107 +1,103 @@
-# Wire-up Readiness Plan
+# Route pipeline reads through the API seam (React Query)
 
-Goal: get the frontend into a state where your backend team only edits **one folder** (`src/lib/api/`) to connect real endpoints. No UI changes, no behaviour changes today — only an integration seam so swapping mock → real is a config flip, not a refactor.
+## Goal
 
-## Current state (audit)
+Stop importing `runPipeline` directly in page components. Have `datasets.tsx` and `visualisation.tsx` fetch pipeline results through `api.pipeline.preview(...)` using TanStack Query, so a real backend can drop in by flipping `VITE_USE_MOCK_API=false` with zero page edits.
 
-Two regimes coexist in the codebase today:
+## Pre-flight (already in place — no changes)
 
-1. **Already backend-wired (Supabase client + React Query):**
-   - `src/routes/ai-analysis.tsx` — reads `datasets`, inserts into `analysis_runs`.
-   - `src/routes/runs.$runId.tsx` — polls `analysis_runs` + reads `eda_results`, `model_results`, `cluster_results`, `analysis_predictions`.
-   - `src/routes/ai-analysis.results.tsx` — same tables.
-   - Types in `src/integrations/supabase/db-types.ts`.
+- `@tanstack/react-query` v5 is installed.
+- `src/routes/__root.tsx` already wraps `<Outlet />` in `QueryClientProvider` with the per-request `QueryClient` from router context.
+- `src/lib/api/pipeline.ts` already exposes `preview({ steps, selectedCols?, limit? })` returning `RunResult`, branching on `USE_MOCK`.
+- `src/router.tsx` already sets `defaultPreloadStaleTime: 0`.
 
-2. **Pure in-memory / client-side (no backend at all):**
-   - `src/lib/projects-store.ts` — projects list, pipeline steps, selected attrs, saved charts (module-level `let projects`, `useSyncExternalStore`).
-   - `src/lib/dataset-tables.ts` — uploaded dataset rows kept in a JS Map.
-   - `src/lib/pipeline-exec.ts` — pipeline runs entirely in the browser.
-   - `src/routes/datasets.tsx` — hardcoded `datasetA` / `datasetB` schemas, client-side CSV/XLSX parse via `parseDatasetFile`, mock seed rows.
-   - `src/routes/visualisation.tsx` — pulls from the in-memory stores above.
-   - `src/routes/index.tsx` — Recent Projects list from `useProjects()`.
+Nothing under `src/lib/api/` is touched. Mock logic is unchanged.
 
-The first regime is roughly fine; the second is the blocker for "connect everything."
+## Changes
 
-## What I will change
+### 1. `src/routes/visualisation.tsx`
 
-### 1. New folder `src/lib/api/` — the only seam your backend touches
+- Remove `import { runPipeline } from "@/lib/pipeline-exec"`.
+- Add `import { useQuery } from "@tanstack/react-query"` and `import * as api from "@/lib/api"`.
+- Replace the `useMemo`-wrapped `runPipeline(...)` block (lines ~147–159) with:
 
-```text
-src/lib/api/
-├── index.ts          // re-exports + USE_MOCK flag
-├── client.ts         // fetch wrapper: baseURL, JSON, auth header hook, error normalisation
-├── types.ts          // shared DTOs (Project, Dataset, PipelinePreview, ChartConfig, etc.)
-├── projects.ts       // listProjects, getProject, createProject, renameProject,
-│                     //   setProjectDatasets, setProjectPipeline, setProjectCharts, deleteProject
-├── datasets.ts       // listDatasets, getDatasetSchema, uploadDataset (multipart),
-│                     //   getDatasetPreview, deleteDataset
-├── pipeline.ts       // runPipelinePreview(projectId | spec)  → { columns, rows, totalRows, notes }
-├── charts.ts         // (thin — charts live on project; helper for export-data if backend ever generates)
-└── mock/             // current in-memory implementations, moved verbatim
-    ├── projects.mock.ts
-    ├── datasets.mock.ts
-    └── pipeline.mock.ts
-```
+  ```ts
+  const selectedCols = useMemo(() => {
+    const out: string[] = [];
+    for (const arr of Object.values(project?.selectedAttrs ?? {})) {
+      for (const c of arr) if (!out.includes(c)) out.push(c);
+    }
+    return out;
+  }, [project]);
 
-- `client.ts` reads `import.meta.env.VITE_API_BASE_URL`. When missing OR `VITE_USE_MOCK_API === "true"`, every function in `projects.ts`/`datasets.ts`/`pipeline.ts` delegates to `./mock/*`. Otherwise it hits real endpoints.
-- One-line auth hook: `setAuthTokenGetter(() => string | null)` called from `__root.tsx` once Supabase auth is in. Empty no-op today.
-- Errors normalise to `ApiError { status, code, message }` so UIs can keep using try/catch.
+  const pipelineQuery = useQuery({
+    queryKey: ["pipeline", projectId, project?.pipelineSteps, selectedCols, "full"],
+    queryFn: () => api.pipeline.preview({
+      steps: project!.pipelineSteps,
+      selectedCols,
+      limit: Number.POSITIVE_INFINITY,
+    }),
+    enabled: !!project?.pipelineSteps?.length,
+    staleTime: 5_000,
+  });
 
-### 2. Endpoint contract (documented in `types.ts`, ready for backend to implement)
-
-```text
-GET    /projects                           → Project[]
-POST   /projects                           → Project              body: { name?, datasets?: string[] }
-GET    /projects/:id                       → Project
-PATCH  /projects/:id                       → Project              body: Partial<Project>
-DELETE /projects/:id                       → 204
-
-GET    /datasets                           → DatasetSummary[]
-POST   /datasets       (multipart: file)   → DatasetSummary
-GET    /datasets/:id/schema                → { columns: Attr[] }
-GET    /datasets/:id/preview?limit=200     → { columns, rows }
-DELETE /datasets/:id                       → 204
-
-POST   /pipeline/preview                   → RunResult           body: { steps: Step[], selectedCols?: string[], limit?: number }
-```
-
-`Project`, `Step`, `Attr`, `ChartConfig`, `RunResult` already exist — I will lift them into `api/types.ts` and re-export from current locations so nothing else needs renaming.
-
-### 3. Refactor existing call sites to use the seam (zero UI change)
-
-- `src/lib/projects-store.ts` → keep the `useProjects`/`useProject` reactive shell, but its actions (`createProject`, `renameProject`, `setProjectDatasets`, `setProjectPipeline`, `setProjectCharts`, `touchProject`) become thin wrappers that call `api/projects.ts` and update the local cache on success. With mock mode on, behaviour is identical to today.
-- `src/routes/datasets.tsx`:
-  - Replace hardcoded `datasetA` / `datasetB` constants with a `useQuery(['dataset-schema', name], () => api.datasets.getSchema(name))` (mock returns the current hardcoded shape).
-  - `parseDatasetFile` → `api.datasets.upload(file)` (mock keeps current client-side parse + `registerDatasetTables`).
-  - The "Run" preview button → `api.pipeline.preview({ steps, selectedCols })` (mock = current `runPipeline(...)`).
-- `src/routes/visualisation.tsx`: reads pipeline rows through `api.pipeline.preview(...)` instead of importing `runPipeline` directly. Mock mode = no behaviour change.
-- `src/routes/index.tsx`: already uses `useProjects()` — no edit needed; it'll just receive real data once `USE_MOCK` is off.
-- `src/routes/ai-analysis.tsx`, `runs.$runId.tsx`, `ai-analysis.results.tsx`: **untouched** — they're already on Supabase and presumably your backend keeps using those tables. If you'd rather route them through `api/` too, I can add `api/runs.ts` in a follow-up; flagging it as an option, not doing it now to keep this PR small.
-
-### 4. Env scaffolding
-
-- Add `.env.example`:
+  const columns = pipelineQuery.data?.columns ?? [];
+  const rows    = pipelineQuery.data?.rows ?? [];
+  const isPipelineLoading = pipelineQuery.isFetching;
+  const pipelineError = pipelineQuery.error as Error | null;
   ```
-  VITE_API_BASE_URL=
-  VITE_USE_MOCK_API=true
+
+- Subtle loading state: in the chart canvas area, when `isPipelineLoading && !pipelineQuery.data`, render an existing-styled skeleton/spinner row above the chart (single coral pulse div, no layout shift). When `pipelineError` is set, show the same empty-state card the page already uses for "no rows" but with the error message in `text-ink-2`.
+- Empty state (`!project` or empty `pipelineSteps`) is unchanged because `pipelineQuery.enabled` is false → `data` undefined → `columns.length === 0` path renders the existing empty card.
+
+### 2. `src/routes/datasets.tsx`
+
+- Remove `runPipeline` import; keep the `Step`/`StepKind` type imports from `@/lib/pipeline-exec` (types only — allowed; seam re-exports same types).
+- Replace the local `tables` registry and the two `useMemo(runPipeline(...))` calls (lines ~1238–1276) with two `useQuery` calls, both keyed off the same inputs and differing only in `limit`:
+
+  ```ts
+  // Tables are still registered into the global dataset table store via the
+  // existing useEffect — that's what api.pipeline.preview reads from in mock mode.
+  const baseKey = ["pipeline", "datasets-page", steps, selectedCols] as const;
+
+  const previewQuery = useQuery({
+    queryKey: [...baseKey, "preview-200"],
+    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: 200 }),
+    enabled: steps.length > 0,
+    staleTime: 5_000,
+    placeholderData: (prev) => prev, // keep last result visible while refetching
+  });
+  const fullQuery = useQuery({
+    queryKey: [...baseKey, "full"],
+    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: Number.POSITIVE_INFINITY }),
+    enabled: steps.length > 0,
+    staleTime: 5_000,
+    placeholderData: (prev) => prev,
+  });
+
+  const EMPTY_RESULT: RunResult = { columns: [], rows: [], totalRows: 0, truncated: false, notes: [] };
+  const previewResult = previewQuery.data ?? EMPTY_RESULT;
+  const fullResult    = fullQuery.data    ?? EMPTY_RESULT;
   ```
-- README note (3 lines) at top of `src/lib/api/index.ts` explaining: set `VITE_API_BASE_URL`, flip `VITE_USE_MOCK_API=false`, done.
 
-### 5. React Query everywhere data crosses the seam
+- Re-type the two component props that use `ReturnType<typeof runPipeline>` (lines 944, 1040, 1064) to `RunResult` imported from `@/lib/api`.
+- Subtle loading: in the preview table header strip, replace the static row-count badge with one that shows a faint coral "·" pulse while `previewQuery.isFetching`. No layout changes.
+- Errors: pipe `previewQuery.error?.message` into the existing notes banner under the preview table (already renders `result.notes`); push the message into a single-element array when present.
 
-All `api/*` calls go through `useQuery` / `useMutation` with stable keys (`['projects']`, `['dataset-schema', id]`, `['pipeline-preview', projectId, hash(steps)]`). This gives you caching, retries, and invalidation for free the moment real endpoints land. The QueryClient already exists in `src/router.tsx`.
+### 3. Verification (mock + simulated-real)
 
-## Out of scope (so this stays small)
+1. **Mock mode (default).** `VITE_USE_MOCK_API=true`. Confirm `/datasets` preview & full result match prior render; `/visualisation` chart builds for a project with a saved pipeline and renders the empty state for an empty pipeline.
+2. **Simulated real mode.** Temporarily edit `src/lib/api/pipeline.ts` *in a local stash only* to wrap the mock branch in `await new Promise(r => setTimeout(r, 600))` (do NOT commit this — purely for verification screenshots), set `VITE_USE_MOCK_API=true`, reload. Confirm the new loading affordance appears in both pages, then the data renders identically. Revert the stash.
+3. **Network mode smoke.** With `VITE_API_BASE_URL=http://localhost:9999` and `VITE_USE_MOCK_API=false`, confirm the pages render the empty/error UI and the network tab shows `POST /pipeline/preview`, proving the seam is wired.
 
-- No new UI, no design changes, no auth flow, no role system.
-- No changes to `ai-analysis` / `runs` data layer (they're already wired).
-- No backend code, no Supabase migrations.
-- No removing Supabase client — it stays for the already-wired flows.
+## Files touched
 
-## Verification after build
+- `src/routes/visualisation.tsx`
+- `src/routes/datasets.tsx`
 
-1. App runs identically in mock mode (default). Datasets page, Visualisation, Recent Projects, Pipeline preview all behave as today.
-2. Setting `VITE_USE_MOCK_API=false` + a fake `VITE_API_BASE_URL` produces network requests to the documented endpoints (visible in DevTools) and graceful `ApiError` toasts when they 404 — proving the seam works end-to-end.
-3. Grep confirms `runPipeline`, `registerDatasetTables`, `parseDatasetFile`, and the in-memory `projects` array are only referenced from `src/lib/api/mock/*` — nowhere else in routes/components.
+## Out of scope
 
-Once you approve, I'll implement in one pass and report back with the three checks above.
+- No edits to `src/lib/api/**`, `src/lib/pipeline-exec.ts`, `src/lib/dataset-tables.ts`.
+- No edits to `ai-analysis.tsx`, `ai-analysis.results.tsx`, `runs.$runId.tsx`.
+- No new dependencies (react-query already installed).
+- No visible layout changes.
