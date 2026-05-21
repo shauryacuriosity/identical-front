@@ -83,14 +83,9 @@ function ActionTile({
   return (
     <Link
       to={href}
-      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+      className="group relative flex flex-col gap-4 rounded-2xl bg-surface border border-hairline p-5 hover:bg-surface-hover transition-colors overflow-hidden"
       style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.28)" }}
     >
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-[2px] opacity-70 group-hover:opacity-100 transition-opacity"
-        style={{ backgroundColor: "var(--coral)" }}
-      />
       <div
         className="flex items-center justify-center h-10 w-10 rounded-lg"
         style={{ backgroundColor: "color-mix(in oklab, var(--coral) 14%, var(--bg-surface))" }}
