@@ -118,6 +118,16 @@ The agent cannot perform any of the following (UI / SSO / billing-gated). Knock 
 
 Service role key has full DB access — keep it in Railway only, never in Vercel.
 
+### Local Docker API (`docker-up.sh`)
+
+From `CSIT321_Project`:
+
+```bash
+./scripts/docker-up.sh   # builds api container, seeds api_storage if empty
+```
+
+Then run the frontend on the host: `cd identical-front && npm run dev` → http://localhost:8080
+
 ### Railway demo seed (`api_storage`)
 
 The API stores **projects** on disk under `STORAGE_DIR` (volume at `/app/api_storage`). Supabase seed does not create the eAsia project (`e1111111-…`).
