@@ -157,9 +157,9 @@ One-command stack: `./scripts/dev-stack.sh` from `identical-front`.
 
 ## Known limitations
 
-1. **`function_mode` not enforced server-side** — UI writes `full` / `prediction_only` / `subgroup_only` / `labels_only` to `analysis_runs`, but `processor.py` always runs the full pipeline. See [`DEMO.md`](./DEMO.md).
-2. **Projects are not in Postgres** — only the API volume; Railway redeploy without volume loses projects unless re-seeded.
-3. **Open-read RLS** — any authenticated user can read all demo runs; tighten before multi-tenant production.
+1. **Projects are not in Postgres** — only the API volume; Railway redeploy without volume loses projects unless re-seeded.
+2. **Open-read RLS** — any authenticated user can read all demo runs; tighten before multi-tenant production.
+3. **Single-model picker** — UI still trains both XGBoost and logistic regression; per-model selection is a v1.1 item.
 
 ---
 

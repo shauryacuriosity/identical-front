@@ -125,17 +125,23 @@ function RunPage() {
   });
 
   const queryClient = useQueryClient();
+  const run = runQ.data;
+  const status = run?.status ?? null;
+  const isComplete = isRunComplete(status);
+  const canStartProcessing =
+    !USE_MOCK && run != null && canTriggerProcess(status, { startedAt: run.started_at });
+  const shouldForceRetry =
+    !USE_MOCK &&
+    run != null &&
+    canTriggerProcess(status, { startedAt: run.started_at, force: true }) &&
+    !canStartProcessing;
+
   const processMutation = useMutation({
-    mutationFn: () => processRun(runId),
+    mutationFn: (force?: boolean) => processRun(runId, { force }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["analysis_runs", runId] });
     },
   });
-
-  const run = runQ.data;
-  const status = run?.status ?? null;
-  const isComplete = isRunComplete(status);
-  const canStartProcessing = !USE_MOCK && run != null && canTriggerProcess(status);
 
   const autoStarted = useRef(false);
   useEffect(() => {
@@ -180,7 +186,8 @@ function RunPage() {
         <RunProgressCard
           run={run}
           canStart={canStartProcessing}
-          onStart={() => processMutation.mutate()}
+          canForceRetry={shouldForceRetry}
+          onStart={(force) => processMutation.mutate(force)}
           starting={processMutation.isPending}
           startError={processMutation.error as Error | null}
         />
@@ -227,13 +234,15 @@ function StatusPill({ status }: { status: string }) {
 function RunProgressCard({
   run,
   canStart,
+  canForceRetry,
   onStart,
   starting,
   startError,
 }: {
   run: RunRow;
   canStart?: boolean;
-  onStart?: () => void;
+  canForceRetry?: boolean;
+  onStart?: (force?: boolean) => void;
   starting?: boolean;
   startError?: Error | null;
 }) {
@@ -281,11 +290,21 @@ function RunProgressCard({
       {canStart && onStart && (
         <button
           type="button"
-          onClick={onStart}
+          onClick={() => onStart()}
           disabled={starting}
           className="mt-4 min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
         >
           {starting ? "Starting…" : failed ? "Retry analysis" : "Start analysis"}
+        </button>
+      )}
+      {canForceRetry && onStart && (
+        <button
+          type="button"
+          onClick={() => onStart(true)}
+          disabled={starting}
+          className="mt-4 min-h-11 h-11 px-5 rounded-lg border border-hairline bg-surface text-[13px] font-semibold text-ink hover:border-coral/40 disabled:opacity-50"
+        >
+          {starting ? "Restarting…" : "Restart stuck run"}
         </button>
       )}
       {startError && <p className="mt-2 text-[12px] text-coral max-w-md">{startError.message}</p>}

@@ -25,7 +25,12 @@ import { __mockSeedSchema } from "@/lib/api/datasets";
 import { ProjectSaveBar } from "@/components/project-save-bar";
 import { saveProjectWork } from "@/lib/project-work";
 
-import { useProjects, useProject, createProject } from "@/lib/projects-store";
+import { useProjects, useProject, createProjectAsync } from "@/lib/projects-store";
+import {
+  buildDatasetLabelMap,
+  slotLabel,
+  stripFileExtension,
+} from "@/lib/dataset-labels";
 
 export const Route = createFileRoute("/datasets")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -116,11 +121,13 @@ function Checkbox({
 
 function AttrGroup({
   name,
+  displayName,
   items,
   selected,
   onChange,
 }: {
   name: string;
+  displayName?: string;
   items: Attr[];
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
@@ -151,7 +158,7 @@ function AttrGroup({
         <ChevronRight
           className={`h-3 w-3 text-ink-3 transition-transform ${open ? "rotate-90" : ""}`}
         />
-        <span className="font-mono text-[12px]">{name}</span>
+        <span className="font-mono text-[12px]">{displayName ?? name}</span>
         <span className="ml-auto text-[10.5px] text-ink-3 font-sans font-medium tabular">
           {items.length}
         </span>
@@ -233,6 +240,7 @@ function DatasetBar({
   usedNames,
   availableNames,
   rowCount,
+  slotLabels,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -240,10 +248,12 @@ function DatasetBar({
   usedNames: string[];
   availableNames: string[];
   rowCount?: number;
+  slotLabels: Record<string, string>;
 }) {
   const [open, setOpen] = useState(value === "");
   const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : null;
   const isEmpty = value === "";
+  const displayValue = slotLabel(value, slotLabels);
   return (
     <div className="relative mb-2.5">
       <button
@@ -256,7 +266,7 @@ function DatasetBar({
             <span className="text-[13.5px] text-ink-2 italic">Please select a dataset</span>
           ) : (
             <>
-              <span className="font-mono text-[13.5px] text-ink">{value}</span>
+              <span className="font-mono text-[13.5px] text-ink">{displayValue}</span>
               {rowLabel && <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>}
             </>
           )}
@@ -307,7 +317,7 @@ function DatasetBar({
                       : "text-ink hover:bg-surface-hover"
                 }`}
               >
-                {opt}
+                {slotLabel(opt, slotLabels)}
                 {disabled && <span className="ml-2 font-sans text-[11px] text-ink-3">in use</span>}
               </button>
             );
@@ -360,6 +370,7 @@ type PartOptions = { kind: "list"; options: string[] } | { kind: "text" };
 
 type EditCtx = {
   slotNames: string[];
+  slotLabels: Record<string, string>;
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
 };
@@ -438,12 +449,14 @@ function EditablePart({
   opts,
   onChange,
   variant = "chip",
+  labelFor,
 }: {
   value: string;
   mono?: boolean;
   opts: PartOptions;
   onChange: (next: string) => void;
   variant?: "chip" | "sentence";
+  labelFor?: (value: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -463,6 +476,7 @@ function EditablePart({
       ? "px-1.5 py-0.5 rounded border border-hairline bg-surface hover:bg-surface-hover hover:border-ink-3/50 transition"
       : "px-1.5 py-0.5 rounded hover:bg-surface-hover transition";
   const txt = mono ? "font-mono text-[12.5px] text-ink" : "text-[12.5px] text-ink";
+  const displayValue = labelFor ? labelFor(value) : value;
 
   return (
     <span ref={ref} className="relative inline-flex">
@@ -475,7 +489,7 @@ function EditablePart({
         }}
         className={`${btnBase} ${txt}`}
       >
-        {value || <span className="text-ink-3">—</span>}
+        {displayValue || <span className="text-ink-3">—</span>}
       </button>
       {open && opts.kind === "list" && (
         <div className="absolute left-0 top-full z-30 mt-1 min-w-[160px] max-h-64 overflow-y-auto bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
@@ -494,7 +508,7 @@ function EditablePart({
                   o === value ? "text-coral" : "text-ink"
                 } ${mono ? "font-mono" : ""}`}
               >
-                {o}
+                {labelFor ? labelFor(o) : o}
               </button>
             ))
           )}
@@ -569,6 +583,7 @@ const PipelineChip = ({
               mono={p.mono}
               opts={optionsForPart(step, p.label, ctx)}
               onChange={(next) => onUpdatePart(i, next)}
+              labelFor={(v) => (p.mono ? (ctx.slotLabels[v] ?? v) : v)}
             />
             {i < step.parts.length - 1 && <span className="text-ink-3/60">·</span>}
           </span>
@@ -613,6 +628,7 @@ function SentenceFragment({
         opts={optionsForPart(step, label, ctx)}
         onChange={(next) => onUpdatePart(idx, next)}
         variant="sentence"
+        labelFor={(v) => ((mono ?? p.mono) ? (ctx.slotLabels[v] ?? v) : v)}
       />
     );
   };
@@ -772,11 +788,13 @@ function PipelineSentence({
 
 function PipelineStrip({
   slotNames,
+  slotLabels,
   schemaBySlot,
   steps,
   setSteps,
 }: {
   slotNames: string[];
+  slotLabels: Record<string, string>;
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
   setSteps: React.Dispatch<React.SetStateAction<Step[]>>;
@@ -785,7 +803,7 @@ function PipelineStrip({
   const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const ctx: EditCtx = { slotNames, schemaBySlot, steps };
+  const ctx: EditCtx = { slotNames, slotLabels, schemaBySlot, steps };
 
   const updatePart = (stepId: string, partIndex: number, next: string) => {
     setSteps((prev) =>
@@ -924,6 +942,7 @@ function ProjectHeader({
   autoFocus,
   nameDraft,
   onNameDraftChange,
+  onCommitName,
 }: {
   projectId: string | undefined;
   effectiveName: string;
@@ -932,6 +951,7 @@ function ProjectHeader({
   autoFocus?: boolean;
   nameDraft: string;
   onNameDraftChange: (value: string) => void;
+  onCommitName?: () => void;
 }) {
   const navigate = useNavigate();
   const projects = useProjects();
@@ -963,7 +983,11 @@ function ProjectHeader({
           value={nameDraft}
           onChange={(e) => onNameDraftChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onCommitName?.();
+              (e.target as HTMLInputElement).blur();
+            } else if (e.key === "Escape") {
               onNameDraftChange(isUntitled ? "" : effectiveName);
               (e.target as HTMLInputElement).blur();
             }
@@ -1011,8 +1035,16 @@ function ProjectHeader({
             <button
               onClick={() => {
                 setOpen(false);
-                const id = createProject({ name: "" });
-                navigate({ to: "/datasets", search: { projectId: id } });
+                void (async () => {
+                  try {
+                    const id = await createProjectAsync({ name: "" });
+                    navigate({ to: "/datasets", search: { projectId: id, focusName: true } });
+                  } catch (err) {
+                    toast.error("Couldn't create project", {
+                      description: err instanceof Error ? err.message : String(err),
+                    });
+                  }
+                })();
               }}
               className="block w-full text-left px-3 py-2 text-[12.5px] text-ink hover:bg-surface-hover transition flex items-center gap-1.5"
             >
@@ -1227,6 +1259,7 @@ function ExportMenu({ result, baseName }: { result: RunResult; baseName: string 
 }
 
 function DatasetsPage() {
+  const navigate = useNavigate();
   const { projectId, focusName } = Route.useSearch();
   const project = useProject(projectId);
   const queryClient = useQueryClient();
@@ -1252,6 +1285,22 @@ function DatasetsPage() {
     enabled: !USE_MOCK,
     staleTime: 30_000,
   });
+
+  const slotLabels = useMemo(
+    () => buildDatasetLabelMap(datasetsListQ.data),
+    [datasetsListQ.data],
+  );
+
+  useEffect(() => {
+    const onRemap = (event: Event) => {
+      const { from, to } = (event as CustomEvent<{ from: string; to: string }>).detail;
+      if (projectId === from) {
+        navigate({ to: "/datasets", search: { projectId: to, focusName } });
+      }
+    };
+    window.addEventListener("lotus:project-id-remapped", onRemap);
+    return () => window.removeEventListener("lotus:project-id-remapped", onRemap);
+  }, [projectId, focusName, navigate]);
 
   const apiSlotIds = useMemo(
     () =>
@@ -1491,7 +1540,7 @@ function DatasetsPage() {
   const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
-    return { name: slot, items };
+    return { slot, label: slotLabel(slot, slotLabels), items };
   });
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
@@ -1565,6 +1614,7 @@ function DatasetsPage() {
       { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean }
     > = {};
     const newSlotNames: string[] = [];
+    let firstImportedDisplayName = "";
     const taken = new Set<string>([...ALL_DATASETS, ...Object.keys(importedDatasets)]);
     for (const file of Array.from(files)) {
       try {
@@ -1573,6 +1623,7 @@ function DatasetsPage() {
           const schema = await api.datasets.getSchema(uploaded.id);
           if (schema.columns.length === 0) throw new Error("No columns detected");
           const slotId = uploaded.id;
+          if (!firstImportedDisplayName) firstImportedDisplayName = uploaded.name;
           newEntries[slotId] = {
             attrs: schema.columns,
             rowCount: uploaded.rowCount ?? 0,
@@ -1589,6 +1640,7 @@ function DatasetsPage() {
           if (parsed.attrs.length === 0) throw new Error("No columns detected");
           const name = uniqueName(file.name, taken);
           taken.add(name);
+          if (!firstImportedDisplayName) firstImportedDisplayName = name;
           newEntries[name] = parsed;
           newSlotNames.push(name);
           toast.success(`Imported ${name}`, {
@@ -1603,34 +1655,56 @@ function DatasetsPage() {
     }
     if (Object.keys(newEntries).length > 0) {
       setImportedDatasets((prev) => ({ ...prev, ...newEntries }));
-      setDatasetSlots((prev) => [...prev, ...newSlotNames]);
+      const nextSlots = [...datasetSlots, ...newSlotNames];
+      setDatasetSlots(nextSlots);
+
+      if (projectId && !project?.name?.trim() && firstImportedDisplayName) {
+        const defaultName = stripFileExtension(firstImportedDisplayName);
+        setProjectNameDraft(defaultName);
+        try {
+          await saveProjectWork(projectId, {
+            name: defaultName,
+            datasets: nextSlots,
+          });
+        } catch (err) {
+          toast.error("Imported file but couldn't name project", {
+            description: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
     }
     setImporting(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const firstNamedSlot = datasetSlots.find(Boolean);
-  const effectiveName = project?.name?.trim()
-    ? project.name
-    : firstNamedSlot
-      ? (() => {
-          const dot = firstNamedSlot.lastIndexOf(".");
-          return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
-        })()
-      : "";
+  const derivedNameFromDataset = firstNamedSlot
+    ? stripFileExtension(slotLabel(firstNamedSlot, slotLabels))
+    : "";
+  const effectiveName = project?.name?.trim() ? project.name : derivedNameFromDataset;
   const isUntitled = !project?.name?.trim();
   const canVisualise =
     !!projectId && previewResult.columns.length > 0 && previewResult.totalRows > 0;
-  const placeholder = firstNamedSlot
-    ? (() => {
-        const dot = firstNamedSlot.lastIndexOf(".");
-        return dot > 0 ? firstNamedSlot.slice(0, dot) : firstNamedSlot;
-      })()
-    : "Untitled project";
+  const placeholder = derivedNameFromDataset || "Untitled project";
 
   useEffect(() => {
     setProjectNameDraft(isUntitled ? "" : effectiveName);
   }, [effectiveName, isUntitled, projectId]);
+
+  const handleCommitProjectName = async () => {
+    if (!projectId) return;
+    const trimmedName = projectNameDraft.trim() || effectiveName.trim();
+    if (!trimmedName) return;
+    try {
+      await saveProjectWork(projectId, { name: trimmedName });
+      setProjectNameDraft(trimmedName);
+      toast.success("Project name saved");
+    } catch (err) {
+      toast.error("Couldn't save project name", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
 
   const handleSaveProject = async () => {
     if (!projectId) {
@@ -1693,6 +1767,7 @@ function DatasetsPage() {
         autoFocus={focusName}
         nameDraft={projectNameDraft}
         onNameDraftChange={setProjectNameDraft}
+        onCommitName={() => void handleCommitProjectName()}
       />
 
       <div className="flex flex-col lg:flex-row gap-5 min-w-0">
@@ -1716,11 +1791,12 @@ function DatasetsPage() {
           </div>
           {groups.map((g) => (
             <AttrGroup
-              key={g.name}
-              name={g.name}
+              key={g.slot}
+              name={g.slot}
+              displayName={g.label}
               items={g.items}
-              selected={selectedAttrs[g.name] ?? new Set()}
-              onChange={(next) => setSelectedAttrs((prev) => ({ ...prev, [g.name]: next }))}
+              selected={selectedAttrs[g.slot] ?? new Set()}
+              onChange={(next) => setSelectedAttrs((prev) => ({ ...prev, [g.slot]: next }))}
             />
           ))}
           <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-3 text-[10.5px] text-ink-2">
@@ -1748,6 +1824,7 @@ function DatasetsPage() {
               usedNames={datasetSlots}
               availableNames={availableNames}
               rowCount={rowCountBySlot[name]}
+              slotLabels={slotLabels}
               onChange={(next) =>
                 setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))
               }
@@ -1782,6 +1859,7 @@ function DatasetsPage() {
           <div className="bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] mt-3 flex-1 flex flex-col overflow-hidden">
             <PipelineStrip
               slotNames={datasetSlots.filter(Boolean)}
+              slotLabels={slotLabels}
               schemaBySlot={schemaBySlot}
               steps={steps}
               setSteps={setSteps}

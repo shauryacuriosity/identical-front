@@ -15,10 +15,26 @@ export function isRunInProgress(status: string | null | undefined): boolean {
   return s === "queued" || s === "running" || s === "processing";
 }
 
+const STALE_RUN_MS = 12 * 60 * 1000;
+
+function isStaleRun(startedAt: string | null | undefined): boolean {
+  if (!startedAt) return true;
+  const t = Date.parse(startedAt);
+  if (Number.isNaN(t)) return true;
+  return Date.now() - t > STALE_RUN_MS;
+}
+
 /** User or UI may call POST /runs/:id/process. */
-export function canTriggerProcess(status: string | null | undefined): boolean {
+export function canTriggerProcess(
+  status: string | null | undefined,
+  opts?: { startedAt?: string | null; force?: boolean },
+): boolean {
   const s = (status ?? "").toLowerCase();
-  return s === "pending" || s === "failed" || s === "error";
+  if (s === "pending" || s === "failed" || s === "error") return true;
+  if (s === "queued" || s === "running" || s === "processing") {
+    return opts?.force === true || isStaleRun(opts?.startedAt);
+  }
+  return false;
 }
 
 export function parseRunProgress(progress: unknown): { percent: number; step: string | null } {

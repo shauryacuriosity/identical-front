@@ -80,9 +80,10 @@ export function profileFromUser(user: User | null): {
   email: string;
   institution: string;
   country: string;
+  avatarUrl: string;
 } {
   if (!user) {
-    return { name: "", email: "", institution: "UOW eAsia", country: "Australia" };
+    return { name: "", email: "", institution: "UOW eAsia", country: "Australia", avatarUrl: "" };
   }
   const meta = user.user_metadata ?? {};
   return {
@@ -90,5 +91,6 @@ export function profileFromUser(user: User | null): {
     email: user.email ?? "",
     institution: String(meta.institution ?? "UOW eAsia"),
     country: String(meta.country ?? "Australia"),
+    avatarUrl: String(meta.avatar_url ?? ""),
   };
 }

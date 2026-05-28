@@ -1,12 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useEffect, useState } from "react";
-import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, RefreshCw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, RefreshCw, Plus } from "lucide-react";
 import {
   useProjects,
   useProjectsHydration,
   refetchProjects,
   formatRelative,
+  createProjectAsync,
 } from "@/lib/projects-store";
+import { resolveProjectDisplayName, buildDatasetLabelMap } from "@/lib/dataset-labels";
+import * as api from "@/lib/api";
+import { USE_MOCK } from "@/lib/api/client";
+import { toast } from "sonner";
 import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createFileRoute("/")({
@@ -247,10 +253,17 @@ function SkeletonRow({ last }: { last?: boolean }) {
 function Index() {
   const projects = useProjects();
   const hydration = useProjectsHydration();
+  const datasetsQ = useQuery({
+    queryKey: ["datasets"],
+    queryFn: () => api.datasets.list(),
+    enabled: !USE_MOCK,
+    staleTime: 30_000,
+  });
+  const datasetLabels = buildDatasetLabelMap(datasetsQ.data);
 
   const rows = projects.map((p) => ({
     id: p.id,
-    name: p.name || "Untitled project",
+    name: resolveProjectDisplayName(p, datasetLabels),
     files: p.datasets.length,
     prevalence: null as number | null,
     modified: formatRelative(p.modifiedAt),
@@ -271,6 +284,20 @@ function Index() {
   };
 
   const navigate = useNavigate();
+  const [creatingProject, setCreatingProject] = useState(false);
+  const handleNewProject = async () => {
+    setCreatingProject(true);
+    try {
+      const id = await createProjectAsync({ name: "" });
+      navigate({ to: "/datasets", search: { projectId: id, focusName: true } });
+    } catch (err) {
+      toast.error("Couldn't create project", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setCreatingProject(false);
+    }
+  };
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const allChecked = rows.length > 0 && selected.size === rows.length;
   const someChecked = selected.size > 0 && !allChecked;
@@ -329,7 +356,7 @@ function Index() {
         </div>
 
         {/* Recent projects */}
-        <div className="flex items-baseline justify-between mb-4">
+        <div className="flex items-baseline justify-between mb-4 gap-3">
           <div className="flex items-baseline gap-3">
             <h2 className="text-[22px] font-semibold text-ink tracking-tight">Recent Projects</h2>
             {rows.length > 0 && (
@@ -338,6 +365,16 @@ function Index() {
               </span>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => void handleNewProject()}
+            disabled={creatingProject}
+            className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-hairline bg-surface text-[12.5px] font-medium text-ink hover:border-coral/40 hover:text-coral transition disabled:opacity-50"
+            aria-label="New project"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2} />
+            {creatingProject ? "Creating…" : "New project"}
+          </button>
         </div>
 
         {/* Unified table card — cards on phone, table from md */}

@@ -159,15 +159,15 @@ Read aloud from [`COMPLIANCE.md`](./COMPLIANCE.md) (judges blurb at the top). Cr
 |-------|-----|
 | **Mock API mode** (`VITE_USE_MOCK_API=true`) | UI works but no real backend — projects/runs are fake. Never demo production with mock env. |
 | **"Generate labels only"** function mode | UI skips the method step, but the **server still runs the full EDA + models + clustering pipeline**. Do not claim labels-only behaviour is implemented server-side. |
-| **"Prediction only" / "Subgroup discovery only"** | UI preview modes — server ignores `function_mode` today and always runs the full pipeline. |
+| **"Prediction only" / "Subgroup discovery only" / "Labels only"** | Supported — `processor.py` branches on `function_mode`. Full demo still uses the seeded run for speed. |
 | **Create new project** if home is empty | Usually means Railway seed was not run — fix bootstrap first instead of improvising. |
 | **Upload real patient data** | Demo uses de-identified NHANES-derived cohorts. No real PHI. |
 | **Delete demo project / run** | Breaks the golden path for the next presenter. |
 | **Forgot-password flow** | Not part of the capstone demo unless B1 auth is fully verified. |
 
-### Honest caveat: `function_mode`
+### `function_mode` (partial pipelines)
 
-The AI Analysis UI stores `function_mode` on each run (`full`, `prediction_only`, `subgroup_only`, `labels_only`), but **`api/jobs/processor.py` does not branch on it**. Every processed run executes EDA → models → clustering regardless of the UI selection. Mention this if a judge asks about partial pipelines — it is on the roadmap, not shipped.
+The AI Analysis UI stores `function_mode` on each run (`full`, `prediction_only`, `subgroup_only`, `labels_only`). **`api/jobs/processor.py` now branches on it** — e.g. labels-only skips ML/clustering and applies MetS labels; prediction-only skips clustering. For booth demos, still prefer the pre-seeded run `bbbbbbbb-…` over a live partial run.
 
 ---
 

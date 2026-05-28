@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import * as apiDatasets from "@/lib/api/datasets";
+import { ensureDatasetInSupabase } from "@/lib/dataset-catalog";
 import { processRun } from "@/lib/api/runs";
 import { USE_MOCK } from "@/lib/api/client";
 import { ProjectSaveBar } from "@/components/project-save-bar";
@@ -652,6 +653,13 @@ function AiAnalysisPage() {
     () => [...projects].sort((a, b) => (a.modifiedAt < b.modifiedAt ? 1 : -1)),
     [projects],
   );
+  const datasetsInAnyProject = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of projects) {
+      for (const d of p.datasets) ids.add(d);
+    }
+    return ids;
+  }, [projects]);
   const [saving, setSaving] = useState(false);
   const draftRestoredFor = useRef<string | null>(null);
   const skipAutoMapOnce = useRef(false);
@@ -683,7 +691,34 @@ function AiAnalysisPage() {
         .sort((a, b) => a.name.localeCompare(b.name));
     },
   });
-  const selectedDataset = datasetsQ.data?.find((d) => d.id === selectedDatasetId) ?? null;
+
+  const visibleDatasets = useMemo(() => {
+    const all = datasetsQ.data ?? [];
+    if (projectId && project) {
+      const allowed = new Set(project.datasets);
+      return all.filter((d) => allowed.has(d.id));
+    }
+    return all.filter((d) => !datasetsInAnyProject.has(d.id));
+  }, [datasetsQ.data, projectId, project, datasetsInAnyProject]);
+
+  useEffect(() => {
+    if (!projectId || !project) return;
+    if (project.datasets.length === 0) {
+      setSelectedDatasetId(null);
+      return;
+    }
+    setSelectedDatasetId((current) =>
+      current && project.datasets.includes(current) ? current : project.datasets[0],
+    );
+  }, [projectId, project]);
+
+  useEffect(() => {
+    if (projectId) return;
+    if (selectedDatasetId && datasetsInAnyProject.has(selectedDatasetId)) {
+      setSelectedDatasetId(null);
+    }
+  }, [projectId, selectedDatasetId, datasetsInAnyProject]);
+  const selectedDataset = visibleDatasets.find((d) => d.id === selectedDatasetId) ?? null;
 
   const previewQ = useQuery({
     queryKey: ["datasets", "preview", selectedDatasetId],
@@ -731,7 +766,22 @@ function AiAnalysisPage() {
 
   const runMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedDatasetId) throw new Error("Select a dataset first.");
+      if (!projectId) throw new Error("Select a project in the header first.");
+      if (!selectedDatasetId) throw new Error("Select a dataset from the linked project.");
+      if (project && !project.datasets.includes(selectedDatasetId)) {
+        throw new Error("That dataset is not part of the selected project.");
+      }
+      const datasetMeta = selectedDataset ?? {
+        id: selectedDatasetId,
+        name: selectedDatasetId,
+        row_count: null,
+      };
+      await ensureDatasetInSupabase({
+        id: datasetMeta.id,
+        name: datasetMeta.name,
+        row_count: datasetMeta.row_count,
+        status: "ready",
+      });
       const payload = {
         dataset_id: selectedDatasetId,
         name: runName,
@@ -1021,17 +1071,38 @@ function AiAnalysisPage() {
         >
           <div className="space-y-6 pt-4">
             <p className="text-[14px] text-ink-2 leading-relaxed">
-              Link a dataset and confirm how its columns map to MetS clinical and dietary fields.
+              Choose a project above, then confirm how its cohort columns map to MetS clinical and
+              dietary fields.
+              {!projectId && (
+                <span className="block mt-1 text-[13px] text-ink-3">
+                  Or pick an unassigned dataset if you are not using a project yet.
+                </span>
+              )}
             </p>
 
-            {/* Dataset selector */}
+            {/* Dataset selector — scoped to project datasets when a project is linked */}
             <div className="max-w-md">
+              {!projectId && (
+                <p className="mb-2 text-[12px] text-ink-3">
+                  Link a project in the header for analysis on the full cohort.
+                </p>
+              )}
+              {projectId && project && project.datasets.length === 0 && (
+                <p className="mb-2 text-[12px] text-ink-3">
+                  This project has no datasets yet — add files on the Datasets page first.
+                </p>
+              )}
               <DatasetSelector
-                datasets={datasetsQ.data ?? []}
+                datasets={visibleDatasets}
                 isLoading={datasetsQ.isLoading}
                 error={datasetsQ.error as Error | null}
                 value={selectedDatasetId}
                 onChange={setSelectedDatasetId}
+                emptyLabel={
+                  projectId
+                    ? "No datasets in this project"
+                    : "No unassigned datasets available"
+                }
               />
               {selectedDatasetId && previewQ.isLoading && (
                 <p className="mt-2 text-[12px] text-ink-3 flex items-center gap-2">
@@ -1898,12 +1969,14 @@ function DatasetSelector({
   error,
   value,
   onChange,
+  emptyLabel = "No ready datasets",
 }: {
   datasets: { id: string; name: string; row_count: number | null }[];
   isLoading: boolean;
   error: Error | null;
   value: string | null;
   onChange: (id: string) => void;
+  emptyLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = datasets.find((d) => d.id === value) ?? null;
@@ -1914,7 +1987,7 @@ function DatasetSelector({
       : selected
         ? selected.name
         : datasets.length === 0
-          ? "No ready datasets"
+          ? emptyLabel
           : "Select a dataset";
   return (
     <div className="relative">

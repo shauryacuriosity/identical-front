@@ -238,8 +238,20 @@ export function createProject(seed?: Partial<Project>): string {
 
   void api
     .create(seed)
-    .then(() => {
+    .then((realId) => {
+      const temp = projects.find((p) => p.id === tempId);
       __cacheRemove(tempId);
+      if (temp) {
+        const server = projects.find((p) => p.id === realId);
+        __cacheUpsert({ ...(server ?? temp), ...temp, id: realId });
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("lotus:project-id-remapped", {
+            detail: { from: tempId, to: realId },
+          }),
+        );
+      }
     })
     .catch((err) => {
       __cacheRemove(tempId);

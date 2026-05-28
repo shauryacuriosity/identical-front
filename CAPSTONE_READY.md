@@ -4,7 +4,7 @@
 
 | | URL |
 |---|-----|
-| **App** | https://identical-front.vercel.app |
+| **App** | https://lotusapp.org (also https://identical-front.vercel.app) |
 | **API** | https://vivacious-wisdom-production.up.railway.app |
 | **API health** | https://vivacious-wisdom-production.up.railway.app/health |
 

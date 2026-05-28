@@ -15,7 +15,7 @@ import { User, X } from "lucide-react";
 import { toast } from "sonner";
 import { FilePlusIcon, ShapesIcon, CodesandboxIcon } from "@/components/brand-icons";
 import * as React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
 import { LotusMarkActive } from "@/components/lotus-mark-active";
@@ -120,7 +120,13 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 type SettingsSection = "general" | "security" | "linked" | "team";
-type ProfileState = { name: string; email: string; institution: string; country: string };
+type ProfileState = {
+  name: string;
+  email: string;
+  institution: string;
+  country: string;
+  avatarUrl: string;
+};
 
 function AppHeader() {
   const { pathname } = useLocation();
@@ -322,10 +328,69 @@ function SettingsDialog({
 }) {
   const [draft, setDraft] = useState(profile);
   const [saving, setSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) setDraft(profile);
   }, [open, profile]);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be 2 MB or smaller");
+      return;
+    }
+    setSaving(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Not signed in");
+      setSaving(false);
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${user.id}/avatar.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true, contentType: file.type });
+
+    let avatarUrl = "";
+    if (uploadError) {
+      if (file.size <= 180_000) {
+        avatarUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result ?? ""));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      } else {
+        toast.error("Avatar upload failed", {
+          description:
+            uploadError.message +
+            " — create a public avatars bucket in Supabase Storage, or use a smaller image.",
+        });
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+      avatarUrl = urlData.publicUrl;
+    }
+
+    const { error } = await supabase.auth.updateUser({ data: { avatar_url: avatarUrl } });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setDraft((prev) => ({ ...prev, avatarUrl }));
+    toast.success("Profile photo updated");
+  };
 
   const handleSaveProfile = async () => {
     const trimmed: ProfileState = {
@@ -398,6 +463,20 @@ function SettingsDialog({
               email={displayEmail}
               institution={draft.institution}
               country={draft.country}
+              avatarUrl={draft.avatarUrl}
+              onAvatarClick={() => avatarInputRef.current?.click()}
+              uploading={saving}
+            />
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleAvatarUpload(file);
+                e.target.value = "";
+              }}
             />
 
             <div className="h-px bg-hairline mx-8 shrink-0" />
@@ -525,17 +604,42 @@ function SettingsProfileHeader({
   email,
   institution,
   country,
+  avatarUrl,
+  onAvatarClick,
+  uploading,
 }: {
   name: string;
   email: string;
   institution: string;
   country: string;
+  avatarUrl?: string;
+  onAvatarClick?: () => void;
+  uploading?: boolean;
 }) {
   return (
     <div className="px-8 pt-8 pb-6 flex items-start gap-5 shrink-0">
-      <div className="h-[72px] w-[72px] rounded-full bg-coral/35 flex items-center justify-center text-[20px] font-bold text-white/90 shrink-0">
-        {profileInitials(name)}
-      </div>
+      <button
+        type="button"
+        onClick={onAvatarClick}
+        disabled={!onAvatarClick || uploading}
+        className="relative h-[72px] w-[72px] rounded-full shrink-0 group disabled:opacity-60"
+        aria-label="Change profile photo"
+      >
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            className="h-[72px] w-[72px] rounded-full object-cover border border-hairline"
+          />
+        ) : (
+          <div className="h-[72px] w-[72px] rounded-full bg-coral/35 flex items-center justify-center text-[20px] font-bold text-white/90">
+            {profileInitials(name)}
+          </div>
+        )}
+        <span className="absolute inset-0 rounded-full bg-black/45 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+          {uploading ? "…" : "Edit"}
+        </span>
+      </button>
       <div className="flex-1 pt-1 min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0 text-[17px] text-ink">
           <span className="font-bold">{name}</span>
@@ -571,9 +675,15 @@ function SettingsPlaceholder({ title, description }: { title: string; descriptio
 
 function SecuritySection() {
   const [enrolling, setEnrolling] = useState(false);
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [verifyCode, setVerifyCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   const handleEnrollMfa = async () => {
     setEnrolling(true);
+    setQrCode(null);
+    setFactorId(null);
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: "totp",
       friendlyName: "Authenticator app",
@@ -586,10 +696,41 @@ function SecuritySection() {
     }
 
     if (data?.totp?.qr_code) {
-      toast.info("TOTP enrollment started — scan the QR code in your authenticator app.");
+      setFactorId(data.id);
+      setQrCode(data.totp.qr_code);
+      toast.info("Scan the QR code, then enter the 6-digit code below.");
     } else {
-      toast.success("Authenticator enrollment initiated.");
+      toast.error(
+        "No QR code returned — enable TOTP under Supabase Dashboard → Authentication → MFA.",
+      );
     }
+  };
+
+  const handleVerifyMfa = async () => {
+    if (!factorId || !verifyCode.trim()) return;
+    setVerifying(true);
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
+      factorId,
+    });
+    if (challengeError) {
+      setVerifying(false);
+      toast.error(challengeError.message);
+      return;
+    }
+    const { error: verifyError } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challenge.id,
+      code: verifyCode.trim(),
+    });
+    setVerifying(false);
+    if (verifyError) {
+      toast.error(verifyError.message);
+      return;
+    }
+    toast.success("Authenticator app enabled");
+    setQrCode(null);
+    setVerifyCode("");
+    setFactorId(null);
   };
 
   return (
@@ -609,9 +750,36 @@ function SecuritySection() {
       >
         {enrolling ? "Starting enrollment…" : "Set up authenticator app"}
       </button>
+      {qrCode && (
+        <div className="space-y-3 rounded-xl border border-hairline bg-surface-hover/40 p-4">
+          <p className="text-[13px] text-ink-2">
+            Scan this QR code with Google Authenticator, 1Password, or similar:
+          </p>
+          <img
+            src={qrCode}
+            alt="Authenticator QR code"
+            className="w-44 h-44 rounded-lg border border-hairline bg-white p-2"
+          />
+          <input
+            value={verifyCode}
+            onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            inputMode="numeric"
+            placeholder="6-digit code"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={() => void handleVerifyMfa()}
+            disabled={verifying || verifyCode.length !== 6}
+            className="h-9 px-5 rounded-lg border border-hairline bg-surface text-[13px] font-semibold text-ink hover:border-coral/40 disabled:opacity-50"
+          >
+            {verifying ? "Verifying…" : "Verify and enable"}
+          </button>
+        </div>
+      )}
       <p className="text-[12px] text-ink-3 leading-relaxed">
-        Password changes are handled via the reset link on the sign-in page. MFA requires TOTP to be
-        enabled in the Supabase project (configured by your team admin).
+        Password changes use the reset link on the sign-in page. MFA requires TOTP to be enabled in
+        the Supabase project (Dashboard → Authentication → Multi-Factor).
       </p>
     </div>
   );
