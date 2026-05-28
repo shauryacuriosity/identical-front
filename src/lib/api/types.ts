@@ -10,8 +10,8 @@ import type { Attr, Row } from "@/lib/dataset-import";
 
 /** What `GET /datasets` returns per item. */
 export type DatasetSummary = {
-  id: string;          // stable backend ID; in mock mode = slot name
-  name: string;        // display name / slot name
+  id: string; // stable backend ID; in mock mode = slot name
+  name: string; // display name / slot name
   rowCount: number | null;
   uploadedAt: string | null;
   status?: "ready" | "processing" | "error" | null;

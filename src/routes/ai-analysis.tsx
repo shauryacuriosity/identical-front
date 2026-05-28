@@ -205,9 +205,7 @@ function ConfidencePill({ row }: { row: MappingSuggestion }) {
     );
   }
   if (kind === "manual") {
-    return (
-      <span className={`${base} border-hairline text-ink-2 bg-surface-hover`}>manual</span>
-    );
+    return <span className={`${base} border-hairline text-ink-2 bg-surface-hover`}>manual</span>;
   }
   const score = row.score!.toFixed(2);
   if (kind === "auto") {
@@ -293,13 +291,25 @@ function AnalysisTypePicker({
               <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
             </span>
             <div className="min-w-0 pr-14 sm:pr-16">
-              <div className={"text-[15px] font-semibold tracking-tight " + (active ? "text-ink" : "text-ink")}>
+              <div
+                className={
+                  "text-[15px] font-semibold tracking-tight " + (active ? "text-ink" : "text-ink")
+                }
+              >
                 {opt.title}
               </div>
-              <div className={"text-[12px] font-medium mt-0.5 " + (active ? "text-coral-deep" : "text-ink-2")}>
+              <div
+                className={
+                  "text-[12px] font-medium mt-0.5 " + (active ? "text-coral-deep" : "text-ink-2")
+                }
+              >
                 {opt.subtitle}
               </div>
-              <p className={"text-[12px] leading-snug mt-2 " + (active ? "text-ink-2" : "text-ink-3")}>
+              <p
+                className={
+                  "text-[12px] leading-snug mt-2 " + (active ? "text-ink-2" : "text-ink-3")
+                }
+              >
                 {opt.detail}
               </p>
             </div>
@@ -344,15 +354,22 @@ function AnalysisPageHeader({
       >
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-semibold mb-1">Workbench</p>
-            <h1 className="text-[26px] sm:text-[30px] font-bold text-ink tracking-tight leading-none">AI Analysis</h1>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-semibold mb-1">
+              Workbench
+            </p>
+            <h1 className="text-[26px] sm:text-[30px] font-bold text-ink tracking-tight leading-none">
+              AI Analysis
+            </h1>
             <p className="text-[14px] text-ink-2 mt-2 max-w-xl leading-relaxed">
               Configure a MetS run on your cohort — map fields, filter participants, then launch.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto lg:min-w-[min(100%,420px)]">
             <div className="flex-1 min-w-0">
-              <label htmlFor="ai-project" className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5">
+              <label
+                htmlFor="ai-project"
+                className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5"
+              >
                 Project
               </label>
               <div className="relative">
@@ -373,7 +390,10 @@ function AnalysisPageHeader({
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <label htmlFor="run-name" className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5">
+              <label
+                htmlFor="run-name"
+                className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5"
+              >
                 Run name
               </label>
               <input
@@ -394,7 +414,9 @@ function AnalysisPageHeader({
       </div>
 
       <div className="px-5 sm:px-6 py-5 bg-canvas/30">
-        <h2 className="text-[15px] font-semibold text-ink tracking-tight">What do you want from this run?</h2>
+        <h2 className="text-[15px] font-semibold text-ink tracking-tight">
+          What do you want from this run?
+        </h2>
         <p className="text-[13px] text-ink-2 mt-1 mb-4">The steps below adjust to your choice.</p>
         <AnalysisTypePicker value={fnMode} onChange={onFnModeChange} />
         <p className="mt-4 flex items-start gap-2 text-[12px] text-ink-3 leading-relaxed">
@@ -467,7 +489,9 @@ function StepIndicator({
                 >
                   {s.label}
                   {isSkipped && (
-                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">n/a</span>
+                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-ink-3">
+                      n/a
+                    </span>
                   )}
                 </span>
               </div>
@@ -510,7 +534,9 @@ function MappingRow({
           }`}
         >
           {row.column ?? "—"}
-          <ChevronDown className={`h-3 w-3 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-3 w-3 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`}
+          />
         </button>
         {open && (
           <div className="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-lg border border-hairline bg-surface shadow-[var(--shadow-md)] p-1">
@@ -695,9 +721,12 @@ function AiAnalysisPage() {
 
   // Map UI fnMode -> canonical function_mode enum
   const fnModeEnum = (m: FnMode): "full" | "prediction_only" | "subgroup_only" | "labels_only" =>
-    m === "full" ? "full"
-      : m === "predict" ? "prediction_only"
-        : m === "discover" ? "subgroup_only"
+    m === "full"
+      ? "full"
+      : m === "predict"
+        ? "prediction_only"
+        : m === "discover"
+          ? "subgroup_only"
           : "labels_only";
 
   const runMutation = useMutation({
@@ -715,12 +744,9 @@ function AiAnalysisPage() {
           require_complete: requireComplete,
         },
         method_config: {
-          prediction:
-            showPredict && predictOn ? { model: predictModel } : null,
+          prediction: showPredict && predictOn ? { model: predictModel } : null,
           subgroup:
-            showSubgroup && subgroupOn
-              ? { algorithm: clusterAlg, k: 4, projection: dimRed }
-              : null,
+            showSubgroup && subgroupOn ? { algorithm: clusterAlg, k: 4, projection: dimRed } : null,
         },
         status: "pending",
       };
@@ -749,7 +775,7 @@ function AiAnalysisPage() {
     !MOCK_API_FORCED &&
     !!selectedDatasetId &&
     !runMutation.isPending &&
-    (methodSkipped || (predictOn || subgroupOn));
+    (methodSkipped || predictOn || subgroupOn);
 
   const startRun = () => {
     if (MOCK_API_FORCED || !selectedDatasetId || runMutation.isPending) return;
@@ -772,13 +798,7 @@ function AiAnalysisPage() {
     }
     labelsRunTriggered.current = true;
     runMutation.mutate();
-  }, [
-    currentStep,
-    methodSkipped,
-    selectedDatasetId,
-    runMutation.isPending,
-    runMutation.isSuccess,
-  ]);
+  }, [currentStep, methodSkipped, selectedDatasetId, runMutation.isPending, runMutation.isSuccess]);
 
   useEffect(() => {
     if (currentStep !== "run") {
@@ -983,7 +1003,12 @@ function AiAnalysisPage() {
         />
       </div>
 
-      <StepIndicator current={currentStep} completed={completed} running={runSubmitting} skipped={skipped} />
+      <StepIndicator
+        current={currentStep}
+        completed={completed}
+        running={runSubmitting}
+        skipped={skipped}
+      />
 
       <div className="mt-6 flex flex-col gap-4">
         {/* STEP 1 — Map */}
@@ -1016,7 +1041,8 @@ function AiAnalysisPage() {
               )}
               {selectedDatasetId && !previewQ.isLoading && previewQ.data && (
                 <p className="mt-2 text-[12px] text-ink-3">
-                  Mapped from {previewQ.data.columns.length} columns · scores reflect name + value checks
+                  Mapped from {previewQ.data.columns.length} columns · scores reflect name + value
+                  checks
                 </p>
               )}
             </div>
@@ -1029,7 +1055,10 @@ function AiAnalysisPage() {
               <Info className="h-4 w-4 text-coral mt-0.5 shrink-0" strokeWidth={1.75} />
               <p className="text-[12.5px] text-ink leading-snug">
                 <span className="font-medium">Preview only</span>
-                <span className="text-ink-2"> — column mappings are not yet applied to the ML run.</span>
+                <span className="text-ink-2">
+                  {" "}
+                  — column mappings are not yet applied to the ML run.
+                </span>
               </p>
             </div>
 
@@ -1040,15 +1069,21 @@ function AiAnalysisPage() {
                   MetS Clinical Criteria
                 </h3>
                 {fnMode === "predict" && metsLabelCol && (
-                  <span className="text-[11px] text-ink-3 italic">optional · used for verification</span>
+                  <span className="text-[11px] text-ink-3 italic">
+                    optional · used for verification
+                  </span>
                 )}
                 {fnMode === "discover" && (
-                  <span className="text-[11px] text-ink-3 italic">optional · clustering doesn't need a label</span>
+                  <span className="text-[11px] text-ink-3 italic">
+                    optional · clustering doesn't need a label
+                  </span>
                 )}
               </div>
               <div
                 className={`rounded-xl border border-hairline bg-canvas/40 px-4 ${
-                  fnMode === "discover" || (fnMode === "predict" && metsLabelCol) ? "opacity-70" : ""
+                  fnMode === "discover" || (fnMode === "predict" && metsLabelCol)
+                    ? "opacity-70"
+                    : ""
                 }`}
               >
                 {fnMode === "predict" && (
@@ -1062,9 +1097,7 @@ function AiAnalysisPage() {
                     <ArrowRight className="hidden sm:block h-3.5 w-3.5 text-ink-3" />
                     <div>
                       <button
-                        onClick={() =>
-                          setMetsLabelCol((c) => (c ? null : "mets_label"))
-                        }
+                        onClick={() => setMetsLabelCol((c) => (c ? null : "mets_label"))}
                         className={`mono inline-flex items-center gap-1.5 min-h-11 h-11 sm:min-h-0 sm:h-7 px-3 sm:px-2 rounded-md text-[12px] border transition-colors w-full sm:w-auto ${
                           metsLabelCol
                             ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
@@ -1072,7 +1105,9 @@ function AiAnalysisPage() {
                         }`}
                       >
                         {metsLabelCol ?? "Select column"}
-                        <ChevronDown className={`h-3 w-3 text-ink-2 transition-transform ${metsLabelCol ? "rotate-180" : ""}`} />
+                        <ChevronDown
+                          className={`h-3 w-3 text-ink-2 transition-transform ${metsLabelCol ? "rotate-180" : ""}`}
+                        />
                       </button>
                     </div>
                     <span />
@@ -1120,7 +1155,12 @@ function AiAnalysisPage() {
                     onClick={() =>
                       setDietary((rows) => [
                         ...rows,
-                        { field: "New field", target: `new_${Date.now()}_${rows.length}`, column: null, score: null },
+                        {
+                          field: "New field",
+                          target: `new_${Date.now()}_${rows.length}`,
+                          column: null,
+                          score: null,
+                        },
                       ])
                     }
                     className="w-full py-2.5 flex items-center gap-2 text-[12.5px] text-ink-2 hover:text-coral transition-colors border-t border-hairline/60"
@@ -1138,8 +1178,8 @@ function AiAnalysisPage() {
                 MetS labels are computed using NCEP ATP III criteria (5-component rule: waist,
                 triglycerides, HDL, blood pressure, fasting glucose; ≥3 abnormal). The model
                 predicts MetS from diet and demographics only — clinical lab values are used to{" "}
-                <em className="text-ink">label</em>, not to{" "}
-                <em className="text-ink">predict</em>. This is the eAsia framing.
+                <em className="text-ink">label</em>, not to <em className="text-ink">predict</em>.
+                This is the eAsia framing.
               </p>
             </div>
 
@@ -1152,7 +1192,9 @@ function AiAnalysisPage() {
                 Continue to Cohort →
               </button>
               {!selectedDatasetId && (
-                <span className="text-[12px] text-ink-3">Select a dataset to auto-map columns.</span>
+                <span className="text-[12px] text-ink-3">
+                  Select a dataset to auto-map columns.
+                </span>
               )}
             </div>
           </div>
@@ -1210,7 +1252,9 @@ function AiAnalysisPage() {
 
               {/* Sex */}
               <div className="space-y-2">
-                <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">Sex</label>
+                <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                  Sex
+                </label>
                 <div className="flex gap-1.5">
                   {(["All", "Female", "Male"] as const).map((s) => (
                     <button
@@ -1245,17 +1289,29 @@ function AiAnalysisPage() {
 
             {/* Cohort preview */}
             <aside className="rounded-xl border border-hairline bg-canvas/40 p-5 h-fit">
-              <div className="text-[11px] uppercase tracking-[0.12em] text-ink-3 font-medium">Cohort preview</div>
-              <div className="mt-3 text-[26px] text-ink tabular leading-tight" style={{ letterSpacing: "-0.02em" }}>
-                {cohort.included.toLocaleString()}
-                <span className="text-[14px] text-ink-3 font-sans"> of {totalRows.toLocaleString()} rows</span>
+              <div className="text-[11px] uppercase tracking-[0.12em] text-ink-3 font-medium">
+                Cohort preview
               </div>
-              <div className="text-[12.5px] text-ink-2 tabular">{cohort.pct.toFixed(1)}% of dataset</div>
+              <div
+                className="mt-3 text-[26px] text-ink tabular leading-tight"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {cohort.included.toLocaleString()}
+                <span className="text-[14px] text-ink-3 font-sans">
+                  {" "}
+                  of {totalRows.toLocaleString()} rows
+                </span>
+              </div>
+              <div className="text-[12.5px] text-ink-2 tabular">
+                {cohort.pct.toFixed(1)}% of dataset
+              </div>
 
               <div className="mt-5">
                 <div className="flex items-baseline justify-between mb-1.5">
                   <span className="text-[12px] text-ink-2">Estimated MetS prevalence</span>
-                  <span className="text-[12.5px] text-ink font-medium tabular">{cohort.prevalence.toFixed(1)}%</span>
+                  <span className="text-[12.5px] text-ink font-medium tabular">
+                    {cohort.prevalence.toFixed(1)}%
+                  </span>
                 </div>
                 <div className="h-2 rounded-full overflow-hidden flex bg-hairline">
                   <div
@@ -1270,7 +1326,12 @@ function AiAnalysisPage() {
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-[11px] text-ink-3">
                   <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)" }} />
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{
+                        backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)",
+                      }}
+                    />
                     No MetS
                   </span>
                   <span className="flex items-center gap-1.5">
@@ -1309,10 +1370,13 @@ function AiAnalysisPage() {
               <div className="flex items-start gap-3 rounded-xl border border-hairline/80 bg-canvas/50 px-4 py-3">
                 <p className="text-[13px] text-ink-2 leading-relaxed flex-1">
                   Choose which analyses to include. Tap{" "}
-                  <Info className="inline h-3.5 w-3.5 text-coral-deep align-[-2px]" aria-hidden /> on each
-                  option for a clinician-oriented explanation.
+                  <Info className="inline h-3.5 w-3.5 text-coral-deep align-[-2px]" aria-hidden />{" "}
+                  on each option for a clinician-oriented explanation.
                 </p>
-                <ClinicalInfoButton info={METHOD_CLINICAL_INFO.selectMethod} ariaLabel="About selecting methods" />
+                <ClinicalInfoButton
+                  info={METHOD_CLINICAL_INFO.selectMethod}
+                  ariaLabel="About selecting methods"
+                />
               </div>
 
               {/* SECTION A — Prediction */}
@@ -1389,7 +1453,10 @@ function AiAnalysisPage() {
                 >
                   <div className="space-y-5">
                     <div>
-                      <SectionLabel label="Clustering algorithm" info={METHOD_CLINICAL_INFO.kmeans} />
+                      <SectionLabel
+                        label="Clustering algorithm"
+                        info={METHOD_CLINICAL_INFO.kmeans}
+                      />
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={clusterAlg === "kmeans"}
@@ -1418,7 +1485,10 @@ function AiAnalysisPage() {
                     </div>
 
                     <div>
-                      <SectionLabel label="Visualisation projection" info={METHOD_CLINICAL_INFO.pca} />
+                      <SectionLabel
+                        label="Visualisation projection"
+                        info={METHOD_CLINICAL_INFO.pca}
+                      />
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={dimRed === "pca"}
@@ -1507,7 +1577,6 @@ function AiAnalysisPage() {
           </StepShell>
         )}
 
-
         {/* STEP 4 — Run (brief state before redirect to /runs/:id) */}
         {(currentStep === "run" || completed.has("run")) && (
           <section className="rounded-2xl border border-hairline bg-surface p-6">
@@ -1523,7 +1592,10 @@ function AiAnalysisPage() {
                   )}
                 </span>
                 <div>
-                  <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+                  <h2
+                    className="text-[15px] font-medium text-ink"
+                    style={{ letterSpacing: "-0.01em" }}
+                  >
                     {runMutation.isError
                       ? "Could not start run"
                       : runMutation.isPending
@@ -1584,8 +1656,7 @@ function AiAnalysisPage() {
       <ProjectSaveBar
         summary={
           <>
-            <span className="text-ink-3">Draft:</span>{" "}
-            <span className="text-ink">{runName}</span>
+            <span className="text-ink-3">Draft:</span> <span className="text-ink">{runName}</span>
             <span className="mx-2 text-ink-3">·</span>
             <span className="text-ink-3">Step</span>{" "}
             <span className="font-mono text-ink">{currentStep}</span>
@@ -1637,13 +1708,7 @@ function ToggleRow({
   );
 }
 
-function ClinicalInfoButton({
-  info,
-  ariaLabel,
-}: {
-  info: ClinicalInfo;
-  ariaLabel?: string;
-}) {
+function ClinicalInfoButton({ info, ariaLabel }: { info: ClinicalInfo; ariaLabel?: string }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -1663,20 +1728,28 @@ function ClinicalInfoButton({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="px-4 py-3 border-b border-hairline bg-canvas/40">
-          <p className="text-[10px] uppercase tracking-[0.12em] text-coral-deep font-semibold">For clinicians</p>
+          <p className="text-[10px] uppercase tracking-[0.12em] text-coral-deep font-semibold">
+            For clinicians
+          </p>
           <h4 className="text-[14px] font-semibold text-ink mt-0.5 leading-snug">{info.title}</h4>
         </div>
         <div className="px-4 py-3 space-y-3 max-h-[min(70vh,320px)] overflow-y-auto">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">What it is</p>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">
+              What it is
+            </p>
             <p className="text-[13px] text-ink-2 leading-relaxed mt-1">{info.what}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">Why run it</p>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">
+              Why run it
+            </p>
             <p className="text-[13px] text-ink-2 leading-relaxed mt-1">{info.why}</p>
           </div>
           {info.note && (
-            <p className="text-[11.5px] text-ink-3 leading-relaxed pt-2 border-t border-hairline">{info.note}</p>
+            <p className="text-[11.5px] text-ink-3 leading-relaxed pt-2 border-t border-hairline">
+              {info.note}
+            </p>
           )}
         </div>
       </PopoverContent>
@@ -1852,7 +1925,9 @@ function DatasetSelector({
         className="w-full min-h-11 h-11 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px] disabled:opacity-60"
       >
         <span className={`mono ${selected ? "text-ink" : "text-ink-3"}`}>{label}</span>
-        <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
       {open && !isLoading && !error && datasets.length > 0 && (
         <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-hairline bg-surface shadow-[var(--shadow-md)] p-1">
@@ -1876,12 +1951,7 @@ function DatasetSelector({
           ))}
         </div>
       )}
-      {error && (
-        <p className="mt-1 text-[12px] text-ink-3">Failed to load — {error.message}</p>
-      )}
+      {error && <p className="mt-1 text-[12px] text-ink-3">Failed to load — {error.message}</p>}
     </div>
   );
 }
-
-
-

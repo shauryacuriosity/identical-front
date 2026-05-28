@@ -15,8 +15,8 @@ export function setAuthTokenGetter(fn: () => string | null | Promise<string | nu
 type RequestOpts = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   query?: Record<string, string | number | boolean | undefined>;
-  body?: unknown;       // JSON-serialized
-  formData?: FormData;  // multipart; overrides body
+  body?: unknown; // JSON-serialized
+  formData?: FormData; // multipart; overrides body
   signal?: AbortSignal;
 };
 
@@ -68,12 +68,18 @@ export async function apiFetch<T>(path: string, opts: RequestOpts = {}): Promise
 
   if (!res.ok) {
     const message =
-      (payload && typeof payload === "object" && "message" in payload && String((payload as { message: unknown }).message)) ||
+      (payload &&
+        typeof payload === "object" &&
+        "message" in payload &&
+        String((payload as { message: unknown }).message)) ||
       (typeof payload === "string" && payload) ||
       res.statusText ||
       "Request failed";
     const code =
-      (payload && typeof payload === "object" && "code" in payload && String((payload as { code: unknown }).code)) ||
+      (payload &&
+        typeof payload === "object" &&
+        "code" in payload &&
+        String((payload as { code: unknown }).code)) ||
       `HTTP_${res.status}`;
     throw new ApiError(res.status, code, message);
   }

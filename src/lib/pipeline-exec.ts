@@ -48,7 +48,8 @@ function joinRows(
 ): Row[] {
   if (kind === "Cross Join") {
     const out: Row[] = [];
-    for (const l of left) for (const r of right) out.push({ ...l, ...prefixCollisions(l, r, rightPrefix) });
+    for (const l of left)
+      for (const r of right) out.push({ ...l, ...prefixCollisions(l, r, rightPrefix) });
     return out;
   }
   const index = new Map<string, Row[]>();
@@ -233,7 +234,9 @@ export function runPipeline(
   let columns = allColumns;
   if (selectedCols && selectedCols.length) {
     const filtered = allColumns.filter((c) => selectedCols.includes(c));
-    const extras = allColumns.filter((c) => !selectedCols.includes(c) && /_(sum|mean|median|count|minmax)$/.test(c));
+    const extras = allColumns.filter(
+      (c) => !selectedCols.includes(c) && /_(sum|mean|median|count|minmax)$/.test(c),
+    );
     columns = [...filtered, ...extras];
     if (columns.length === 0) columns = allColumns;
   }

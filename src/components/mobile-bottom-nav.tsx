@@ -3,9 +3,24 @@ import { Home, FilePlus, Shapes, Codesandbox } from "lucide-react";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
-  { to: "/datasets", label: "Datasets", icon: FilePlus, match: (p: string) => p.startsWith("/datasets") },
-  { to: "/visualisation", label: "Charts", icon: Shapes, match: (p: string) => p.startsWith("/visualisation") },
-  { to: "/ai-analysis", label: "AI", icon: Codesandbox, match: (p: string) => p.startsWith("/ai-analysis") },
+  {
+    to: "/datasets",
+    label: "Datasets",
+    icon: FilePlus,
+    match: (p: string) => p.startsWith("/datasets"),
+  },
+  {
+    to: "/visualisation",
+    label: "Charts",
+    icon: Shapes,
+    match: (p: string) => p.startsWith("/visualisation"),
+  },
+  {
+    to: "/ai-analysis",
+    label: "AI",
+    icon: Codesandbox,
+    match: (p: string) => p.startsWith("/ai-analysis"),
+  },
 ] as const;
 
 export function MobileBottomNav() {

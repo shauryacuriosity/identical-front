@@ -46,6 +46,9 @@ export type ProjectWorkPatch = {
   analysisDraft?: AnalysisDraft | null;
 };
 
-export async function saveProjectWork(projectId: string, patch: ProjectWorkPatch): Promise<Project> {
+export async function saveProjectWork(
+  projectId: string,
+  patch: ProjectWorkPatch,
+): Promise<Project> {
   return api.patchProject(projectId, patch);
 }

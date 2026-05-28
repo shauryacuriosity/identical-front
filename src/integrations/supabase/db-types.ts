@@ -142,4 +142,3 @@ export interface Database {
     CompositeTypes: { [k: string]: never };
   };
 }
-

@@ -1,10 +1,7 @@
 import { apiFetch, USE_MOCK } from "./client";
 import type { DatasetSummary, DatasetSchema, DatasetPreview } from "./types";
 import { parseDatasetFile } from "@/lib/dataset-import";
-import {
-  registerDatasetTable,
-  getDatasetTables,
-} from "@/lib/dataset-tables";
+import { registerDatasetTable, getDatasetTables } from "@/lib/dataset-tables";
 
 // --- Mock-mode schema registry --------------------------------------------
 // In real mode, the backend owns schemas. In mock mode we keep a tiny
@@ -28,7 +25,13 @@ export async function list(): Promise<DatasetSummary[]> {
       const meta = mockMeta.get(name);
       const tables = getDatasetTables();
       const rc = tables[name]?.length ?? meta?.rowCount ?? null;
-      return { id: name, name, rowCount: rc, uploadedAt: meta?.uploadedAt ?? null, status: "ready" };
+      return {
+        id: name,
+        name,
+        rowCount: rc,
+        uploadedAt: meta?.uploadedAt ?? null,
+        status: "ready",
+      };
     });
   }
   return apiFetch<DatasetSummary[]>("/datasets");
@@ -74,7 +77,9 @@ export async function preview(id: string, limit = 200): Promise<DatasetPreview> 
       truncated,
     };
   }
-  return apiFetch<DatasetPreview>(`/datasets/${encodeURIComponent(id)}/preview`, { query: { limit } });
+  return apiFetch<DatasetPreview>(`/datasets/${encodeURIComponent(id)}/preview`, {
+    query: { limit },
+  });
 }
 
 export async function remove(id: string): Promise<void> {

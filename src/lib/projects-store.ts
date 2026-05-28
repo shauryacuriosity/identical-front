@@ -175,7 +175,9 @@ export function __mockCreateProject(seed?: Partial<Project>): string {
   return id;
 }
 export function __mockRenameProject(id: string, name: string) {
-  commit(projects.map((p) => (p.id === id ? { ...p, name, modifiedAt: new Date().toISOString() } : p)));
+  commit(
+    projects.map((p) => (p.id === id ? { ...p, name, modifiedAt: new Date().toISOString() } : p)),
+  );
 }
 export function __mockSetProjectDatasets(id: string, datasets: string[]) {
   commit(
@@ -202,9 +204,7 @@ export function __mockSetProjectPipeline(
 }
 export function __mockSetProjectCharts(id: string, charts: ChartConfig[]) {
   commit(
-    projects.map((p) =>
-      p.id === id ? { ...p, charts, modifiedAt: new Date().toISOString() } : p,
-    ),
+    projects.map((p) => (p.id === id ? { ...p, charts, modifiedAt: new Date().toISOString() } : p)),
   );
 }
 export function __mockRemoveProject(id: string) {

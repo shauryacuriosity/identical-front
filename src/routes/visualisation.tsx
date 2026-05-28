@@ -33,10 +33,7 @@ import {
 } from "lucide-react";
 import { ChartContainer } from "@/components/ui/chart";
 import { ProjectSaveBar } from "@/components/project-save-bar";
-import {
-  useProjects,
-  formatRelative,
-} from "@/lib/projects-store";
+import { useProjects, formatRelative } from "@/lib/projects-store";
 import { saveProjectWork, type ChartDraft } from "@/lib/project-work";
 import * as api from "@/lib/api";
 import { useDatasetTables } from "@/lib/dataset-tables";
@@ -62,7 +59,15 @@ export const Route = createFileRoute("/visualisation")({
 // Lucide doesn't export "Histogram" / "Scatter3D"; build small SVG icons inline.
 function HistIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
       <line x1="3" y1="21" x2="21" y2="21" />
       <rect x="4" y="14" width="3" height="7" />
       <rect x="8.5" y="9" width="3" height="12" />
@@ -89,7 +94,12 @@ const CHART_TYPES: { value: ChartType; label: string; Icon: React.ElementType; d
   { value: "line", label: "Line", Icon: LineIcon, desc: "Trend over an ordered axis" },
   { value: "area", label: "Area", Icon: AreaIcon, desc: "Cumulative trend or share" },
   { value: "scatter", label: "Scatter", Icon: ScatterIcon, desc: "Two numeric variables" },
-  { value: "histogram", label: "Histogram", Icon: HistIcon, desc: "Distribution of a numeric column" },
+  {
+    value: "histogram",
+    label: "Histogram",
+    Icon: HistIcon,
+    desc: "Distribution of a numeric column",
+  },
   { value: "box", label: "Box plot", Icon: Box, desc: "Spread by category" },
   { value: "heatmap", label: "Heatmap", Icon: Grid3x3, desc: "Correlation across numeric columns" },
   { value: "kpi", label: "Summary KPI", Icon: Hash, desc: "One aggregated number" },
@@ -167,7 +177,11 @@ function VisualisationPage() {
 
   // Dataset registry signature — invalidates the query when tables change.
   const tablesSig = useMemo(
-    () => Object.keys(tables).sort().map((k) => `${k}:${tables[k]?.length ?? 0}`).join("|"),
+    () =>
+      Object.keys(tables)
+        .sort()
+        .map((k) => `${k}:${tables[k]?.length ?? 0}`)
+        .join("|"),
     [tables],
   );
 
@@ -237,7 +251,8 @@ function VisualisationPage() {
     cs: string[],
   ): boolean => {
     if (!cs.length) return true;
-    const yIsNum = y !== "__count__" && cs.includes(y) && isNumericColumn(rs, y) && !isIdColumn(rs, y);
+    const yIsNum =
+      y !== "__count__" && cs.includes(y) && isNumericColumn(rs, y) && !isIdColumn(rs, y);
     const yIsCountOrNum = y === "__count__" || yIsNum;
     const xPresent = cs.includes(x);
     const xIsNonIdNum = xPresent && isNumericColumn(rs, x) && !isIdColumn(rs, x);
@@ -464,7 +479,11 @@ function VisualisationPage() {
           </div>
           <Link
             to="/datasets"
-            search={projectId ? { projectId, focusName: undefined } : { projectId: undefined, focusName: undefined }}
+            search={
+              projectId
+                ? { projectId, focusName: undefined }
+                : { projectId: undefined, focusName: undefined }
+            }
             className="text-[12.5px] text-ink-2 hover:text-coral transition-colors"
           >
             Open in Datasets
@@ -482,9 +501,13 @@ function VisualisationPage() {
       {/* Three-column body */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 min-w-0">
         {/* LEFT RAIL */}
-        <aside className={`flex flex-col gap-6 order-2 lg:order-none ${builderDisabled ? "opacity-60 pointer-events-none" : ""}`}>
+        <aside
+          className={`flex flex-col gap-6 order-2 lg:order-none ${builderDisabled ? "opacity-60 pointer-events-none" : ""}`}
+        >
           <section>
-            <div className="text-[11px] uppercase tracking-[0.08em] text-ink-3 mb-2">Chart type</div>
+            <div className="text-[11px] uppercase tracking-[0.08em] text-ink-3 mb-2">
+              Chart type
+            </div>
             <div className="flex flex-col gap-1.5">
               {CHART_TYPES.map(({ value, label, Icon, desc }) => {
                 const active = chartType === value;
@@ -500,7 +523,11 @@ function VisualisationPage() {
                   >
                     <Icon className={`h-4 w-4 ${active ? "text-coral" : "text-ink-2"}`} />
                     <div className="min-w-0">
-                      <div className={`text-[13px] ${active ? "text-coral font-medium" : "text-ink"}`}>{label}</div>
+                      <div
+                        className={`text-[13px] ${active ? "text-coral font-medium" : "text-ink"}`}
+                      >
+                        {label}
+                      </div>
                       <div className="text-[11px] text-ink-3 leading-tight">{desc}</div>
                     </div>
                   </button>
@@ -555,7 +582,9 @@ function VisualisationPage() {
                     min={2}
                     max={60}
                     value={bins}
-                    onChange={(e) => setBins(Math.max(2, Math.min(60, Number(e.target.value) || 2)))}
+                    onChange={(e) =>
+                      setBins(Math.max(2, Math.min(60, Number(e.target.value) || 2)))
+                    }
                     className="w-full h-8 px-2.5 text-[12.5px] rounded-md border border-hairline bg-surface text-ink focus:outline-none focus:border-coral"
                   />
                 </div>
@@ -575,7 +604,8 @@ function VisualisationPage() {
               )}
               {chartType === "heatmap" && (
                 <div className="text-[12px] text-ink-3">
-                  Computes pairwise correlation across all currently-selected numeric columns ({numCols.length}).
+                  Computes pairwise correlation across all currently-selected numeric columns (
+                  {numCols.length}).
                 </div>
               )}
             </div>
@@ -636,10 +666,7 @@ function VisualisationPage() {
                   <div className="h-1.5 w-32 rounded-full bg-coral/30 animate-pulse" />
                 </div>
               ) : pipelineError ? (
-                <EmptyState
-                  title="Couldn't load pipeline"
-                  body={pipelineError.message}
-                />
+                <EmptyState title="Couldn't load pipeline" body={pipelineError.message} />
               ) : columns.length === 0 ? (
                 <EmptyState
                   title="No columns to chart"
@@ -649,11 +676,15 @@ function VisualisationPage() {
                 <ChartCanvas config={config} built={built} />
               )}
             </div>
-            {built.error && project && columns.length > 0 && !isPipelineLoading && !pipelineError && (
-              <div className="mx-5 mb-5 rounded-lg border border-coral/30 bg-coral-tint px-3 py-2 text-[12.5px] text-coral">
-                {built.error}
-              </div>
-            )}
+            {built.error &&
+              project &&
+              columns.length > 0 &&
+              !isPipelineLoading &&
+              !pipelineError && (
+                <div className="mx-5 mb-5 rounded-lg border border-coral/30 bg-coral-tint px-3 py-2 text-[12.5px] text-coral">
+                  {built.error}
+                </div>
+              )}
           </section>
 
           {/* SAVED CHARTS */}
@@ -751,10 +782,12 @@ function ChartCanvas({
     return (
       <div className="h-full min-h-[380px] flex flex-col items-center justify-center">
         <div className="text-[12px] uppercase tracking-[0.08em] text-ink-3 mb-2">
-          {(config.agg ?? "avg")}({config.y})
+          {config.agg ?? "avg"}({config.y})
         </div>
         <div className="text-[64px] tabular text-coral leading-none">
-          {built.kpiValue === null || built.kpiValue === undefined ? "—" : built.kpiValue.toLocaleString()}
+          {built.kpiValue === null || built.kpiValue === undefined
+            ? "—"
+            : built.kpiValue.toLocaleString()}
         </div>
       </div>
     );
@@ -806,7 +839,14 @@ function CartesianChart({
           <Tooltip />
           {built.yKeys.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
           {built.yKeys.map((k, i) => (
-            <Line key={k} type="monotone" dataKey={k} stroke={PALETTE[i % PALETTE.length]} dot={false} strokeWidth={2} />
+            <Line
+              key={k}
+              type="monotone"
+              dataKey={k}
+              stroke={PALETTE[i % PALETTE.length]}
+              dot={false}
+              strokeWidth={2}
+            />
           ))}
         </LineChart>
       </ChartContainer>
@@ -839,7 +879,10 @@ function CartesianChart({
   }
   if (config.chartType === "histogram") {
     return (
-      <ChartContainer config={{ count: { label: "count", color: PALETTE[0] } }} className="h-[420px] w-full">
+      <ChartContainer
+        config={{ count: { label: "count", color: PALETTE[0] } }}
+        className="h-[420px] w-full"
+      >
         <BarChart {...common}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
           <XAxis dataKey="bin" tick={{ fontSize: 11 }} />
@@ -953,7 +996,12 @@ function Heatmap({ built }: { built: ReturnType<typeof buildChartData> }) {
                   <td
                     key={c}
                     className="border border-surface text-center"
-                    style={{ background: cell(v), color: Math.abs(v) > 0.6 ? "white" : "var(--ink)", minWidth: 44, padding: 4 }}
+                    style={{
+                      background: cell(v),
+                      color: Math.abs(v) > 0.6 ? "white" : "var(--ink)",
+                      minWidth: 44,
+                      padding: 4,
+                    }}
                     title={`${row.__row} × ${c}: ${v.toFixed(2)}`}
                   >
                     {v.toFixed(2)}
@@ -986,11 +1034,7 @@ function SavedChartCard({
   const built = useMemo(() => buildChartData(rows, columns, config), [rows, columns, config]);
   return (
     <div className="group relative shrink-0 w-[180px] rounded-lg border border-hairline bg-surface hover:border-coral/40 transition-colors">
-      <button
-        onClick={onClick}
-        className="w-full text-left p-2"
-        title="Load into builder"
-      >
+      <button onClick={onClick} className="w-full text-left p-2" title="Load into builder">
         <div className="h-20 w-full bg-canvas/60 rounded overflow-hidden flex items-center justify-center">
           <ThumbChart config={config} built={built} />
         </div>
@@ -1023,7 +1067,9 @@ function ThumbChart({
   if (config.chartType === "kpi") {
     return (
       <div className="text-[18px] tabular text-coral">
-        {built.kpiValue === null || built.kpiValue === undefined ? "—" : built.kpiValue.toLocaleString()}
+        {built.kpiValue === null || built.kpiValue === undefined
+          ? "—"
+          : built.kpiValue.toLocaleString()}
       </div>
     );
   }
@@ -1038,7 +1084,13 @@ function ThumbChart({
         {Chart === BarChart ? (
           <Bar dataKey={built.yKeys[0]} fill={PALETTE[0]} />
         ) : (
-          <Line type="monotone" dataKey={built.yKeys[0]} stroke={PALETTE[0]} dot={false} strokeWidth={1.5} />
+          <Line
+            type="monotone"
+            dataKey={built.yKeys[0]}
+            stroke={PALETTE[0]}
+            dot={false}
+            strokeWidth={1.5}
+          />
         )}
       </Chart>
     </ChartContainer>

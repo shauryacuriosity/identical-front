@@ -1,7 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AuthLayout, inputClass, primaryButtonClass, primaryButtonStyle } from "@/components/auth/auth-layout";
+import {
+  AuthLayout,
+  inputClass,
+  primaryButtonClass,
+  primaryButtonStyle,
+} from "@/components/auth/auth-layout";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/forgot-password")({
@@ -16,7 +21,8 @@ function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
+    const redirectTo =
+      typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
     setSubmitting(false);
 
@@ -41,8 +47,8 @@ function ForgotPasswordPage() {
     >
       {sent ? (
         <p className="text-[14px] text-ink-2 leading-relaxed">
-          If an account exists for <span className="font-semibold text-ink">{email}</span>, check your inbox for
-          reset instructions.
+          If an account exists for <span className="font-semibold text-ink">{email}</span>, check
+          your inbox for reset instructions.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

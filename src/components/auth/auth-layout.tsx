@@ -34,7 +34,9 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
           style={{ boxShadow: "var(--shadow-depth)" }}
         >
           <h1 className="text-[20px] font-bold text-ink tracking-tight">{title}</h1>
-          {subtitle ? <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{subtitle}</p>
+          ) : null}
           <div className="mt-6">{children}</div>
         </div>
 

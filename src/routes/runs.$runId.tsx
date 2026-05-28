@@ -13,6 +13,24 @@ import {
   parseRunProgress,
 } from "@/lib/run-status";
 
+function RunErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="mx-auto max-w-[1280px] px-6 pt-10 flex flex-col gap-3">
+      <p className="text-[14px] text-ink-2">{error.message}</p>
+      <button
+        onClick={() => {
+          router.invalidate();
+          reset();
+        }}
+        className="text-coral underline w-fit text-[13px]"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/runs/$runId")({
   component: RunPage,
   notFoundComponent: () => (
@@ -20,23 +38,7 @@ export const Route = createFileRoute("/runs/$runId")({
       <p className="text-[14px] text-ink-2">Run not found.</p>
     </div>
   ),
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="mx-auto max-w-[1280px] px-6 pt-10 flex flex-col gap-3">
-        <p className="text-[14px] text-ink-2">{error.message}</p>
-        <button
-          onClick={() => {
-            router.invalidate();
-            reset();
-          }}
-          className="text-coral underline w-fit text-[13px]"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  },
+  errorComponent: RunErrorComponent,
 });
 
 // ---------- Helpers ----------
@@ -62,14 +64,20 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
 function PanelHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div>
-      <h2 className="text-[18px] text-ink leading-tight" style={{ letterSpacing: "-0.015em" }}>{title}</h2>
+      <h2 className="text-[18px] text-ink leading-tight" style={{ letterSpacing: "-0.015em" }}>
+        {title}
+      </h2>
       {subtitle && <p className="text-[12.5px] text-ink-3 mt-0.5">{subtitle}</p>}
     </div>
   );
 }
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <div className="text-[10.5px] uppercase tracking-[0.14em] text-ink-3 font-medium">{children}</div>;
+  return (
+    <div className="text-[10.5px] uppercase tracking-[0.14em] text-ink-3 font-medium">
+      {children}
+    </div>
+  );
 }
 
 // ---------- Types ----------
@@ -196,7 +204,10 @@ function StatusPill({ status }: { status: string }) {
   const map: Record<string, { bg: string; fg: string }> = {
     pending: { bg: "var(--surface-hover)", fg: "var(--ink-2)" },
     running: { bg: "var(--coral-tint)", fg: "var(--coral)" },
-    complete: { bg: "color-mix(in oklab, var(--data-sage) 18%, transparent)", fg: "color-mix(in oklab, var(--data-sage) 60%, var(--ink))" },
+    complete: {
+      bg: "color-mix(in oklab, var(--data-sage) 18%, transparent)",
+      fg: "color-mix(in oklab, var(--data-sage) 60%, var(--ink))",
+    },
     failed: { bg: "var(--coral-tint)", fg: "var(--coral)" },
     error: { bg: "var(--coral-tint)", fg: "var(--coral)" },
     pending: { bg: "var(--surface-hover)", fg: "var(--ink-2)" },
@@ -232,7 +243,11 @@ function RunProgressCard({
 
   return (
     <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6 flex flex-col items-center text-center">
-      <CodesandboxIcon size={120} strokeWidth={2} className={failed ? "text-coral" : "text-highlight"} />
+      <CodesandboxIcon
+        size={120}
+        strokeWidth={2}
+        className={failed ? "text-coral" : "text-highlight"}
+      />
       <div className="mt-4">
         <PanelHeader
           title={failed ? "Run failed" : pending ? "Waiting to start" : "Running analysis…"}
@@ -252,7 +267,11 @@ function RunProgressCard({
           </div>
           <div className="mt-2 text-[12px] text-ink-3 tabular">
             {percent.toFixed(0)}%
-            {step ? <span className="ml-2 normal-case tracking-normal text-ink-2">· {step.replace(/_/g, " ")}</span> : null}
+            {step ? (
+              <span className="ml-2 normal-case tracking-normal text-ink-2">
+                · {step.replace(/_/g, " ")}
+              </span>
+            ) : null}
           </div>
         </div>
       )}
@@ -269,12 +288,11 @@ function RunProgressCard({
           {starting ? "Starting…" : failed ? "Retry analysis" : "Start analysis"}
         </button>
       )}
-      {startError && (
-        <p className="mt-2 text-[12px] text-coral max-w-md">{startError.message}</p>
-      )}
+      {startError && <p className="mt-2 text-[12px] text-coral max-w-md">{startError.message}</p>}
       {USE_MOCK && (
         <p className="mt-3 text-[12px] text-ink-3 max-w-md">
-          Set <span className="mono">VITE_API_BASE_URL</span> and run the API server to process analyses.
+          Set <span className="mono">VITE_API_BASE_URL</span> and run the API server to process
+          analyses.
         </p>
       )}
     </section>
@@ -338,15 +356,28 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
               <SkeletonBlock className="h-3 w-48" />
             </div>
           ) : edaQ.error ? (
-            <p className="mt-3 text-[12.5px] text-ink-3">Failed to load — {(edaQ.error as Error).message}</p>
+            <p className="mt-3 text-[12.5px] text-ink-3">
+              Failed to load — {(edaQ.error as Error).message}
+            </p>
           ) : (
             <>
-              <div className="mt-2 text-[28px] text-ink tabular leading-none" style={{ letterSpacing: "-0.02em" }}>
-                <span className="mono text-[26px]">{eda?.n != null ? eda.n.toLocaleString() : "—"}</span>{" "}
+              <div
+                className="mt-2 text-[28px] text-ink tabular leading-none"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                <span className="mono text-[26px]">
+                  {eda?.n != null ? eda.n.toLocaleString() : "—"}
+                </span>{" "}
                 <span className="text-[14px] text-ink-3 font-sans">rows</span>
               </div>
               <div className="mt-2 text-[13px] text-ink-2 tabular">
-                {pct(eda?.mets_prevalence) ? <><span className="mono">{pct(eda?.mets_prevalence)}</span> MetS prevalence</> : <Em />}
+                {pct(eda?.mets_prevalence) ? (
+                  <>
+                    <span className="mono">{pct(eda?.mets_prevalence)}</span> MetS prevalence
+                  </>
+                ) : (
+                  <Em />
+                )}
               </div>
               {eda?.mets_prevalence_by_sex && (
                 <div className="mt-1 text-[12.5px] text-ink-3 tabular flex flex-wrap gap-x-3 gap-y-1">
@@ -372,17 +403,28 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
               <SkeletonBlock className="h-3 w-48" />
             </div>
           ) : modelQ.error ? (
-            <p className="mt-3 text-[12.5px] text-ink-3">Failed to load — {(modelQ.error as Error).message}</p>
+            <p className="mt-3 text-[12.5px] text-ink-3">
+              Failed to load — {(modelQ.error as Error).message}
+            </p>
           ) : (
             <>
-              <div className="mt-2 text-[28px] tabular leading-none" style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}>
+              <div
+                className="mt-2 text-[28px] tabular leading-none"
+                style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}
+              >
                 <span className="text-[14px] text-ink-3 font-sans mr-2">Weighted AUC</span>
                 <span className="mono">{num(m?.weighted_auc) ?? "—"}</span>
               </div>
               <div className="mt-2 text-[13px] text-ink-2 tabular flex flex-wrap gap-x-3 gap-y-1">
-                <span>Precision <span className="mono text-ink">{num(m?.precision) ?? "—"}</span></span>
-                <span>Recall <span className="mono text-ink">{num(m?.recall) ?? "—"}</span></span>
-                <span>F1 <span className="mono text-ink">{num(m?.f1) ?? "—"}</span></span>
+                <span>
+                  Precision <span className="mono text-ink">{num(m?.precision) ?? "—"}</span>
+                </span>
+                <span>
+                  Recall <span className="mono text-ink">{num(m?.recall) ?? "—"}</span>
+                </span>
+                <span>
+                  F1 <span className="mono text-ink">{num(m?.f1) ?? "—"}</span>
+                </span>
               </div>
               <div className="mt-2 text-[11.5px] text-ink-3 italic">XGBoost · test-set only</div>
             </>
@@ -405,7 +447,8 @@ function ShapPanel({ runId }: { runId: string }) {
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
-      return ((data as { shap_top_features: ShapMap | null } | null)?.shap_top_features ?? null) as ShapMap | null;
+      return ((data as { shap_top_features: ShapMap | null } | null)?.shap_top_features ??
+        null) as ShapMap | null;
     },
   });
 
@@ -434,7 +477,10 @@ function ShapPanel({ runId }: { runId: string }) {
         ) : (
           <div className="space-y-2">
             {items.map(([feature, value]) => (
-              <div key={feature} className="grid grid-cols-[minmax(0,1fr)_1fr_auto] sm:grid-cols-[170px_1fr_56px] items-center gap-2 sm:gap-3">
+              <div
+                key={feature}
+                className="grid grid-cols-[minmax(0,1fr)_1fr_auto] sm:grid-cols-[170px_1fr_56px] items-center gap-2 sm:gap-3"
+              >
                 <span className="text-[12.5px] text-ink mono truncate">{feature}</span>
                 <div className="h-3 rounded-full bg-hairline overflow-hidden">
                   <div
@@ -474,13 +520,17 @@ function ClustersPanel({ runId }: { runId: string }) {
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
-      return ((data as { cluster_summaries: ClusterSummary[] | null } | null)?.cluster_summaries ?? null) as ClusterSummary[] | null;
+      return ((data as { cluster_summaries: ClusterSummary[] | null } | null)?.cluster_summaries ??
+        null) as ClusterSummary[] | null;
     },
   });
 
   return (
     <section className="rounded-2xl border border-hairline bg-surface p-6">
-      <PanelHeader title="Sub-population clusters" subtitle="Per-cluster profiles and MetS prevalence" />
+      <PanelHeader
+        title="Sub-population clusters"
+        subtitle="Per-cluster profiles and MetS prevalence"
+      />
       <div className="mt-4">
         {q.isLoading ? (
           <div className="grid grid-cols-2 gap-2">
@@ -503,7 +553,9 @@ function ClustersPanel({ runId }: { runId: string }) {
                 >
                   <div className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-                    <span className="text-[11px] text-ink-3 mono">cluster {c.cluster_id ?? idx}</span>
+                    <span className="text-[11px] text-ink-3 mono">
+                      cluster {c.cluster_id ?? idx}
+                    </span>
                   </div>
                   <div className="mt-1 text-[13px] text-ink font-medium leading-tight">
                     {c.label ?? `Cluster ${c.cluster_id ?? idx}`}
@@ -571,8 +623,7 @@ function PredictionsPanel({ runId }: { runId: string }) {
   const rows = q.data?.rows ?? [];
   const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
 
-  const labelCell = (v: boolean | null) =>
-    v == null ? <Em /> : v ? "✓" : "–";
+  const labelCell = (v: boolean | null) => (v == null ? <Em /> : v ? "✓" : "–");
 
   return (
     <section className="mt-4 rounded-2xl border border-hairline bg-surface p-6">
@@ -616,24 +667,44 @@ function PredictionsPanel({ runId }: { runId: string }) {
             {!q.isLoading &&
               !q.error &&
               rows.map((r) => (
-                <tr key={r.subject_id} className="border-b border-hairline/60 hover:bg-surface-hover/70 transition-colors">
-                  <td className="py-2.5 px-2 align-middle"><span className="mono">{r.subject_id}</span></td>
+                <tr
+                  key={r.subject_id}
+                  className="border-b border-hairline/60 hover:bg-surface-hover/70 transition-colors"
+                >
+                  <td className="py-2.5 px-2 align-middle">
+                    <span className="mono">{r.subject_id}</span>
+                  </td>
                   <td className="py-2.5 px-2 align-middle">
                     {r.predicted_prob != null ? (
                       <div className="flex items-center gap-2">
-                        <span className="mono tabular w-12">{(r.predicted_prob * 100).toFixed(1)}%</span>
+                        <span className="mono tabular w-12">
+                          {(r.predicted_prob * 100).toFixed(1)}%
+                        </span>
                         <div className="h-1 w-16 rounded-full bg-hairline overflow-hidden">
-                          <div className="h-full bg-coral" style={{ width: `${Math.max(0, Math.min(1, r.predicted_prob)) * 100}%` }} />
+                          <div
+                            className="h-full bg-coral"
+                            style={{
+                              width: `${Math.max(0, Math.min(1, r.predicted_prob)) * 100}%`,
+                            }}
+                          />
                         </div>
                       </div>
                     ) : (
                       <Em />
                     )}
                   </td>
-                  <td className="py-2.5 px-2 align-middle"><span className="mono">{labelCell(r.predicted_label)}</span></td>
-                  <td className="py-2.5 px-2 align-middle"><span className="mono">{labelCell(r.actual_label)}</span></td>
                   <td className="py-2.5 px-2 align-middle">
-                    {r.cluster_label != null ? <span className="mono">{r.cluster_label}</span> : <Em />}
+                    <span className="mono">{labelCell(r.predicted_label)}</span>
+                  </td>
+                  <td className="py-2.5 px-2 align-middle">
+                    <span className="mono">{labelCell(r.actual_label)}</span>
+                  </td>
+                  <td className="py-2.5 px-2 align-middle">
+                    {r.cluster_label != null ? (
+                      <span className="mono">{r.cluster_label}</span>
+                    ) : (
+                      <Em />
+                    )}
                   </td>
                 </tr>
               ))}

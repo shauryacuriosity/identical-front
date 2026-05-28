@@ -21,7 +21,13 @@ import lotusMark from "@/assets/logo_lotus.png";
 import { LotusMarkActive } from "@/components/lotus-mark-active";
 import { setProjectsQueryInvalidator } from "@/lib/projects-store";
 import { setAuthTokenGetter } from "@/lib/api/client";
-import { AuthProvider, useAuth, isPublicAuthPath, profileFromUser, getClientAuthSession } from "@/lib/auth";
+import {
+  AuthProvider,
+  useAuth,
+  isPublicAuthPath,
+  profileFromUser,
+  getClientAuthSession,
+} from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -34,6 +40,24 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/sonner";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+
+function RootErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="flex min-h-screen items-center justify-center flex-col gap-3">
+      <p>{error.message}</p>
+      <button
+        onClick={() => {
+          router.invalidate();
+          reset();
+        }}
+        className="text-coral underline"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   /** Avoid SSR rendering protected pages (e.g. Home) before client session is known. */
@@ -60,23 +84,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: () => (
-    <div className="flex min-h-screen items-center justify-center"><p>404</p></div>
+    <div className="flex min-h-screen items-center justify-center">
+      <p>404</p>
+    </div>
   ),
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="flex min-h-screen items-center justify-center flex-col gap-3">
-        <p>{error.message}</p>
-        <button onClick={() => { router.invalidate(); reset(); }} className="text-coral underline">Retry</button>
-      </div>
-    );
-  },
+  errorComponent: RootErrorComponent,
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
@@ -108,7 +129,9 @@ function AppHeader() {
   const profile = profileFromUser(user);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [activeSection, setActiveSection] = useState<"general" | "security" | "linked" | "team">("general");
+  const [activeSection, setActiveSection] = useState<"general" | "security" | "linked" | "team">(
+    "general",
+  );
 
   const openSettings = (section: SettingsSection = "general") => {
     setActiveSection(section);
@@ -339,7 +362,9 @@ function SettingsDialog({
             className="p-5 flex flex-col gap-1"
             style={{ background: "linear-gradient(180deg, #E8928E 0%, #C49090 55%, #A06B6B 100%)" }}
           >
-            <h2 className="px-3 py-3 mb-1 text-[17px] font-bold text-white tracking-tight">Edit Profile</h2>
+            <h2 className="px-3 py-3 mb-1 text-[17px] font-bold text-white tracking-tight">
+              Edit Profile
+            </h2>
             {SETTINGS_SECTIONS.map((s) => {
               const active = activeSection === s.id;
               return (
@@ -398,7 +423,11 @@ function SettingsDialog({
                     />
                   </Field>
                   <Field label="Institution">
-                    <input value={draft.institution} disabled className={inputClass + " bg-surface-hover/50 text-ink-2 cursor-not-allowed"} />
+                    <input
+                      value={draft.institution}
+                      disabled
+                      className={inputClass + " bg-surface-hover/50 text-ink-2 cursor-not-allowed"}
+                    />
                   </Field>
                   <Field label="Country">
                     <input
@@ -410,7 +439,11 @@ function SettingsDialog({
                   <div className="pt-4">
                     <h3 className="text-[13px] font-bold text-coral mb-3">Preferences</h3>
                     <PreferenceRow label="Dark mode" last>
-                      <Switch checked={darkMode} onCheckedChange={onDarkModeChange} className={switchClass} />
+                      <Switch
+                        checked={darkMode}
+                        onCheckedChange={onDarkModeChange}
+                        className={switchClass}
+                      />
                     </PreferenceRow>
                   </div>
                 </div>
@@ -440,7 +473,10 @@ function SettingsDialog({
                         <div className="min-w-0">
                           <p className="text-[14px] font-bold text-ink">{displayName}</p>
                           {displayEmail ? (
-                            <a href={`mailto:${displayEmail}`} className="text-[13px] text-[#0077FF] hover:underline truncate block">
+                            <a
+                              href={`mailto:${displayEmail}`}
+                              className="text-[13px] text-[#0077FF] hover:underline truncate block"
+                            >
                               {displayEmail}
                             </a>
                           ) : (
@@ -507,7 +543,10 @@ function SettingsProfileHeader({
           <span className="font-medium">Researcher</span>
         </div>
         {email ? (
-          <a href={`mailto:${email}`} className="block mt-1 text-[14px] text-[#0077FF] hover:underline truncate">
+          <a
+            href={`mailto:${email}`}
+            className="block mt-1 text-[14px] text-[#0077FF] hover:underline truncate"
+          >
             {email}
           </a>
         ) : (
@@ -571,8 +610,8 @@ function SecuritySection() {
         {enrolling ? "Starting enrollment…" : "Set up authenticator app"}
       </button>
       <p className="text-[12px] text-ink-3 leading-relaxed">
-        Password changes are handled via the reset link on the sign-in page. MFA requires TOTP to be enabled in the
-        Supabase project (configured by your team admin).
+        Password changes are handled via the reset link on the sign-in page. MFA requires TOTP to be
+        enabled in the Supabase project (configured by your team admin).
       </p>
     </div>
   );
@@ -647,9 +686,21 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function PreferenceRow({ label, children, last }: { label: string; children: React.ReactNode; last?: boolean }) {
+function PreferenceRow({
+  label,
+  children,
+  last,
+}: {
+  label: string;
+  children: React.ReactNode;
+  last?: boolean;
+}) {
   return (
-    <div className={"flex items-center justify-between gap-4 py-3 " + (last ? "" : "border-b border-hairline")}>
+    <div
+      className={
+        "flex items-center justify-between gap-4 py-3 " + (last ? "" : "border-b border-hairline")
+      }
+    >
       <span className="text-[14px] text-ink">{label}</span>
       {children}
     </div>

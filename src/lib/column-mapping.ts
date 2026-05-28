@@ -31,12 +31,28 @@ export const DIETARY_FIELDS: MappingField[] = [
 
 /** Known aliases per analysis target (NHANES + eAsia naming). */
 const TARGET_ALIASES: Record<string, string[]> = {
-  waist_circ: ["waist_circ", "waist", "waist_cm", "waist circumference", "bmxwaist", "wc", "abdominal circumference"],
+  waist_circ: [
+    "waist_circ",
+    "waist",
+    "waist_cm",
+    "waist circumference",
+    "bmxwaist",
+    "wc",
+    "abdominal circumference",
+  ],
   trig_mg_dl: ["trig_mg_dl", "trig", "triglycerides", "lbxtr", "tg", "serum_triglycerides"],
   hdl_chol: ["hdl_chol", "hdl", "hdl_mg_dl", "lbdhdd", "hdl cholesterol"],
   bp_sys: ["bp_sys", "systolic", "systolic bp", "sbp", "avg_sys", "mean_sbp", "bpxsy1", "bpsys"],
   bp_dia: ["bp_dia", "diastolic", "diastolic bp", "dbp", "avg_dia", "mean_dbp", "bpxdi1", "bpdia"],
-  glucose_fasting: ["glucose_fasting", "glu", "glucose", "lbxglu", "fpg", "fasting glucose", "fasting_glucose"],
+  glucose_fasting: [
+    "glucose_fasting",
+    "glu",
+    "glucose",
+    "lbxglu",
+    "fpg",
+    "fasting glucose",
+    "fasting_glucose",
+  ],
   age_years: ["age_years", "age", "ridageyr", "age years"],
   sex: ["sex", "riagendr", "gender", "biological sex"],
   diet_sodium_mg: ["diet_sodium_mg", "sodium", "dr1isodi", "sodium_mg", "na_mg"],
@@ -51,7 +67,11 @@ function compact(text: string): string {
 }
 
 function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(/\s+/).filter(Boolean);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
 }
 
 function fuzzyRatio(a: string, b: string): number {
@@ -242,7 +262,13 @@ export function autoMapAnalysisFields(
   rows: Row[],
 ): { clinical: MappingSuggestion[]; dietary: MappingSuggestion[] } {
   const clinicalResult = assignFields(CLINICAL_FIELDS, columns, rows, new Set(), 0.5);
-  const dietaryResult = assignFields(DIETARY_FIELDS, columns, rows, clinicalResult.usedColumns, 0.65);
+  const dietaryResult = assignFields(
+    DIETARY_FIELDS,
+    columns,
+    rows,
+    clinicalResult.usedColumns,
+    0.65,
+  );
   return {
     clinical: clinicalResult.mappings,
     dietary: dietaryResult.mappings,

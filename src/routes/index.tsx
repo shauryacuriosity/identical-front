@@ -137,7 +137,6 @@ function TypePill({ type, archived }: { type: FileType; archived?: boolean }) {
   );
 }
 
-
 function RowAction({
   icon: Icon,
   label,
@@ -295,8 +294,12 @@ function Index() {
         <div className="mb-10 sm:mb-14 flex items-start gap-4">
           <img src={lotusMark} alt="" className="h-10 sm:h-12 w-auto mt-1 shrink-0" />
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">Workbench</div>
-            <h1 className="text-[32px] sm:text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">Welcome back</h1>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">
+              Workbench
+            </div>
+            <h1 className="text-[32px] sm:text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">
+              Welcome back
+            </h1>
             <p className="text-[15px] text-ink-2 mt-3 max-w-[520px] leading-relaxed">
               Pick up where you left off, or start something new.
             </p>
@@ -338,9 +341,7 @@ function Index() {
         </div>
 
         {/* Unified table card — cards on phone, table from md */}
-        <div
-          className="rounded-2xl bg-surface border border-hairline overflow-hidden shadow-[var(--shadow-card)]"
-        >
+        <div className="rounded-2xl bg-surface border border-hairline overflow-hidden shadow-[var(--shadow-card)]">
           {/* Mobile list */}
           <div className="md:hidden divide-y divide-hairline">
             {isLoading &&
@@ -391,111 +392,120 @@ function Index() {
 
           {/* Desktop table */}
           <div className="hidden md:block overflow-x-auto">
-          <div className="grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
-            <span className="flex items-center justify-center">
-              {rows.length > 0 && (
-                <RowCheckbox
-                  checked={allChecked}
-                  indeterminate={someChecked}
-                  onChange={toggleAll}
-                  ariaLabel="Select all rows"
-                />
-              )}
-            </span>
-            <span>Name</span>
-            <span className="text-right tabular">Files</span>
-            <span className="text-right">MetS prevalence</span>
-            <span className="text-right">Modified</span>
-          </div>
-
-          <div>
-            {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
-
-            {!isLoading && error && (
-              <div className="hidden md:flex px-5 py-6 flex-wrap items-center justify-between gap-3">
-                <div className="text-[13px] text-ink-2">
-                  Couldn’t load projects — <span className="text-ink">{error.message}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleRetry}
-                  disabled={retrying}
-                  className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw
-                    className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
-                    strokeWidth={1.75}
+            <div className="grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
+              <span className="flex items-center justify-center">
+                {rows.length > 0 && (
+                  <RowCheckbox
+                    checked={allChecked}
+                    indeterminate={someChecked}
+                    onChange={toggleAll}
+                    ariaLabel="Select all rows"
                   />
-                  {retrying ? "Retrying…" : "Retry"}
-                </button>
-              </div>
-            )}
+                )}
+              </span>
+              <span>Name</span>
+              <span className="text-right tabular">Files</span>
+              <span className="text-right">MetS prevalence</span>
+              <span className="text-right">Modified</span>
+            </div>
 
-            {!isLoading && !error && rows.length === 0 && (
-              <div className="hidden md:block px-5 py-6 text-[13px] text-ink-2">No projects yet</div>
-            )}
+            <div>
+              {isLoading &&
+                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
 
-            {!isLoading &&
-              !error &&
-              rows.map((f, i) => {
-                const isSelected = selected.has(f.id);
-                const isLast = i === rows.length - 1;
-                return (
-                  <div
-                    key={f.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate({ to: "/datasets", search: { projectId: f.id } })}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        navigate({ to: "/datasets", search: { projectId: f.id } });
-                      }
-                    }}
-                    className={`group relative grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
-                      isLast ? "" : "border-b border-hairline"
-                    } ${f.archived ? "opacity-75" : ""}`}
-                  >
-                    <span className="flex items-center justify-center h-[14px] w-[14px]">
-                      <RowCheckbox
-                        checked={isSelected}
-                        onChange={() => toggleOne(f.id)}
-                        ariaLabel={`Select ${f.name}`}
-                      />
-                    </span>
-
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
-                      <span className="text-[13.5px] font-medium text-ink truncate">{f.name}</span>
-                    </div>
-
-                    <span className={`tabular text-[12.5px] text-right ${f.files === 0 ? "text-ink-3" : "text-ink-2"}`}>
-                      {f.files} file{f.files === 1 ? "" : "s"}
-                    </span>
-
-                    <span className="tabular text-[12.5px] text-ink-2 text-right">
-                      {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
-                    </span>
-
-                    <span className="text-[12.5px] text-ink-2 text-right">{f.modified || <Em />}</span>
-
-                    <div
-                      className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
-                      style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
-                    >
-                      <RowAction
-                        icon={SquareArrowOutUpRight}
-                        label="Open"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate({ to: "/datasets", search: { projectId: f.id } });
-                        }}
-                      />
-                    </div>
+              {!isLoading && error && (
+                <div className="hidden md:flex px-5 py-6 flex-wrap items-center justify-between gap-3">
+                  <div className="text-[13px] text-ink-2">
+                    Couldn’t load projects — <span className="text-ink">{error.message}</span>
                   </div>
-                );
-              })}
-          </div>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    disabled={retrying}
+                    className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
+                      strokeWidth={1.75}
+                    />
+                    {retrying ? "Retrying…" : "Retry"}
+                  </button>
+                </div>
+              )}
+
+              {!isLoading && !error && rows.length === 0 && (
+                <div className="hidden md:block px-5 py-6 text-[13px] text-ink-2">
+                  No projects yet
+                </div>
+              )}
+
+              {!isLoading &&
+                !error &&
+                rows.map((f, i) => {
+                  const isSelected = selected.has(f.id);
+                  const isLast = i === rows.length - 1;
+                  return (
+                    <div
+                      key={f.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate({ to: "/datasets", search: { projectId: f.id } })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          navigate({ to: "/datasets", search: { projectId: f.id } });
+                        }
+                      }}
+                      className={`group relative grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+                        isLast ? "" : "border-b border-hairline"
+                      } ${f.archived ? "opacity-75" : ""}`}
+                    >
+                      <span className="flex items-center justify-center h-[14px] w-[14px]">
+                        <RowCheckbox
+                          checked={isSelected}
+                          onChange={() => toggleOne(f.id)}
+                          ariaLabel={`Select ${f.name}`}
+                        />
+                      </span>
+
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
+                        <span className="text-[13.5px] font-medium text-ink truncate">
+                          {f.name}
+                        </span>
+                      </div>
+
+                      <span
+                        className={`tabular text-[12.5px] text-right ${f.files === 0 ? "text-ink-3" : "text-ink-2"}`}
+                      >
+                        {f.files} file{f.files === 1 ? "" : "s"}
+                      </span>
+
+                      <span className="tabular text-[12.5px] text-ink-2 text-right">
+                        {f.prevalence != null ? `${(f.prevalence * 100).toFixed(1)}%` : <Em />}
+                      </span>
+
+                      <span className="text-[12.5px] text-ink-2 text-right">
+                        {f.modified || <Em />}
+                      </span>
+
+                      <div
+                        className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 px-1 rounded-lg bg-surface border border-hairline-grey opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150"
+                        style={{ boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}
+                      >
+                        <RowAction
+                          icon={SquareArrowOutUpRight}
+                          label="Open"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate({ to: "/datasets", search: { projectId: f.id } });
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AuthLayout, inputClass, primaryButtonClass, primaryButtonStyle } from "@/components/auth/auth-layout";
+import {
+  AuthLayout,
+  inputClass,
+  primaryButtonClass,
+  primaryButtonStyle,
+} from "@/components/auth/auth-layout";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signup")({
@@ -37,7 +42,8 @@ function SignupPage() {
           institution: "UOW eAsia",
           country: "Australia",
         },
-        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
+        emailRedirectTo:
+          typeof window !== "undefined" ? `${window.location.origin}/login` : undefined,
       },
     });
     setSubmitting(false);
@@ -101,7 +107,10 @@ function SignupPage() {
           />
         </div>
         <div>
-          <label htmlFor="signup-password" className="block text-[13px] font-bold text-coral mb-1.5">
+          <label
+            htmlFor="signup-password"
+            className="block text-[13px] font-bold text-coral mb-1.5"
+          >
             Password
           </label>
           <input

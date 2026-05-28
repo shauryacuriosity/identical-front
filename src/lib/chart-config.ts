@@ -283,11 +283,7 @@ function pearson(xs: number[], ys: number[]): number {
   return num / den;
 }
 
-export function buildChartData(
-  rows: Row[],
-  columns: string[],
-  config: ChartConfig,
-): BuiltChart {
+export function buildChartData(rows: Row[], columns: string[], config: ChartConfig): BuiltChart {
   const empty: BuiltChart = { data: [], xKey: "", yKeys: [] };
   if (!rows.length || !columns.length) {
     return { ...empty, error: "No data — select attributes in Datasets first." };
@@ -299,10 +295,14 @@ export function buildChartData(
   if (chartType === "heatmap") {
     const nums = nonIdNumericColumns(rows, columns);
     if (nums.length < 2) {
-      return { ...empty, error: "Need at least two numeric non-ID columns for a correlation heatmap." };
+      return {
+        ...empty,
+        error: "Need at least two numeric non-ID columns for a correlation heatmap.",
+      };
     }
     const series: Record<string, number[]> = {};
-    for (const c of nums) series[c] = rows.map((r) => toNum(r[c])).filter((n): n is number => n !== null);
+    for (const c of nums)
+      series[c] = rows.map((r) => toNum(r[c])).filter((n): n is number => n !== null);
     const data: Array<Record<string, unknown>> = [];
     for (const yc of nums) {
       const row: Record<string, unknown> = { __row: yc };
@@ -316,7 +316,10 @@ export function buildChartData(
   if (chartType === "histogram") {
     if (!config.x) return { ...empty, error: "Pick an X axis column." };
     if (!isNumericColumn(rows, config.x))
-      return { ...empty, error: `"${config.x}" is not numeric — histograms need a numeric column.` };
+      return {
+        ...empty,
+        error: `"${config.x}" is not numeric — histograms need a numeric column.`,
+      };
     const vals = rows.map((r) => toNum(r[config.x!])).filter((n): n is number => n !== null);
     if (!vals.length) return { ...empty, error: "No numeric values to bin." };
     const bins = Math.max(2, Math.min(60, config.bins ?? 12));
@@ -349,7 +352,10 @@ export function buildChartData(
       return { ...empty, kpiValue: rows.length };
     }
     if (!isNumericColumn(rows, config.y))
-      return { ...empty, error: `"${config.y}" is not numeric — pick "count" or a numeric column.` };
+      return {
+        ...empty,
+        error: `"${config.y}" is not numeric — pick "count" or a numeric column.`,
+      };
     const vals = rows.map((r) => toNum(r[config.y!])).filter((n): n is number => n !== null);
     return { ...empty, kpiValue: vals.length ? round(aggregate(vals, agg)) : null };
   }
@@ -387,8 +393,7 @@ export function buildChartData(
 
   // -- SCATTER --
   if (chartType === "scatter") {
-    if (!config.x || !config.y)
-      return { ...empty, error: "Pick X and Y columns." };
+    if (!config.x || !config.y) return { ...empty, error: "Pick X and Y columns." };
     if (!isNumericColumn(rows, config.x) || !isNumericColumn(rows, config.y))
       return { ...empty, error: "Scatter requires numeric X and Y." };
     if (config.series) {

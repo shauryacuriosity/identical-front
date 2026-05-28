@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AuthLayout, inputClass, primaryButtonClass, primaryButtonStyle } from "@/components/auth/auth-layout";
+import {
+  AuthLayout,
+  inputClass,
+  primaryButtonClass,
+  primaryButtonStyle,
+} from "@/components/auth/auth-layout";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
@@ -77,7 +82,10 @@ function LoginPage() {
             <label htmlFor="login-password" className="text-[13px] font-bold text-coral">
               Password
             </label>
-            <Link to="/forgot-password" className="text-[12px] font-semibold text-ink-2 hover:text-coral">
+            <Link
+              to="/forgot-password"
+              className="text-[12px] font-semibold text-ink-2 hover:text-coral"
+            >
               Forgot password?
             </Link>
           </div>

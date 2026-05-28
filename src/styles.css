@@ -69,42 +69,42 @@
   --radius-pill: 9999px;
 
   /* Locked palette — canonical reference */
-  --bg-page:      #F2D0CF;
-  --bg-surface:   #FFF5F5;
-  --bg-emphasis:  #CAA8A7;
-  --bg-highlight: #FFFFFF;
+  --bg-page: #f2d0cf;
+  --bg-surface: #fff5f5;
+  --bg-emphasis: #caa8a7;
+  --bg-highlight: #ffffff;
 
-  --accent-primary:   #E8928E;
-  --accent-secondary: #0077FF;
-  --accent-highlight: #FFFFFF;
+  --accent-primary: #e8928e;
+  --accent-secondary: #0077ff;
+  --accent-highlight: #ffffff;
 
-  --text-primary:   #1A0003;
-  --text-muted:     #4A2828;
-  --text-tertiary:  #623838;
+  --text-primary: #1a0003;
+  --text-muted: #4a2828;
+  --text-tertiary: #623838;
 
-  --border-default: #7A4545;
-  --border-muted:   #9A6363;
+  --border-default: #7a4545;
+  --border-muted: #9a6363;
 
-  --status-success: #7AAB8A;
-  --status-warning: #9A9268;
-  --status-danger:  #C08880;
-  --status-info:    #7A9DC4;
+  --status-success: #7aab8a;
+  --status-warning: #9a9268;
+  --status-danger: #c08880;
+  --status-info: #7a9dc4;
 
   /* Elevation scale — use utilities (.shadow-card, .shadow-action, etc.) */
-  --shadow-xs:       0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-sm:       0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
-  --shadow-card:     0 1px 0 0 rgba(0, 0, 0, 0.04), 0 2px 8px -2px rgba(0, 0, 0, 0.12);
-  --shadow-action:   0 1px 0 rgba(0, 0, 0, 0.04), 0 12px 32px -14px rgba(0, 0, 0, 0.28);
-  --shadow-md:       0 4px 16px -4px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
-  --shadow-lg:       0 8px 24px -8px rgba(0, 0, 0, 0.16), 0 4px 8px -4px rgba(0, 0, 0, 0.06);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 0 0 rgba(0, 0, 0, 0.04), 0 2px 8px -2px rgba(0, 0, 0, 0.12);
+  --shadow-action: 0 1px 0 rgba(0, 0, 0, 0.04), 0 12px 32px -14px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.16), 0 4px 8px -4px rgba(0, 0, 0, 0.06);
   --shadow-elevated: var(--shadow-md);
-  --shadow-depth:    0 8px 24px -12px rgba(0, 0, 0, 0.22);
+  --shadow-depth: 0 8px 24px -12px rgba(0, 0, 0, 0.22);
 
   /* Chart series */
-  --data-sage:  #7aab8a;
+  --data-sage: #7aab8a;
   --data-ochre: #c79a5a;
   --data-slate: #7a9dc4;
-  --data-plum:  #8a5a6e;
+  --data-plum: #8a5a6e;
 
   /* Back-compat aliases */
   --canvas: var(--bg-page);
@@ -114,7 +114,7 @@
   --ink-2: var(--text-muted);
   --ink-3: var(--text-tertiary);
   --coral: var(--accent-primary);
-  --coral-ink: #9A3C38;
+  --coral-ink: #9a3c38;
   --coral-hover: var(--bg-emphasis);
   --coral-deep: #8b3d38;
   --coral-muted: var(--text-muted);
@@ -149,19 +149,19 @@
 }
 
 .dark {
-  --bg-page:      #140F0F;
-  --bg-surface:   #140405;
-  --bg-emphasis:  #0A0101;
-  --bg-highlight: #6E4A4A;
+  --bg-page: #140f0f;
+  --bg-surface: #140405;
+  --bg-emphasis: #0a0101;
+  --bg-highlight: #6e4a4a;
 
-  --text-primary: #FFFFFF;
-  --text-muted:   #E8B8B4;
-  --text-tertiary: #C99894;
+  --text-primary: #ffffff;
+  --text-muted: #e8b8b4;
+  --text-tertiary: #c99894;
 
   --border-default: #737373;
-  --border-muted:   #3D1718;
+  --border-muted: #3d1718;
 
-  --coral-ink: #F0A8A4;
+  --coral-ink: #f0a8a4;
 
   --canvas: var(--bg-page);
   --surface: var(--bg-surface);
@@ -188,14 +188,14 @@
   --border: var(--border-muted);
   --input: var(--border-muted);
 
-  --shadow-xs:       0 1px 2px 0 rgba(0, 0, 0, 0.35);
-  --shadow-sm:       0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
-  --shadow-card:     0 1px 0 0 rgba(0, 0, 0, 0.2), 0 2px 8px -2px rgba(0, 0, 0, 0.45);
-  --shadow-action:   0 1px 0 rgba(0, 0, 0, 0.15), 0 12px 32px -14px rgba(0, 0, 0, 0.55);
-  --shadow-md:       0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
-  --shadow-lg:       0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 0 0 rgba(0, 0, 0, 0.2), 0 2px 8px -2px rgba(0, 0, 0, 0.45);
+  --shadow-action: 0 1px 0 rgba(0, 0, 0, 0.15), 0 12px 32px -14px rgba(0, 0, 0, 0.55);
+  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
   --shadow-elevated: var(--shadow-md);
-  --shadow-depth:    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-depth: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 
   --shadow-drop-color: rgba(200, 200, 255, 0.25);
   --shadow-inner-color: rgba(200, 200, 255, 0.25);
@@ -210,7 +210,11 @@
   * {
     border-color: var(--color-border);
   }
-  html, body, #root { min-height: 100vh; }
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
   body {
     background-color: var(--bg-page);
     color: var(--ink);
@@ -220,18 +224,37 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-sans);
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--ink);
   }
-  h1 { font-size: 24px; line-height: 1.25; }
-  h2 { font-size: 20px; line-height: 1.3; }
-  h3 { font-size: 18px; line-height: 1.35; font-weight: 600; }
+  h1 {
+    font-size: 24px;
+    line-height: 1.25;
+  }
+  h2 {
+    font-size: 20px;
+    line-height: 1.3;
+  }
+  h3 {
+    font-size: 18px;
+    line-height: 1.35;
+    font-weight: 600;
+  }
 
-  .tabular { font-variant-numeric: tabular-nums; }
-  code, kbd, .mono { font-family: var(--font-sans); }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  code,
+  kbd,
+  .mono {
+    font-family: var(--font-sans);
+  }
 
   :focus:not(:focus-visible) {
     outline: none;

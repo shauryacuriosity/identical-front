@@ -4,7 +4,12 @@ export type AttrType = "id" | "num" | "cat";
 export type Attr = { name: string; type: AttrType };
 
 export type Row = Record<string, unknown>;
-export type ParsedDataset = { attrs: Attr[]; rowCount: number; rows: Row[]; rowsAvailable: boolean };
+export type ParsedDataset = {
+  attrs: Attr[];
+  rowCount: number;
+  rows: Row[];
+  rowsAvailable: boolean;
+};
 
 function inferType(name: string, samples: unknown[]): AttrType {
   const lower = name.toLowerCase();
@@ -23,7 +28,10 @@ function attrsFromRows(headers: string[], rows: Record<string, unknown>[]): Attr
   const sample = rows.slice(0, 200);
   return headers.map((h) => ({
     name: h,
-    type: inferType(h, sample.map((r) => r[h])),
+    type: inferType(
+      h,
+      sample.map((r) => r[h]),
+    ),
   }));
 }
 
@@ -59,14 +67,19 @@ async function parseJson(file: File): Promise<ParsedDataset> {
       for (const k of Object.keys(row)) headerSet.add(k);
     }
   }
-  return { attrs: attrsFromRows([...headerSet], rows), rowCount: rows.length, rows, rowsAvailable: true };
+  return {
+    attrs: attrsFromRows([...headerSet], rows),
+    rowCount: rows.length,
+    rows,
+    rowsAvailable: true,
+  };
 }
 
 /** Decode bytes as ASCII (XPORT uses EBCDIC-like trimmed ASCII for names). */
 function ascii(bytes: Uint8Array, start: number, len: number): string {
   let s = "";
   for (let i = 0; i < len; i++) s += String.fromCharCode(bytes[start + i] ?? 0);
-  return s.replace(/\u0000/g, " ").trimEnd();
+  return s.replaceAll("\0", " ").trimEnd();
 }
 
 /**

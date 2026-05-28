@@ -44,7 +44,10 @@ export function ShapesIcon({ size = 24, strokeWidth = 5, ...rest }: IconProps) {
       stroke="currentColor"
       {...rest}
     >
-      <path d="M38.0273 31.5488H7.37109L22.6992 4.99902L38.0273 31.5488Z" strokeWidth={strokeWidth} />
+      <path
+        d="M38.0273 31.5488H7.37109L22.6992 4.99902L38.0273 31.5488Z"
+        strokeWidth={strokeWidth}
+      />
       <rect x="30.7207" y="9.61182" width="26.7793" height="26.7793" strokeWidth={strokeWidth} />
       <circle cx="31.852" cy="41.8427" r="15.6596" strokeWidth={strokeWidth} />
     </svg>
