@@ -1072,7 +1072,7 @@ function ExportMenu({
       <button
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="h-9 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)] disabled:opacity-40 disabled:cursor-not-allowed"
+        className="min-h-11 h-11 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)] disabled:opacity-40 disabled:cursor-not-allowed"
       >
         <Download className="h-3.5 w-3.5" />Export
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -1621,18 +1621,18 @@ function DatasetsPage() {
             onChange={(e) => onFilesPicked(e.target.files)}
             className="hidden"
           />
-          <div className="flex gap-2.5 mb-2.5">
+          <div className="flex flex-col sm:flex-row gap-2.5 mb-2.5">
             <button
               onClick={addSlot}
               disabled={datasetSlots.includes("")}
-              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
+              className="flex-1 min-h-11 h-11 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-ink-2 disabled:hover:border-ink-2/50"
             >
               <Plus className="h-3.5 w-3.5" /> Add dataset
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
-              className="flex-1 h-10 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+              className="flex-1 min-h-11 h-11 rounded-lg border border-dashed border-ink-2/50 text-[12.5px] text-ink-2 hover:text-ink hover:border-ink transition flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
             >
               <Upload className="h-3.5 w-3.5" /> {importing ? "Importing…" : "Import file"}
             </button>
@@ -1662,7 +1662,7 @@ function DatasetsPage() {
           <Link
             to="/visualisation"
             search={{ projectId }}
-            className="h-9 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:text-coral hover:border-coral/35 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)]"
+            className="min-h-11 h-11 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:text-coral hover:border-coral/35 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)]"
           >
             Visualise
             <ArrowRight className="h-3.5 w-3.5" />

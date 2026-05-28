@@ -13,8 +13,7 @@ export function MobileBottomNav() {
 
   return (
     <nav
-      className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]"
-      style={{ boxShadow: "0 -4px 24px -8px rgba(0,0,0,0.12)" }}
+      className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline bg-surface/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.12)]"
       aria-label="Primary navigation"
     >
       <div className="grid grid-cols-4 h-14 max-w-lg mx-auto">

@@ -690,7 +690,7 @@ function AiAnalysisPage() {
                 const id = e.target.value || undefined;
                 navigate({ to: "/ai-analysis", search: { projectId: id } });
               }}
-              className="appearance-none h-9 pl-3 pr-8 text-[13px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral min-w-[220px]"
+              className="appearance-none min-h-11 h-11 pl-3 pr-8 text-[13px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral w-full sm:min-w-[220px]"
             >
               <option value="">No project linked</option>
               {sortedProjects.map((p) => (
@@ -834,20 +834,20 @@ function AiAnalysisPage() {
                 }`}
               >
                 {fnMode === "predict" && (
-                  <div className="grid grid-cols-[1fr_16px_1fr_auto] items-center gap-3 py-2.5 border-b border-hairline/60">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_16px_1fr_auto] items-start sm:items-center gap-2 sm:gap-3 py-3 sm:py-2.5 border-b border-hairline/60">
                     <span className="text-[13.5px] text-ink font-medium">
                       MetS label
                       <span className="ml-1.5 text-[11px] text-ink-3 font-normal">
                         (if already in your data)
                       </span>
                     </span>
-                    <ArrowRight className="h-3.5 w-3.5 text-ink-3" />
+                    <ArrowRight className="hidden sm:block h-3.5 w-3.5 text-ink-3" />
                     <div>
                       <button
                         onClick={() =>
                           setMetsLabelCol((c) => (c ? null : "mets_label"))
                         }
-                        className={`mono inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] border transition-colors ${
+                        className={`mono inline-flex items-center gap-1.5 min-h-11 h-11 sm:min-h-0 sm:h-7 px-3 sm:px-2 rounded-md text-[12px] border transition-colors w-full sm:w-auto ${
                           metsLabelCol
                             ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
                             : "border-dashed border-hairline text-ink-3 hover:text-ink"
@@ -929,7 +929,7 @@ function AiAnalysisPage() {
               <button
                 onClick={() => advanceFrom("map", "cohort")}
                 disabled={!selectedDatasetId || previewQ.isLoading}
-                className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continue to Cohort →
               </button>
@@ -966,7 +966,7 @@ function AiAnalysisPage() {
                     onChange={(e) => setAgeMin(Math.min(Number(e.target.value), ageMax - 1))}
                     className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50"
                   />
-                  <div className="flex-1 px-1">
+                  <div className="flex-1 px-1 py-3 sm:py-2 [&_[role=slider]]:h-5 [&_[role=slider]]:w-5 [&_[role=slider]]:border-2">
                     <Slider
                       min={0}
                       max={100}
@@ -998,7 +998,7 @@ function AiAnalysisPage() {
                     <button
                       key={s}
                       onClick={() => setSex(s)}
-                      className={`h-8 px-3 rounded-full text-[12.5px] border transition-colors ${
+                      className={`min-h-11 h-11 px-4 rounded-full text-[12.5px] border transition-colors ${
                         sex === s
                           ? "bg-coral text-white border-coral"
                           : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
@@ -1071,7 +1071,7 @@ function AiAnalysisPage() {
           <div className="flex justify-end mt-6">
             <button
               onClick={continueFromCohort}
-              className="h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
+              className="min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
             >
               {methodSkipped ? "Continue to Run →" : "Continue to Method →"}
             </button>
@@ -1398,7 +1398,7 @@ function ToggleRow({
   return (
     <button
       onClick={() => onChange(!on)}
-      className="w-full flex items-center justify-between rounded-lg border border-hairline bg-surface hover:bg-surface-hover px-3 h-10 text-left transition-colors"
+      className="w-full flex items-center justify-between rounded-lg border border-hairline bg-surface hover:bg-surface-hover px-3 min-h-11 h-11 text-left transition-colors"
     >
       <span className="text-[13px] text-ink">{label}</span>
       <span
@@ -1552,7 +1552,7 @@ function DatasetSelector({
         type="button"
         onClick={() => setOpen((o) => !o)}
         disabled={isLoading || !!error || datasets.length === 0}
-        className="w-full h-10 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px] disabled:opacity-60"
+        className="w-full min-h-11 h-11 px-3 rounded-lg border border-hairline bg-surface-hover flex items-center justify-between text-[13px] disabled:opacity-60"
       >
         <span className={`mono ${selected ? "text-ink" : "text-ink-3"}`}>{label}</span>
         <ChevronDown className={`h-4 w-4 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`} />

@@ -64,6 +64,9 @@
 
 :root {
   --radius: 0.875rem;
+  --radius-card: var(--radius-2xl);
+  --radius-control: var(--radius-lg);
+  --radius-pill: 9999px;
 
   /* Locked palette — canonical reference */
   --bg-page:      #F2D0CF;
@@ -75,20 +78,27 @@
   --accent-secondary: #0077FF;
   --accent-highlight: #FFFFFF;
 
-  --text-primary: #1A0003;
-  --text-muted:   #5c3838;
-  --text-tertiary: #7a4f4f;
+  --text-primary:   #1A0003;
+  --text-muted:     #4A2828;
+  --text-tertiary:  #623838;
 
-  --border-default: #A06B6B;
-  --border-muted:   #C49090;
+  --border-default: #7A4545;
+  --border-muted:   #9A6363;
 
   --status-success: #7AAB8A;
   --status-warning: #9A9268;
   --status-danger:  #C08880;
   --status-info:    #7A9DC4;
 
-  --shadow-card:     0 2px 4px rgba(0, 0, 0, 0.25);
-  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.25);
+  /* Elevation scale — use utilities (.shadow-card, .shadow-action, etc.) */
+  --shadow-xs:       0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm:       0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-card:     0 1px 0 0 rgba(0, 0, 0, 0.04), 0 2px 8px -2px rgba(0, 0, 0, 0.12);
+  --shadow-action:   0 1px 0 rgba(0, 0, 0, 0.04), 0 12px 32px -14px rgba(0, 0, 0, 0.28);
+  --shadow-md:       0 4px 16px -4px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+  --shadow-lg:       0 8px 24px -8px rgba(0, 0, 0, 0.16), 0 4px 8px -4px rgba(0, 0, 0, 0.06);
+  --shadow-elevated: var(--shadow-md);
+  --shadow-depth:    0 8px 24px -12px rgba(0, 0, 0, 0.22);
 
   /* Chart series */
   --data-sage:  #7aab8a;
@@ -104,6 +114,7 @@
   --ink-2: var(--text-muted);
   --ink-3: var(--text-tertiary);
   --coral: var(--accent-primary);
+  --coral-ink: #9A3C38;
   --coral-hover: var(--bg-emphasis);
   --coral-deep: #8b3d38;
   --coral-muted: var(--text-muted);
@@ -129,18 +140,12 @@
   --destructive-foreground: #ffffff;
   --border: var(--border-muted);
   --input: var(--border-muted);
-  --ring: var(--accent-primary);
+  --ring: var(--coral-deep);
 
   --ambient: none;
 
-  --shadow-xs: 0 1px 0 0 rgba(0, 0, 0, 0.08);
-  --shadow-sm: var(--shadow-card);
-  --shadow-md: var(--shadow-elevated);
-  --shadow-lg: var(--shadow-elevated);
-
-  --shadow-drop-color: rgba(0, 0, 0, 0.25);
+  --shadow-drop-color: rgba(0, 0, 0, 0.22);
   --shadow-inner-color: rgba(255, 255, 255, 0.25);
-  --shadow-depth: 0 8px 24px -12px var(--shadow-drop-color);
 }
 
 .dark {
@@ -150,17 +155,20 @@
   --bg-highlight: #6E4A4A;
 
   --text-primary: #FFFFFF;
-  --text-muted:   #D4908A;
+  --text-muted:   #E8B8B4;
+  --text-tertiary: #C99894;
 
   --border-default: #737373;
   --border-muted:   #3D1718;
+
+  --coral-ink: #F0A8A4;
 
   --canvas: var(--bg-page);
   --surface: var(--bg-surface);
   --surface-hover: var(--bg-highlight);
   --ink: var(--text-primary);
   --ink-2: var(--text-muted);
-  --ink-3: var(--text-muted);
+  --ink-3: var(--text-tertiary);
   --hairline: var(--border-muted);
   --hairline-strong: var(--border-default);
   --hairline-grey: var(--border-muted);
@@ -179,6 +187,15 @@
   --accent-foreground: var(--text-primary);
   --border: var(--border-muted);
   --input: var(--border-muted);
+
+  --shadow-xs:       0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sm:       0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --shadow-card:     0 1px 0 0 rgba(0, 0, 0, 0.2), 0 2px 8px -2px rgba(0, 0, 0, 0.45);
+  --shadow-action:   0 1px 0 rgba(0, 0, 0, 0.15), 0 12px 32px -14px rgba(0, 0, 0, 0.55);
+  --shadow-md:       0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+  --shadow-lg:       0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
+  --shadow-elevated: var(--shadow-md);
+  --shadow-depth:    0 8px 24px -12px rgba(0, 0, 0, 0.6);
 
   --shadow-drop-color: rgba(200, 200, 255, 0.25);
   --shadow-inner-color: rgba(200, 200, 255, 0.25);
@@ -211,28 +228,93 @@
   .tabular { font-variant-numeric: tabular-nums; }
   code, kbd, .mono { font-family: var(--font-sans); }
 
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
   :focus-visible {
     outline: 2px solid var(--coral-deep);
     outline-offset: 2px;
-    border-radius: 4px;
   }
 
   a:focus-visible,
   button:focus-visible,
   [role="button"]:focus-visible,
+  [role="checkbox"]:focus-visible,
+  [role="tab"]:focus-visible,
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
     outline: 2px solid var(--coral-deep);
     outline-offset: 2px;
   }
+
+  input:not([type="hidden"]):focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    border-color: var(--coral-deep);
+    outline-offset: 0;
+  }
+
+  header nav :is(a, button):focus-visible,
+  nav[aria-label="Primary navigation"] :is(a, button):focus-visible {
+    outline: 2px solid var(--coral-deep);
+    outline-offset: 2px;
+  }
+
+  table :is(a, button, [role="button"], [role="checkbox"]):focus-visible,
+  [data-slot="table"] :is(a, button, [role="button"], [role="checkbox"]):focus-visible {
+    outline: 2px solid var(--coral-deep);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
 }
 
 @layer utilities {
+  .text-coral {
+    color: var(--coral-ink);
+  }
+  .bg-coral {
+    background-color: var(--coral);
+  }
+  .border-coral {
+    border-color: var(--coral);
+  }
+
+  .rounded-card {
+    border-radius: var(--radius-card);
+  }
+  .rounded-control {
+    border-radius: var(--radius-control);
+  }
+
+  .shadow-xs {
+    box-shadow: var(--shadow-xs);
+  }
+  .shadow-sm {
+    box-shadow: var(--shadow-sm);
+  }
   .shadow-card {
     box-shadow: var(--shadow-card);
   }
+  .shadow-action {
+    box-shadow: var(--shadow-action);
+  }
+  .shadow-md {
+    box-shadow: var(--shadow-md);
+  }
+  .shadow-lg {
+    box-shadow: var(--shadow-lg);
+  }
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
+  }
+  .shadow-depth {
+    box-shadow: var(--shadow-depth);
+  }
+
+  .focus-ring {
+    outline: 2px solid var(--coral-deep);
+    outline-offset: 2px;
   }
 }

@@ -129,7 +129,7 @@ function AppHeader() {
             to="/"
             aria-label="Home"
             className={
-              "flex items-center gap-2 px-3 h-10 my-auto rounded-full transition-colors text-ink " +
+              "flex items-center gap-2 px-3 min-h-11 h-11 my-auto rounded-full transition-colors text-ink focus-visible:ring-2 focus-visible:ring-coral/50 " +
               (homeActive ? "bg-coral" : "hover:bg-highlight/50")
             }
           >

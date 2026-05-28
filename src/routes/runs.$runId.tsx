@@ -139,7 +139,7 @@ function RunPage() {
   }, [canStartProcessing, status, runId]);
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pb-24 pt-6">
+    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pb-24 pt-4 sm:pt-6 min-w-0">
       {/* Header */}
       <div className="text-[13px] text-ink-2 flex items-center gap-2 flex-wrap">
         <span>Run</span>
@@ -264,7 +264,7 @@ function RunProgressCard({
           type="button"
           onClick={onStart}
           disabled={starting}
-          className="mt-4 h-9 px-5 rounded-lg bg-coral text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
+          className="mt-4 min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
         >
           {starting ? "Starting…" : failed ? "Retry analysis" : "Start analysis"}
         </button>
@@ -434,7 +434,7 @@ function ShapPanel({ runId }: { runId: string }) {
         ) : (
           <div className="space-y-2">
             {items.map(([feature, value]) => (
-              <div key={feature} className="grid grid-cols-[170px_1fr_56px] items-center gap-3">
+              <div key={feature} className="grid grid-cols-[minmax(0,1fr)_1fr_auto] sm:grid-cols-[170px_1fr_56px] items-center gap-2 sm:gap-3">
                 <span className="text-[12.5px] text-ink mono truncate">{feature}</span>
                 <div className="h-3 rounded-full bg-hairline overflow-hidden">
                   <div
@@ -650,14 +650,14 @@ function PredictionsPanel({ runId }: { runId: string }) {
           <button
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0 || q.isLoading}
-            className="h-7 px-3 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="min-h-11 h-11 px-4 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Prev
           </button>
           <button
             onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
             disabled={page >= lastPage || q.isLoading}
-            className="h-7 px-3 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="min-h-11 h-11 px-4 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next
           </button>
