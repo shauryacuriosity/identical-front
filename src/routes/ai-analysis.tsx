@@ -12,6 +12,9 @@ import {
   Network,
   Boxes,
   ArrowRight,
+  Sparkles,
+  TrendingUp,
+  Tags,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import * as apiDatasets from "@/lib/api/datasets";
@@ -21,6 +24,7 @@ import { ProjectSaveBar } from "@/components/project-save-bar";
 import { useProjects, useProject, formatRelative } from "@/lib/projects-store";
 import { saveProjectWork, type AnalysisDraft } from "@/lib/project-work";
 import { Slider } from "@/components/ui/slider";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   autoMapAnalysisFields,
   CLINICAL_FIELDS,
@@ -42,7 +46,133 @@ const MOCK_API_FORCED = import.meta.env.VITE_USE_MOCK_API === "true";
 
 /** Backend always runs EDA → both models → clustering; UI choices are stored but not applied yet. */
 const PIPELINE_HONESTY =
-  "The server currently runs the full pipeline (EDA, logistic + XGBoost, K-Means clustering) on every run. Function mode and most method settings below are saved for your record but not applied yet.";
+  "Every run today uses the same server pipeline (EDA, logistic + XGBoost, and clustering). Your selections are saved on the run record; selective modes are on the roadmap.";
+
+type FnMode = "full" | "predict" | "discover" | "labels";
+
+type ClinicalInfo = {
+  title: string;
+  what: string;
+  why: string;
+  note?: string;
+};
+
+const METHOD_CLINICAL_INFO = {
+  selectMethod: {
+    title: "Selecting analysis methods",
+    what: "After you define the cohort, Lotus can run supervised risk models (who is likely to meet Metabolic Syndrome criteria) and/or unsupervised clustering (which dietary patterns group together).",
+    why: "Population-health teams often need both angles: prediction supports screening and resource planning; clustering reveals subgroups that averages hide — for example, high MetS prevalence in one dietary cluster but not another.",
+    note: "Research use only — not for individual diagnosis or treatment decisions.",
+  },
+  modelGroup: {
+    title: "Choosing a prediction model",
+    what: "Lotus can fit logistic regression (linear, coefficient-based), XGBoost (non-linear trees with SHAP explanations), or both on the same train/test split.",
+    why: "Clinical collaborators often want interpretable odds ratios; reviewers expect strong ML benchmarks — comparing both supports multidisciplinary discussion without committing to one approach upfront.",
+  },
+  prediction: {
+    title: "MetS risk prediction",
+    what: "Supervised machine learning estimates each participant's probability of meeting Metabolic Syndrome (MetS) criteria using mapped clinical and dietary variables.",
+    why: "Helps prioritise follow-up in research cohorts and quantify which factors (waist, lipids, glucose, diet patterns) drive risk. Outputs include calibrated scores and explainability for discussion with clinical collaborators.",
+  },
+  predictBoth: {
+    title: "Compare logistic regression & XGBoost",
+    what: "Trains two models on the same train/test split: logistic regression (linear, coefficient-based) and XGBoost (gradient-boosted trees, handles non-linear effects).",
+    why: "Logistic regression is familiar and auditable for clinicians; XGBoost often improves discrimination when relationships are complex. Running both strengthens capstone and publication narratives.",
+    note: "Current server default — both models always run today.",
+  },
+  logreg: {
+    title: "Logistic regression",
+    what: "A linear model for binary outcomes: log-odds of MetS ≈ weighted sum of inputs, with L2 regularisation to limit overfitting on correlated nutrition variables.",
+    why: "Coefficients show direction and relative strength (e.g. waist circumference vs HDL). Preferred when interpretability and transparency matter more than marginal AUC gains.",
+    note: "Single-model selection coming soon; server trains both models now.",
+  },
+  xgb: {
+    title: "XGBoost",
+    what: "An ensemble of decision trees that learns non-linear and interaction effects between diet, anthropometry, and MetS labels.",
+    why: "Useful when risk is not a simple linear combination — e.g. threshold effects or feature interactions. SHAP values summarise which variables pushed predictions up or down per person.",
+    note: "Single-model selection coming soon; server trains both models now.",
+  },
+  subgroup: {
+    title: "Subgroup discovery (clustering)",
+    what: "Unsupervised learning groups participants by similarity in dietary intake features, without using the MetS label to form clusters.",
+    why: "Shows heterogeneity in the cohort: clusters with higher MetS prevalence may reflect distinct dietary phenotypes worth separate public-health messaging or further study.",
+  },
+  kmeans: {
+    title: "K-Means clustering",
+    what: "Splits the cohort into k groups (default k=4) so members within a cluster have similar dietary profiles; an elbow plot helps assess k=2–5.",
+    why: "Fast and interpretable on large surveys (NHANES-style). Cluster means and MetS rates by cluster are easy to present to non-technical stakeholders.",
+    note: "Server default — k=4 on dietary features.",
+  },
+  hierarchical: {
+    title: "Hierarchical clustering",
+    what: "Builds a tree of nested clusters by progressively merging similar dietary profiles (agglomerative approach).",
+    why: "Useful when you want to see how clusters merge at different scales, not only a single k.",
+    note: "Not available in this release.",
+  },
+  dbscan: {
+    title: "DBSCAN",
+    what: "Density-based clustering: finds tight groups and flags sparse points as outliers without fixing k in advance.",
+    why: "Helpful when you suspect rare dietary patterns or noise; less common in survey pipelines than K-Means.",
+    note: "Not available in this release.",
+  },
+  pca: {
+    title: "PCA (principal components)",
+    what: "Reduces many dietary variables to two orthogonal axes that capture the most variance, then plots participants coloured by MetS status.",
+    why: "Gives a single visual summary of how dietary variation aligns with MetS in the cohort — good for exploratory talks and posters.",
+    note: "Server generates PCA and t-SNE plots every run.",
+  },
+  tsne: {
+    title: "t-SNE embedding",
+    what: "A non-linear 2D map where similar dietary profiles appear closer together; typically run on a sample for large datasets.",
+    why: "Can reveal local structure (subgroups, outliers) that linear PCA smooths over — useful for hypothesis generation, not for formal inference alone.",
+    note: "Server generates PCA and t-SNE plots every run.",
+  },
+  umap: {
+    title: "UMAP",
+    what: "Another non-linear dimension reduction method, often preserving both local and global structure better than t-SNE on some datasets.",
+    why: "Alternative embedding for exploratory visuals when comparing dietary phenotypes.",
+    note: "Not available in this release.",
+  },
+} as const satisfies Record<string, ClinicalInfo>;
+
+const ANALYSIS_TYPES: {
+  key: FnMode;
+  title: string;
+  subtitle: string;
+  detail: string;
+  icon: React.ElementType;
+  recommended?: boolean;
+}[] = [
+  {
+    key: "full",
+    title: "Complete analysis",
+    subtitle: "Recommended for demos",
+    detail: "Walk through mapping, cohort, methods, and a full results report.",
+    icon: Sparkles,
+    recommended: true,
+  },
+  {
+    key: "predict",
+    title: "MetS prediction",
+    subtitle: "Risk models",
+    detail: "Emphasise supervised models and SHAP-style explanations.",
+    icon: TrendingUp,
+  },
+  {
+    key: "discover",
+    title: "Subgroup discovery",
+    subtitle: "Patterns & clusters",
+    detail: "Emphasise clustering and cohort structure in the wizard.",
+    icon: Boxes,
+  },
+  {
+    key: "labels",
+    title: "Generate labels",
+    subtitle: "Fast path",
+    detail: "Map columns and cohort, then jump straight to run (skips method step).",
+    icon: Tags,
+  },
+];
 
 // ---------- Mock data ----------
 
@@ -115,6 +245,165 @@ function ConfidencePill({ row }: { row: MappingSuggestion }) {
     >
       needs review · {score}
     </span>
+  );
+}
+
+// ---------- Page header & analysis type ----------
+
+function AnalysisTypePicker({
+  value,
+  onChange,
+}: {
+  value: FnMode;
+  onChange: (mode: FnMode) => void;
+}) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      {ANALYSIS_TYPES.map((opt) => {
+        const active = value === opt.key;
+        const Icon = opt.icon;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => onChange(opt.key)}
+            aria-pressed={active}
+            className={
+              "group relative flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-all min-h-[44px] focus-visible:ring-2 focus-visible:ring-coral/50 " +
+              (active
+                ? "border-coral/60 bg-coral-tint shadow-[var(--shadow-card)] ring-1 ring-coral/25"
+                : "border-hairline bg-surface hover:border-coral/35 hover:bg-surface-hover/30")
+            }
+          >
+            {opt.recommended && (
+              <span
+                className={
+                  "absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full " +
+                  (active ? "bg-coral text-white" : "bg-coral/15 text-coral-deep")
+                }
+              >
+                Demo pick
+              </span>
+            )}
+            <span
+              className={
+                "flex h-10 w-10 items-center justify-center rounded-lg transition-colors " +
+                (active ? "bg-coral text-ink" : "bg-canvas text-coral-deep group-hover:bg-coral/15")
+              }
+            >
+              <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </span>
+            <div className="min-w-0 pr-14 sm:pr-16">
+              <div className={"text-[15px] font-semibold tracking-tight " + (active ? "text-ink" : "text-ink")}>
+                {opt.title}
+              </div>
+              <div className={"text-[12px] font-medium mt-0.5 " + (active ? "text-coral-deep" : "text-ink-2")}>
+                {opt.subtitle}
+              </div>
+              <p className={"text-[12px] leading-snug mt-2 " + (active ? "text-ink-2" : "text-ink-3")}>
+                {opt.detail}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AnalysisPageHeader({
+  projectId,
+  projects,
+  runName,
+  editingName,
+  onProjectChange,
+  onRunNameChange,
+  onRunNameFocus,
+  onRunNameBlur,
+  fnMode,
+  onFnModeChange,
+}: {
+  projectId: string | undefined;
+  projects: { id: string; name: string; modifiedAt: string }[];
+  runName: string;
+  editingName: boolean;
+  onProjectChange: (id: string | undefined) => void;
+  onRunNameChange: (name: string) => void;
+  onRunNameFocus: () => void;
+  onRunNameBlur: () => void;
+  fnMode: FnMode;
+  onFnModeChange: (mode: FnMode) => void;
+}) {
+  return (
+    <header className="rounded-2xl border border-hairline bg-surface shadow-card overflow-hidden mb-6">
+      <div
+        className="px-5 sm:px-6 pt-5 pb-5 border-b border-hairline"
+        style={{
+          background:
+            "linear-gradient(135deg, color-mix(in oklab, var(--coral) 12%, var(--bg-surface)) 0%, var(--bg-surface) 55%)",
+        }}
+      >
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-ink-3 font-semibold mb-1">Workbench</p>
+            <h1 className="text-[26px] sm:text-[30px] font-bold text-ink tracking-tight leading-none">AI Analysis</h1>
+            <p className="text-[14px] text-ink-2 mt-2 max-w-xl leading-relaxed">
+              Configure a MetS run on your cohort — map fields, filter participants, then launch.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto lg:min-w-[min(100%,420px)]">
+            <div className="flex-1 min-w-0">
+              <label htmlFor="ai-project" className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5">
+                Project
+              </label>
+              <div className="relative">
+                <select
+                  id="ai-project"
+                  value={projectId ?? ""}
+                  onChange={(e) => onProjectChange(e.target.value || undefined)}
+                  className="appearance-none w-full min-h-11 h-11 pl-3 pr-9 text-[13px] rounded-lg border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral focus-visible:ring-2 focus-visible:ring-coral/40"
+                >
+                  <option value="">Choose a project…</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name || "Untitled project"} · {formatRelative(p.modifiedAt)}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-3 pointer-events-none" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <label htmlFor="run-name" className="block text-[11px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-1.5">
+                Run name
+              </label>
+              <input
+                id="run-name"
+                value={runName}
+                onChange={(e) => onRunNameChange(e.target.value)}
+                onFocus={onRunNameFocus}
+                onBlur={onRunNameBlur}
+                placeholder="e.g. eAsia cohort · March run"
+                className={
+                  "w-full min-h-11 h-11 px-3 rounded-lg border bg-surface text-ink text-[14px] font-medium focus:outline-none focus:border-coral/70 focus-visible:ring-2 focus-visible:ring-coral/40 transition-colors " +
+                  (editingName ? "border-coral/60" : "border-hairline")
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 sm:px-6 py-5 bg-canvas/30">
+        <h2 className="text-[15px] font-semibold text-ink tracking-tight">What do you want from this run?</h2>
+        <p className="text-[13px] text-ink-2 mt-1 mb-4">The steps below adjust to your choice.</p>
+        <AnalysisTypePicker value={fnMode} onChange={onFnModeChange} />
+        <p className="mt-4 flex items-start gap-2 text-[12px] text-ink-3 leading-relaxed">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-ink-3" strokeWidth={2} aria-hidden />
+          <span>{PIPELINE_HONESTY}</span>
+        </p>
+      </div>
+    </header>
   );
 }
 
@@ -347,8 +636,6 @@ function AiAnalysisPage() {
   );
   const [editingName, setEditingName] = useState(false);
 
-  // Function mode — what are you running?
-  type FnMode = "full" | "predict" | "discover" | "labels";
   const [fnMode, setFnMode] = useState<FnMode>("full");
   const [metsLabelCol, setMetsLabelCol] = useState<string | null>(null);
 
@@ -674,53 +961,28 @@ function AiAnalysisPage() {
     }
   };
 
+  const headerProjects = sortedProjects.map((p) => ({
+    id: p.id,
+    name: p.name || "Untitled project",
+    modifiedAt: p.modifiedAt,
+  }));
+
   return (
     <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pb-24 min-w-0 overflow-x-hidden">
-      {/* Breadcrumb + project link */}
-      <div className="pt-4 sm:pt-6 pb-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2 text-[13px] text-ink-2">
-          <span>Analysis</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-[0.08em] text-ink-3">Project</span>
-          <div className="relative">
-            <select
-              value={projectId ?? ""}
-              onChange={(e) => {
-                const id = e.target.value || undefined;
-                navigate({ to: "/ai-analysis", search: { projectId: id } });
-              }}
-              className="appearance-none min-h-11 h-11 pl-3 pr-8 text-[13px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral w-full sm:min-w-[220px]"
-            >
-              <option value="">No project linked</option>
-              {sortedProjects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name || "Untitled project"} · {formatRelative(p.modifiedAt)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-ink-3 pointer-events-none" />
-          </div>
-        </div>
-      </div>
-
-      {/* Run name */}
-      <div className="mb-5">
-        <label htmlFor="run-name" className="block text-[11px] uppercase tracking-[0.12em] text-ink-2 font-medium mb-1.5">
-          Run name
-        </label>
-        <input
-          id="run-name"
-          value={runName}
-          onChange={(e) => setRunName(e.target.value)}
-          onFocus={() => setEditingName(true)}
-          onBlur={() => setEditingName(false)}
-          className={`w-full max-w-xl h-11 px-3 rounded-lg border bg-surface text-ink text-[15px] font-medium focus:outline-none focus:border-coral/70 transition-colors ${
-            editingName ? "border-coral/60" : "border-hairline"
-          }`}
+      <div className="pt-4 sm:pt-6">
+        <AnalysisPageHeader
+          projectId={projectId}
+          projects={headerProjects}
+          runName={runName}
+          editingName={editingName}
+          onProjectChange={(id) => navigate({ to: "/ai-analysis", search: { projectId: id } })}
+          onRunNameChange={setRunName}
+          onRunNameFocus={() => setEditingName(true)}
+          onRunNameBlur={() => setEditingName(false)}
+          fnMode={fnMode}
+          onFnModeChange={setFnMode}
         />
       </div>
-
 
       <StepIndicator current={currentStep} completed={completed} running={runSubmitting} skipped={skipped} />
 
@@ -734,49 +996,8 @@ function AiAnalysisPage() {
           onExpand={() => reopen("map")}
         >
           <div className="space-y-6 pt-4">
-            {/* Function-mode selector */}
-            <div>
-              <h3 className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                What are you running?
-              </h3>
-              <div className="flex flex-wrap gap-1.5">
-                {(
-                  [
-                    ["full", "Full analysis", "predict + discover", "Runs EDA, both models, and clustering (server default pipeline)."],
-                    ["predict", "Prediction only", null, "UI preview — server still runs the full pipeline today."],
-                    ["discover", "Subgroup discovery only", null, "UI preview — server still runs the full pipeline today."],
-                    ["labels", "Generate labels only", null, "Skips method step; server still runs EDA + models + clustering."],
-                  ] as const
-                ).map(([key, label, hint, description]) => {
-                  const active = fnMode === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setFnMode(key)}
-                      title={description}
-                      className={`h-auto min-h-7 px-3 py-1.5 rounded-full text-[12.5px] border transition-colors text-left ${
-                        active
-                          ? "bg-coral text-white border-coral"
-                          : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
-                      }`}
-                    >
-                      <span className="block">{label}</span>
-                      {hint && (
-                        <span className={`block text-[11px] ${active ? "text-white/75" : "text-ink-3"}`}>
-                          {hint}
-                        </span>
-                      )}
-                      <span className={`block text-[11px] mt-0.5 ${active ? "text-white/70" : "text-ink-3"}`}>
-                        {description}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <p className="text-[13.5px] text-ink-2">
-              Confirm how your dataset columns map to the fields we need.
+            <p className="text-[14px] text-ink-2 leading-relaxed">
+              Link a dataset and confirm how its columns map to MetS clinical and dietary fields.
             </p>
 
             {/* Dataset selector */}
@@ -1088,9 +1309,13 @@ function AiAnalysisPage() {
             onExpand={() => reopen("method")}
           >
             <div className="space-y-4 pt-4">
-              <div className="flex items-start gap-2.5 rounded-lg border border-dashed border-hairline bg-canvas/40 px-3 py-2.5">
-                <Info className="h-4 w-4 text-ink-3 mt-0.5 shrink-0" strokeWidth={1.75} />
-                <p className="text-[12.5px] text-ink-2 leading-snug">{PIPELINE_HONESTY}</p>
+              <div className="flex items-start gap-3 rounded-xl border border-hairline/80 bg-canvas/50 px-4 py-3">
+                <p className="text-[13px] text-ink-2 leading-relaxed flex-1">
+                  Choose which analyses to include. Tap{" "}
+                  <Info className="inline h-3.5 w-3.5 text-coral-deep align-[-2px]" aria-hidden /> on each
+                  option for a clinician-oriented explanation.
+                </p>
+                <ClinicalInfoButton info={METHOD_CLINICAL_INFO.selectMethod} ariaLabel="About selecting methods" />
               </div>
 
               {/* SECTION A — Prediction */}
@@ -1099,28 +1324,29 @@ function AiAnalysisPage() {
                   icon={<Network className="h-5 w-5" strokeWidth={1.75} />}
                   title="Prediction"
                   subtitle="supervised · what predicts MetS in this cohort?"
+                  info={METHOD_CLINICAL_INFO.prediction}
                   enabled={predictOn}
                   onToggle={() => setPredictOn((v) => !v)}
                 >
                   <div className="space-y-5">
                     <div>
-                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                        Model
-                      </div>
+                      <SectionLabel label="Model" info={METHOD_CLINICAL_INFO.modelGroup} />
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={predictModel === "both"}
                           onSelect={() => setPredictModel("both")}
                           title="Compare both"
-                          hint="matches server — trains logistic regression and XGBoost every run"
+                          hint="Logistic regression + XGBoost on the same cohort split"
+                          info={METHOD_CLINICAL_INFO.predictBoth}
                         />
                         <RadioRow
                           checked={predictModel === "xgb"}
                           onSelect={() => setPredictModel("xgb")}
                           title="XGBoost only"
-                          hint="gradient-boosted trees with SHAP importance"
+                          hint="Gradient-boosted trees with SHAP importance"
                           disabled
                           tooltip="Coming soon — server currently trains both models every run"
+                          info={METHOD_CLINICAL_INFO.xgb}
                         />
                         <RadioRow
                           checked={predictModel === "logreg"}
@@ -1129,6 +1355,7 @@ function AiAnalysisPage() {
                           hint="L2-regularised, interpretable coefficients"
                           disabled
                           tooltip="Coming soon — server currently trains both models every run"
+                          info={METHOD_CLINICAL_INFO.logreg}
                         />
                       </div>
                     </div>
@@ -1159,65 +1386,68 @@ function AiAnalysisPage() {
                   icon={<Boxes className="h-5 w-5" strokeWidth={1.75} />}
                   title="Subgroup Discovery"
                   subtitle="unsupervised · what sub-populations exist?"
+                  info={METHOD_CLINICAL_INFO.subgroup}
                   enabled={subgroupOn}
                   onToggle={() => setSubgroupOn((v) => !v)}
                 >
                   <div className="space-y-5">
                     <div>
-                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                        Clustering algorithm
-                      </div>
+                      <SectionLabel label="Clustering algorithm" info={METHOD_CLINICAL_INFO.kmeans} />
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={clusterAlg === "kmeans"}
                           onSelect={() => setClusterAlg("kmeans")}
                           title="K-Means"
-                          hint="server default — k=4 with elbow curve for k ∈ {2, 3, 4, 5} on dietary (DR1I) features"
+                          hint="Default k=4; elbow plot for k = 2–5 on dietary features"
+                          info={METHOD_CLINICAL_INFO.kmeans}
                         />
                         <RadioRow
                           disabled
                           title="Hierarchical clustering"
-                          hint="agglomerative clustering on dietary features"
+                          hint="Agglomerative clustering on dietary features"
                           tooltip="Coming soon"
                           soon
+                          info={METHOD_CLINICAL_INFO.hierarchical}
                         />
                         <RadioRow
                           disabled
                           title="DBSCAN"
-                          hint="density-based clusters without fixed k"
+                          hint="Density-based clusters without fixed k"
                           tooltip="Coming soon"
                           soon
+                          info={METHOD_CLINICAL_INFO.dbscan}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium mb-2">
-                        Visualisation projection
-                      </div>
+                      <SectionLabel label="Visualisation projection" info={METHOD_CLINICAL_INFO.pca} />
                       <div className="space-y-1.5">
                         <RadioRow
                           checked={dimRed === "pca"}
                           onSelect={() => setDimRed("pca")}
                           title="PCA"
-                          hint="variance curve + 2D scatter coloured by MetS"
+                          hint="Variance curve + 2D scatter coloured by MetS"
                           disabled
                           tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
+                          info={METHOD_CLINICAL_INFO.pca}
                         />
                         <RadioRow
                           checked={dimRed === "tsne"}
                           onSelect={() => setDimRed("tsne")}
                           title="t-SNE"
-                          hint="2D embedding on a dietary-feature sample (≤2000 rows)"
+                          hint="2D embedding on a dietary sample (≤2000 rows)"
                           disabled
                           tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
+                          info={METHOD_CLINICAL_INFO.tsne}
                         />
                         <RadioRow
                           disabled
                           title="UMAP"
-                          hint="non-linear 2D projection"
+                          hint="Non-linear 2D projection"
                           tooltip="Coming soon"
                           soon
+                          info={METHOD_CLINICAL_INFO.umap}
                         />
                       </div>
                       <p className="text-[12px] text-ink-3 mt-2">
@@ -1414,10 +1644,67 @@ function ToggleRow({
   );
 }
 
+function ClinicalInfoButton({
+  info,
+  ariaLabel,
+}: {
+  info: ClinicalInfo;
+  ariaLabel?: string;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 flex h-8 w-8 min-h-[44px] min-w-[44px] sm:min-h-8 sm:min-w-8 items-center justify-center rounded-full border border-hairline bg-surface text-coral-deep hover:bg-coral-tint hover:border-coral/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral/50 transition-colors"
+          aria-label={ariaLabel ?? `About ${info.title}`}
+        >
+          <Info className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-[min(calc(100vw-2rem),24rem)] rounded-xl border-hairline bg-surface p-0 shadow-[var(--shadow-elevated)] text-ink"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="px-4 py-3 border-b border-hairline bg-canvas/40">
+          <p className="text-[10px] uppercase tracking-[0.12em] text-coral-deep font-semibold">For clinicians</p>
+          <h4 className="text-[14px] font-semibold text-ink mt-0.5 leading-snug">{info.title}</h4>
+        </div>
+        <div className="px-4 py-3 space-y-3 max-h-[min(70vh,320px)] overflow-y-auto">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">What it is</p>
+            <p className="text-[13px] text-ink-2 leading-relaxed mt-1">{info.what}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">Why run it</p>
+            <p className="text-[13px] text-ink-2 leading-relaxed mt-1">{info.why}</p>
+          </div>
+          {info.note && (
+            <p className="text-[11.5px] text-ink-3 leading-relaxed pt-2 border-t border-hairline">{info.note}</p>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function SectionLabel({ label, info }: { label: string; info?: ClinicalInfo }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <div className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">{label}</div>
+      {info && <ClinicalInfoButton info={info} ariaLabel={`About ${label}`} />}
+    </div>
+  );
+}
+
 function MethodSection({
   icon,
   title,
   subtitle,
+  info,
   enabled,
   onToggle,
   children,
@@ -1425,6 +1712,7 @@ function MethodSection({
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  info?: ClinicalInfo;
   enabled: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -1435,35 +1723,38 @@ function MethodSection({
         enabled ? "border-coral/50 bg-coral-tint/30" : "border-hairline bg-surface"
       }`}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between gap-3 p-5 text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-stretch gap-1 p-3 sm:p-4 sm:pr-5">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 flex items-center justify-between gap-3 min-h-11 text-left rounded-lg hover:bg-surface-hover/30 transition-colors px-2"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span
+              className={`h-9 w-9 shrink-0 rounded-lg flex items-center justify-center ${
+                enabled ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
+              }`}
+            >
+              {icon}
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+                {title}
+              </h3>
+              <div className="text-[12px] text-ink-3 mt-0.5">{subtitle}</div>
+            </div>
+          </div>
           <span
-            className={`h-9 w-9 rounded-lg flex items-center justify-center ${
-              enabled ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
+            className={`h-5 w-5 shrink-0 rounded-md border flex items-center justify-center ${
+              enabled ? "bg-coral border-coral" : "border-hairline bg-surface"
             }`}
           >
-            {icon}
+            {enabled && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
           </span>
-          <div>
-            <h3 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
-              {title}
-            </h3>
-            <div className="text-[12px] text-ink-3 mt-0.5">{subtitle}</div>
-          </div>
-        </div>
-        <span
-          className={`h-5 w-5 rounded-md border flex items-center justify-center ${
-            enabled ? "bg-coral border-coral" : "border-hairline bg-surface"
-          }`}
-        >
-          {enabled && <Check className="h-3 w-3 text-white" strokeWidth={2.5} />}
-        </span>
-      </button>
-      {enabled && <div className="px-5 pb-5 pt-1 border-t border-hairline/60">{children}</div>}
+        </button>
+        {info && <ClinicalInfoButton info={info} />}
+      </div>
+      {enabled && <div className="px-5 pb-5 pt-0 border-t border-hairline/60">{children}</div>}
     </div>
   );
 }
@@ -1476,6 +1767,7 @@ function RadioRow({
   disabled,
   soon,
   tooltip,
+  info,
 }: {
   checked?: boolean;
   onSelect?: () => void;
@@ -1484,41 +1776,53 @@ function RadioRow({
   disabled?: boolean;
   soon?: boolean;
   tooltip?: string;
+  info?: ClinicalInfo;
 }) {
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!disabled) onSelect?.();
-      }}
-      disabled={disabled}
-      title={tooltip}
-      className={`w-full flex items-center gap-3 px-3 min-h-10 py-2 rounded-lg border text-left transition-colors ${
+    <div
+      className={`flex items-center gap-1 rounded-lg border pr-1 transition-colors ${
         disabled
-          ? "border-dashed border-hairline bg-surface opacity-50 cursor-not-allowed"
+          ? "border-dashed border-hairline bg-surface opacity-50"
           : checked
             ? "border-coral/50 bg-surface"
-            : "border-hairline bg-surface hover:border-coral/40"
+            : "border-hairline bg-surface"
       }`}
     >
-      <span
-        className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
-          checked ? "border-coral" : "border-hairline"
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) onSelect?.();
+        }}
+        disabled={disabled}
+        title={tooltip}
+        className={`flex-1 flex items-center gap-3 px-3 min-h-11 py-2 text-left transition-colors rounded-lg ${
+          disabled ? "cursor-not-allowed" : "hover:bg-surface-hover/40"
         }`}
       >
-        {checked && <span className="h-2 w-2 rounded-full bg-coral" />}
-      </span>
-      <span className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-[13px] text-ink font-medium">{title}</span>
-        {hint && <span className="text-[12px] text-ink-3 leading-snug">{hint}</span>}
-      </span>
-      {soon && (
-        <span className="ml-auto text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5 shrink-0">
-          coming soon
+        <span
+          className={`h-4 w-4 rounded-full border flex items-center justify-center shrink-0 ${
+            checked ? "border-coral" : "border-hairline"
+          }`}
+        >
+          {checked && <span className="h-2 w-2 rounded-full bg-coral" />}
+        </span>
+        <span className="flex flex-col gap-0.5 min-w-0 flex-1">
+          <span className="text-[13px] text-ink font-medium">{title}</span>
+          {hint && <span className="text-[12px] text-ink-3 leading-snug">{hint}</span>}
+        </span>
+        {soon && (
+          <span className="text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5 shrink-0">
+            coming soon
+          </span>
+        )}
+      </button>
+      {info && (
+        <span className={disabled ? "opacity-40 pointer-events-none" : undefined}>
+          <ClinicalInfoButton info={info} />
         </span>
       )}
-    </button>
+    </div>
   );
 }
 
