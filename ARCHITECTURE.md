@@ -1,6 +1,6 @@
 # Lotus — System architecture
 
-> High-level view of the capstone deployment: **Browser → Vercel → Railway API → Supabase → ML processor**.
+> **Browser → Vercel → Railway API → Supabase → ML processor**
 
 Production URLs:
 
@@ -155,7 +155,7 @@ One-command stack: `./scripts/dev-stack.sh` from `identical-front`.
 
 ---
 
-## Known capstone limitations (honest architecture notes)
+## Known limitations
 
 1. **`function_mode` not enforced server-side** — UI writes `full` / `prediction_only` / `subgroup_only` / `labels_only` to `analysis_runs`, but `processor.py` always runs the full pipeline. See [`DEMO.md`](./DEMO.md).
 2. **Projects are not in Postgres** — only the API volume; Railway redeploy without volume loses projects unless re-seeded.

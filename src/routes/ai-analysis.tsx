@@ -40,8 +40,7 @@ export const Route = createFileRoute("/ai-analysis")({
   component: AiAnalysisPage,
 });
 
-// C3:MOCK_GUARD — narrow check for the explicitly-forced mock flag (separate
-// from the broader USE_MOCK, which also matches "no VITE_API_BASE_URL" mode).
+// True only when VITE_USE_MOCK_API is explicitly set (not when API URL is merely unset).
 const MOCK_API_FORCED = import.meta.env.VITE_USE_MOCK_API === "true";
 
 /** Backend always runs EDA → both models → clustering; UI choices are stored but not applied yet. */
@@ -77,7 +76,7 @@ const METHOD_CLINICAL_INFO = {
   predictBoth: {
     title: "Compare logistic regression & XGBoost",
     what: "Trains two models on the same train/test split: logistic regression (linear, coefficient-based) and XGBoost (gradient-boosted trees, handles non-linear effects).",
-    why: "Logistic regression is familiar and auditable for clinicians; XGBoost often improves discrimination when relationships are complex. Running both strengthens capstone and publication narratives.",
+    why: "Logistic regression is familiar and auditable for clinicians; XGBoost often improves discrimination when relationships are complex. Running both supports side-by-side comparison in reports.",
     note: "Current server default — both models always run today.",
   },
   logreg: {
@@ -1022,7 +1021,6 @@ function AiAnalysisPage() {
               )}
             </div>
 
-            {/* C3:BANNER START — column-mapping disclaimer (owned by C3; C2 may relocate as a whole) */}
             <div
               role="note"
               aria-label="Column mappings preview disclaimer"
@@ -1034,7 +1032,6 @@ function AiAnalysisPage() {
                 <span className="text-ink-2"> — column mappings are not yet applied to the ML run.</span>
               </p>
             </div>
-            {/* C3:BANNER END */}
 
             {/* Group A — MetS Clinical */}
             <div>
@@ -1465,7 +1462,6 @@ function AiAnalysisPage() {
               )}
             </div>
 
-            {/* C3:MOCK_GUARD START — block Run when VITE_USE_MOCK_API=true so we don't silently pretend AI works (owned by C3) */}
             <div className="flex flex-col items-end gap-2 mt-6">
               <button
                 onClick={() => {
@@ -1508,7 +1504,6 @@ function AiAnalysisPage() {
                 </span>
               )}
             </div>
-            {/* C3:MOCK_GUARD END */}
           </StepShell>
         )}
 
@@ -1549,7 +1544,6 @@ function AiAnalysisPage() {
                 </div>
               </div>
 
-              {/* C3:MOCK_GUARD START — labels-only / run-step retry (C2-owned panel; same MOCK_API_FORCED guard) */}
               {(runMutation.isIdle || runMutation.isError) && methodSkipped && (
                 <div className="flex flex-col items-end gap-2">
                   <button
@@ -1582,7 +1576,6 @@ function AiAnalysisPage() {
                   )}
                 </div>
               )}
-              {/* C3:MOCK_GUARD END */}
             </div>
           </section>
         )}

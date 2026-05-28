@@ -1,8 +1,6 @@
 # Lotus — 5-minute demo script
 
-> **Audience:** teammates, judges, capstone reviewers.  
-> **Goal:** walk through the golden path on production without touching broken or misleading UI.  
-> **Time:** ~5 minutes (plus 2 minutes if you trigger a live ML run).
+Walk through the golden path on production (~5 minutes). Prefer the seeded run link over a live ML job at a booth.
 
 ---
 
@@ -48,7 +46,7 @@ See [`DEPLOY.md`](./DEPLOY.md) for the full checklist. Minimum for a working dem
 | `ALLOWED_ORIGINS` | Railway | includes `https://identical-front.vercel.app` |
 | `ALLOWED_ORIGIN_REGEX` | Railway | `^https://.*\.vercel\.app$` |
 
-**Human-only secrets:** anon and service_role keys live in the team password manager — agents cannot paste them here.
+**Secrets:** anon and service_role keys live in the team password manager — not in this repo.
 
 ### 2. Railway bootstrap (eAsia project on disk)
 

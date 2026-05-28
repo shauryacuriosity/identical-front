@@ -1,23 +1,16 @@
 import { ApiError } from "./types";
 
-// ---- Configuration --------------------------------------------------------
-
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const FORCE_MOCK = import.meta.env.VITE_USE_MOCK_API === "true";
 
 /** True when the frontend should serve data from in-memory mocks instead of hitting a real backend. */
 export const USE_MOCK = FORCE_MOCK || !BASE_URL;
 
-// ---- Auth -----------------------------------------------------------------
-
 let authTokenGetter: () => string | null | Promise<string | null> = () => null;
 
-/** Wire up once (e.g. in __root.tsx) when auth is added. */
 export function setAuthTokenGetter(fn: () => string | null | Promise<string | null>) {
   authTokenGetter = fn;
 }
-
-// ---- Fetch wrapper --------------------------------------------------------
 
 type RequestOpts = {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";

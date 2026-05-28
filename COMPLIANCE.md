@@ -22,7 +22,7 @@ Lotus is a **research workbench** for exploratory data analysis, visualisation, 
 | SOC 2 audit | **Not completed** |
 | Suitable for real patient data without additional controls | **No** |
 
-Be explicit with judges and industry reviewers: Lotus demonstrates security **patterns** (auth, RLS, secret separation) appropriate for a capstone — not a production clinical deployment.
+Be explicit with judges and industry reviewers: Lotus demonstrates security **patterns** (auth, RLS, secret separation) for a research demo — not a production clinical deployment.
 
 ---
 
@@ -40,7 +40,7 @@ Details: [`SECURITY.md` § Authentication](../UniProjects/CSIT321_Project/SECURI
 ### Row Level Security (RLS)
 
 - RLS is **enabled on every table** in `public`.
-- Capstone policy model: **"open-read demo"** — any authenticated user can read all runs and results; writes to result tables go through the API service role only.
+- Demo policy model: **"open-read"** — any authenticated user can read all runs and results; writes to result tables go through the API service role only.
 - `analysis_runs.user_id` defaults to `auth.uid()` so we can tighten to per-user RLS later without a data migration.
 
 Details: [`SECURITY.md` § RLS](../UniProjects/CSIT321_Project/SECURITY.md#2-row-level-security-rls-model)
@@ -81,7 +81,7 @@ If a judge asks "could this hold real hospital data?" — answer honestly: **not
 
 ## Roadmap (regulated / production context)
 
-Bullet list only — not implemented in the capstone:
+Bullet list only — not implemented yet:
 
 1. **Sign a Supabase BAA** and migrate to a HIPAA-eligible Supabase plan (Team or Enterprise).
 2. **Audit logging** — in-database `audit_log` table with triggers on `analysis_runs` / `analysis_predictions`; 7-year retention policy.
@@ -96,15 +96,13 @@ Full roadmap with verification steps: [`SECURITY.md` § Roadmap](../UniProjects/
 
 ---
 
-## Human actions still required
-
-These cannot be automated by agents (dashboard / billing / secrets):
+## Dashboard setup (team)
 
 - [ ] Store anon + service_role keys in Vercel and Railway envs (password manager)
-- [ ] Apply Supabase migrations and seed — see [`SECURITY.md` § Human dashboard actions](../UniProjects/CSIT321_Project/SECURITY.md#9-human-dashboard-actions)
+- [ ] Apply Supabase migrations and seed — see [`SECURITY.md`](../UniProjects/CSIT321_Project/SECURITY.md)
 - [ ] Add Vercel URL to Supabase Auth redirect allowlist
-- [ ] Enable MFA (TOTP) toggle when ready for stricter demo
-- [ ] Drop anon demo policies after auth (B1) is fully live
+- [ ] Enable MFA (TOTP) when you want stricter access
+- [ ] Optionally drop legacy anon demo policies in `20260528000001_lotus_rls.sql` if tightening access
 
 ---
 

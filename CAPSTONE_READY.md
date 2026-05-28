@@ -1,4 +1,4 @@
-# Lotus — Capstone demo (you're ready)
+# Lotus — Demo quick reference
 
 ## Live URLs
 
@@ -31,22 +31,13 @@ You can still **Sign up** with your own email if you prefer a personal account.
 5. **AI Analysis** → dataset `510a6e3f-…` (eAsia full cohort) → run or open seeded results:
    - https://identical-front.vercel.app/runs/bbbbbbbb-0000-0000-0000-000000000002
 
-## What we fixed (Waves 1–3)
+## What's included
 
-### Waves 1–2
-
-- Vercel + Railway deploy
-- Supabase auth (login first)
-- Dataset page state persistence
-- AI Analysis age slider, labels-only, honest model copy
-- Supabase migrations + demo run seed
-- Railway auto-seeds demo on container start
-
-### Wave 3
-- Mobile bottom nav + responsive layouts ([`MOBILE.md`](./MOBILE.md))
-- UI contrast polish ([`UI_POLISH.md`](./UI_POLISH.md))
-- Demo / compliance / architecture docs ([`DEMO.md`](./DEMO.md), [`COMPLIANCE.md`](./COMPLIANCE.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md))
-- CI smoke tests (`npm run test`, `pytest tests/test_smoke.py`)
+- Hosted app (Vercel) + API (Railway) + Supabase auth/RLS
+- Login-first flow, shared demo account, seeded eAsia project and run
+- Mobile-friendly layout ([`MOBILE.md`](./MOBILE.md))
+- Docs: [`DEMO.md`](./DEMO.md), [`COMPLIANCE.md`](./COMPLIANCE.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- CI: `npm run test`, `pytest tests/test_smoke.py` in backend repo
 
 ## Local dev
 

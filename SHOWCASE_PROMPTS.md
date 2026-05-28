@@ -1,8 +1,8 @@
-# Lotus Capstone — Agent Prompt Playbook
+# Lotus — Implementation prompt playbook (internal)
 
-> **Copy-paste ready:** use [`AGENT_COPY_PASTE.md`](./AGENT_COPY_PASTE.md) — every prompt is one block (`BEGIN` → `END`) for new Agent chats.
+> **Copy-paste ready:** use [`AGENT_COPY_PASTE.md`](./AGENT_COPY_PASTE.md).
 
-Copy each **Prompt** block into a **new Cursor agent** (separate chat). Run prompts in the **Order** column where noted; prompts with the same order can run in parallel.
+Historical task breakdown for parallel Cursor chats. The app is already deployed; use this only if you are extending the codebase.
 
 **Repos**
 - Frontend: `~/Documents/identical-front` (Vite/TanStack Start, :8080)

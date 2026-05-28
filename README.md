@@ -98,6 +98,17 @@ curl -X POST http://localhost:8000/runs/<run-id>/process
 
 See `CSIT321_Project/api/README.md` for run reset SQL and endpoint details.
 
+## More docs
+
+| Doc | Purpose |
+|-----|---------|
+| [`DEMO.md`](./DEMO.md) | Expo / judge walkthrough |
+| [`DEPLOY.md`](./DEPLOY.md) | Vercel + Railway setup |
+| [`COMPLIANCE.md`](./COMPLIANCE.md) | HIPAA talking points |
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | System diagram |
+
+Internal coordinator prompts (`AGENT_*.md`, `SHOWCASE_PROMPTS.md`) are optional team tooling — not required to run the app.
+
 ## Git workflow
 
 Each repo is independent — pull and push separately:

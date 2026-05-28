@@ -1,6 +1,8 @@
-# Lotus — ONE master agent (orchestrator)
+# Lotus — Coordinator prompts (internal)
 
-Paste **everything below the line** into **one** new Agent chat. It will run work in **waves** using sub-agents (parallel where safe).
+Optional Cursor workflow notes for the team — not part of the product README.
+
+Paste **everything below the line** into **one** new Agent chat to run parallel implementation tasks.
 
 **You still must:** Vercel/Railway login, env secrets, Supabase dashboard MFA toggle, final merge approval.
 

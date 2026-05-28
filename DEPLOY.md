@@ -3,7 +3,7 @@
 > **Authoritative doc for A1 (Vercel + hosted API).** Anything in here overrides
 > ad-hoc Slack instructions. Keep it accurate as URLs land.
 
-The Lotus capstone runs as two independently-deployable services:
+Lotus runs as two independently-deployable services:
 
 | Layer | Repo | Host | Why |
 |-------|------|------|-----|
@@ -67,9 +67,9 @@ Document trade-offs in the demo PR before flipping to Option B.
 
 ---
 
-## ⚠️ HUMAN ACTIONS REQUIRED before this works in prod
+## Setup checklist (dashboard / secrets)
 
-The agent cannot perform any of the following (UI / SSO / billing-gated). Knock these out in order:
+Complete these in the Vercel and Railway dashboards before production works:
 
 1. **Vercel** — log in at <https://vercel.com>, create the `identical-front` project, connect the GitHub repo `shauryacuriosity/identical-front`. Branch: `main` → Production. Preview: every other branch.
 2. **Vercel env vars** — paste the table below into Project → Settings → Environment Variables (mark each for **Production** + **Preview** + **Development**).
@@ -214,24 +214,15 @@ If `vite.config.ts` is swapped to Nitro+Vercel preset (Option A), `npm run dev` 
 
 - [ ] `curl https://<railway-service>.up.railway.app/health` → `{"status":"ok","supabase_configured":true}`
 - [ ] Open `https://<vercel-prod>.vercel.app` → app loads, no console CORS errors
-- [ ] Login (after B1 + A2 ship) → home shows projects from API
+- [ ] Login → home shows projects from API
 - [ ] Hit `POST /runs/bbbbbbbb-0000-0000-0000-000000000002/process` from the deployed UI or `curl` → 200 within ~10 s
 - [ ] Vercel preview URL for a feature branch is allowed by API CORS
 
 ---
 
-## Files this agent touched
+## Related files
 
-Frontend repo (`identical-front`):
-- `vercel.json` *(new — minimal build hints)*
-- `DEPLOY.md` *(this file)*
-- `.env.example` *(additive comments about Vercel preview env)*
+- Frontend: `vercel.json`, `DEPLOY.md`, `.env.example`
+- Backend: `api/main.py`, `api/Dockerfile`, `railway.toml`, `api/.env.example`
 
-Backend repo (`CSIT321_Project`):
-- `api/main.py` *(CORS: added `ALLOWED_ORIGIN_REGEX` env support)*
-- `api/Dockerfile` *(honour `$PORT` for Railway / Render / Fly)*
-- `api/.env.example` *(additive — Railway/CORS hints, no secrets)*
-- `railway.toml` *(new — build + healthcheck + start)*
-- `README.md` *(small "hosted deploy" cross-link section)*
-
-No secrets committed. `.env` files remain untracked. No other code refactors.
+Do not commit `.env` files or service-role keys.
