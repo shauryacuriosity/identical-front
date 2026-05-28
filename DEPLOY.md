@@ -25,7 +25,7 @@ The `wrangler.jsonc` Cloudflare config is **kept intentionally** — historical 
 
 | Env | URL | Status |
 |-----|-----|--------|
-| Frontend — Vercel **production** | `https://identical-front.vercel.app` | live |
+| Frontend — Vercel **production** | `https://lotusapp.org` (also `https://identical-front.vercel.app`) | live |
 | Frontend — Vercel **preview** (per PR) | `https://<branch>-identical-front.vercel.app` | auto on push |
 | API — Railway **production** | `https://vivacious-wisdom-production.up.railway.app` | live |
 | Supabase | `https://poizespthezmvrfhcyps.supabase.co` | live |
@@ -96,7 +96,7 @@ Complete these in the Vercel and Railway dashboards before production works:
 
 8. **Vercel ← API URL** — after Railway gives you the API hostname, set `VITE_API_BASE_URL` in Vercel to that exact URL, redeploy.
 9. **Railway ← Vercel URL** — after Vercel gives you the production hostname, set `ALLOWED_ORIGINS` and `ALLOWED_ORIGIN_REGEX` in Railway (see CORS section), redeploy.
-10. **Supabase Auth redirect URLs** — Dashboard → Authentication → URL Configuration → add `https://<vercel-project>.vercel.app/**` and `https://*-<vercel-project>.vercel.app/**` to the allowlist. (Coordinate with A2 / B1 — they own auth.)
+10. **Supabase Auth redirect URLs** — Dashboard → Authentication → URL Configuration → set **Site URL** to `https://lotusapp.org` and add `https://lotusapp.org/**`, `https://www.lotusapp.org/**`, `https://identical-front.vercel.app/**`, and `https://*-identical-front.vercel.app/**` to the allowlist. Or run `supabase config push` from `CSIT321_Project` (see `supabase/config.toml`).
 
 ---
 
@@ -111,7 +111,7 @@ Complete these in the Vercel and Railway dashboards before production works:
 | `SUPABASE_URL` | n/a | n/a | `https://poizespthezmvrfhcyps.supabase.co` | same project. |
 | `SUPABASE_SERVICE_ROLE_KEY` | n/a | n/a | `<service_role key>` | Supabase → Settings → API → "service_role" key. **Never put in any VITE_* var.** |
 | `SUPABASE_STORAGE_BUCKET` | n/a | n/a | `run-artifacts` | Existing bucket. |
-| `ALLOWED_ORIGINS` | n/a | n/a | `http://localhost:8080,https://<vercel-prod>.vercel.app` | Exact origins the API trusts. |
+| `ALLOWED_ORIGINS` | n/a | n/a | `http://localhost:8080,https://lotusapp.org,https://www.lotusapp.org,https://identical-front.vercel.app` | Exact origins the API trusts. |
 | `ALLOWED_ORIGIN_REGEX` | n/a | n/a | `^https://.*\.vercel\.app$` | One regex covering every preview URL. |
 | `STORAGE_DIR` | n/a | n/a | `/app/api_storage` | Mount path of the Railway volume. |
 | `PORT` | n/a | n/a | **leave unset** — Railway injects it | `api/Dockerfile` falls back to 8000 locally. |
@@ -155,12 +155,12 @@ Then re-run `supabase/seed.sql` in the SQL editor (or `psql … -f supabase/seed
 
 ## CORS update step (after both URLs land)
 
-1. Copy your Vercel production URL (e.g. `https://lotus.vercel.app`).
+1. Copy your production URL (`https://lotusapp.org`).
 2. Railway → Service → Variables → set:
-   - `ALLOWED_ORIGINS=http://localhost:8080,https://lotus.vercel.app`
+   - `ALLOWED_ORIGINS=http://localhost:8080,https://lotusapp.org,https://www.lotusapp.org,https://identical-front.vercel.app`
    - `ALLOWED_ORIGIN_REGEX=^https://.*\.vercel\.app$`
 3. Railway redeploys automatically on save.
-4. Verify with browser devtools — load the Vercel URL, open any page that calls the API, check no CORS error in console.
+4. Verify with browser devtools — load `https://lotusapp.org`, open any page that calls the API, check no CORS error in console.
 
 `api/main.py` reads both `ALLOWED_ORIGINS` (comma-separated exact list) and `ALLOWED_ORIGIN_REGEX` (single regex for preview URLs). Localhost:8080 is always allowed for dev parity.
 
@@ -213,7 +213,7 @@ If `vite.config.ts` is swapped to Nitro+Vercel preset (Option A), `npm run dev` 
 ## Verification checklist (after both URLs are live)
 
 - [ ] `curl https://<railway-service>.up.railway.app/health` → `{"status":"ok","supabase_configured":true}`
-- [ ] Open `https://<vercel-prod>.vercel.app` → app loads, no console CORS errors
+- [ ] Open `https://lotusapp.org` → app loads, no console CORS errors
 - [ ] Login → home shows projects from API
 - [ ] Hit `POST /runs/bbbbbbbb-0000-0000-0000-000000000002/process` from the deployed UI or `curl` → 200 within ~10 s
 - [ ] Vercel preview URL for a feature branch is allowed by API CORS

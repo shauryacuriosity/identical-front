@@ -355,7 +355,7 @@ const stepAccent: Record<StepKind, string> = {
   from: "border-data-plum/35 bg-data-plum/[0.06]",
   join: "border-data-slate/35 bg-data-slate/[0.06]",
   aggregate: "border-data-ochre/40 bg-data-ochre/[0.07]",
-  filter: "border-coral/35 bg-coral-tint",
+  filter: "border-coral/50 bg-selection-subtle",
   sort: "border-data-sage/40 bg-data-sage/[0.07]",
 };
 

@@ -27,4 +27,4 @@
 npm run dev
 ```
 
-Use DevTools device mode at 390×844 and 1280×800. Production: https://identical-front.vercel.app
+Use DevTools device mode at 390×844 and 1280×800. Production: https://lotusapp.org

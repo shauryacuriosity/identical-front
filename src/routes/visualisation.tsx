@@ -517,8 +517,8 @@ function VisualisationPage() {
                     onClick={() => setChartType(value)}
                     className={`flex items-center gap-2.5 px-2.5 py-2.5 min-h-11 rounded-lg border text-left transition-colors ${
                       active
-                        ? "border-coral/50 bg-coral-tint"
-                        : "border-hairline bg-surface hover:bg-surface-hover"
+                        ? "border-coral bg-selection ring-1 ring-coral/25"
+                        : "border-hairline bg-surface hover:bg-selection-subtle"
                     }`}
                   >
                     <Icon className={`h-4 w-4 ${active ? "text-coral" : "text-ink-2"}`} />

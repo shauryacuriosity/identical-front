@@ -6,7 +6,7 @@ Production URLs:
 
 | Layer | URL |
 |-------|-----|
-| Frontend | https://identical-front.vercel.app |
+| Frontend | https://lotusapp.org |
 | API | https://vivacious-wisdom-production.up.railway.app |
 | Database / Auth / Storage | https://poizespthezmvrfhcyps.supabase.co |
 

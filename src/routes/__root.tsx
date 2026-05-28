@@ -182,16 +182,16 @@ function AppHeader() {
             to="/"
             aria-label="Home"
             className={
-              "flex items-center gap-2 px-3 min-h-11 h-11 my-auto rounded-full transition-colors text-ink focus-visible:ring-2 focus-visible:ring-coral/50 " +
-              (homeActive ? "bg-coral" : "hover:bg-highlight/50")
+              "flex items-center gap-2 px-3 min-h-11 h-11 my-auto rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-coral/50 " +
+              (homeActive ? "bg-coral text-white" : "text-ink hover:bg-highlight/50")
             }
           >
             {homeActive ? (
-              <LotusMarkActive className="h-[18px] w-auto text-ink" />
+              <LotusMarkActive className="h-[18px] w-auto text-white" />
             ) : (
               <img src={lotusMark} alt="" className="h-[18px] w-auto" />
             )}
-            <span className="hidden sm:inline text-[15px] sm:text-[16px] font-semibold text-ink leading-none tracking-tight">
+            <span className="hidden sm:inline text-[15px] sm:text-[16px] font-semibold leading-none tracking-tight">
               Lotus
             </span>
           </Link>
@@ -210,8 +210,8 @@ function AppHeader() {
                   to={t.to}
                   aria-label={t.label}
                   className={
-                    "h-11 min-w-[44px] px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink focus-visible:ring-2 focus-visible:ring-coral/50 " +
-                    (active ? "bg-coral" : "hover:bg-highlight/50")
+                    "h-11 min-w-[44px] px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-coral/50 " +
+                    (active ? "bg-coral text-white" : "text-ink hover:bg-highlight/50")
                   }
                 >
                   <Icon size={18} strokeWidth={2.5} />

@@ -17,7 +17,7 @@
 
 Also documented in [`CAPSTONE_DEMO_LOGIN.md`](./CAPSTONE_DEMO_LOGIN.md).
 
-1. Open https://identical-front.vercel.app/login
+1. Open https://lotusapp.org/login
 2. Sign in → **Home** with projects
 
 You can still **Sign up** with your own email if you prefer a personal account.
@@ -29,7 +29,7 @@ You can still **Sign up** with your own email if you prefer a personal account.
 3. **Datasets** → show pipeline / preview
 4. **Visualisation** → one chart
 5. **AI Analysis** → dataset `510a6e3f-…` (eAsia full cohort) → run or open seeded results:
-   - https://identical-front.vercel.app/runs/bbbbbbbb-0000-0000-0000-000000000002
+   - https://lotusapp.org/runs/bbbbbbbb-0000-0000-0000-000000000002
 
 ## What's included
 

@@ -46,7 +46,9 @@
   --color-coral-deep: var(--coral-deep);
   --color-coral-muted: var(--coral-muted);
   --color-coral-soft: var(--coral-muted);
-  --color-coral-tint: var(--surface-hover);
+  --color-coral-tint: var(--coral-tint);
+  --color-selection: var(--selection-bg);
+  --color-selection-subtle: var(--selection-bg-subtle);
   --color-highlight: var(--bg-highlight);
   --color-data-sage: var(--data-sage);
   --color-data-ochre: var(--data-ochre);
@@ -68,11 +70,19 @@
   --radius-control: var(--radius-lg);
   --radius-pill: 9999px;
 
-  /* Locked palette — canonical reference */
-  --bg-page: #f2d0cf;
+  /* Locked palette — Figma bg tokens (light mode) */
+  --bg-dark: #f2d0cf;
+  --bg-dark-faded: #caa8a7;
+  --bg-page: var(--bg-dark);
   --bg-surface: #fff5f5;
-  --bg-emphasis: #caa8a7;
+  --bg-light: #fff5f5;
+  --bg-emphasis: var(--bg-dark-faded);
   --bg-highlight: #ffffff;
+
+  /* Selected / active surfaces — lighter than emphasis, never the muted fade */
+  --selection-bg: var(--bg-light);
+  --selection-bg-subtle: color-mix(in oklab, var(--accent-primary) 14%, var(--bg-light));
+  --coral-tint: color-mix(in oklab, var(--accent-primary) 16%, var(--bg-light));
 
   --accent-primary: #e8928e;
   --accent-secondary: #0077ff;
@@ -98,7 +108,9 @@
   --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.14), 0 2px 6px -2px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.16), 0 4px 8px -4px rgba(0, 0, 0, 0.06);
   --shadow-elevated: var(--shadow-md);
-  --shadow-depth: 0 8px 24px -12px rgba(0, 0, 0, 0.22);
+  --shadow-depth:
+    0 10px 7px 0 var(--shadow-drop-color),
+    inset 0 10px 7px 0 var(--shadow-inner-color);
 
   /* Chart series */
   --data-sage: #7aab8a;
@@ -144,15 +156,23 @@
 
   --ambient: none;
 
-  --shadow-drop-color: rgba(0, 0, 0, 0.22);
+  --shadow-drop-color: rgba(0, 0, 0, 0.25);
   --shadow-inner-color: rgba(255, 255, 255, 0.25);
 }
 
 .dark {
-  --bg-page: #140f0f;
+  /* Figma bg tokens (dark mode) */
+  --bg-dark: #140f0f;
+  --bg-dark-faded: #0a0101;
+  --bg-page: var(--bg-dark);
   --bg-surface: #140405;
-  --bg-emphasis: #0a0101;
-  --bg-highlight: #6e4a4a;
+  --bg-light: #1e1e1e;
+  --bg-emphasis: var(--bg-dark-faded);
+  --bg-highlight: var(--bg-light);
+
+  --selection-bg: var(--bg-light);
+  --selection-bg-subtle: color-mix(in oklab, var(--accent-primary) 20%, var(--bg-light));
+  --coral-tint: color-mix(in oklab, var(--accent-primary) 24%, var(--bg-light));
 
   --text-primary: #ffffff;
   --text-muted: #e8b8b4;
@@ -165,7 +185,7 @@
 
   --canvas: var(--bg-page);
   --surface: var(--bg-surface);
-  --surface-hover: var(--bg-highlight);
+  --surface-hover: var(--bg-light);
   --ink: var(--text-primary);
   --ink-2: var(--text-muted);
   --ink-3: var(--text-tertiary);
@@ -195,7 +215,6 @@
   --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.35);
   --shadow-lg: 0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
   --shadow-elevated: var(--shadow-md);
-  --shadow-depth: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 
   --shadow-drop-color: rgba(200, 200, 255, 0.25);
   --shadow-inner-color: rgba(200, 200, 255, 0.25);
@@ -339,6 +358,13 @@
   }
   .shadow-depth {
     box-shadow: var(--shadow-depth);
+  }
+
+  .bg-selection {
+    background-color: var(--selection-bg);
+  }
+  .bg-selection-subtle {
+    background-color: var(--selection-bg-subtle);
   }
 
   .focus-ring {

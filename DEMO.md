@@ -8,7 +8,7 @@ Walk through the golden path on production (~5 minutes). Prefer the seeded run l
 
 | Service | URL |
 |---------|-----|
-| **App (Vercel)** | https://identical-front.vercel.app |
+| **App (Vercel)** | https://lotusapp.org |
 | **API (Railway)** | https://vivacious-wisdom-production.up.railway.app |
 | **API health** | https://vivacious-wisdom-production.up.railway.app/health |
 | **Supabase** | https://poizespthezmvrfhcyps.supabase.co |
@@ -25,7 +25,7 @@ Walk through the golden path on production (~5 minutes). Prefer the seeded run l
 
 Direct link to seeded run results:
 
-https://identical-front.vercel.app/runs/bbbbbbbb-0000-0000-0000-000000000002
+https://lotusapp.org/runs/bbbbbbbb-0000-0000-0000-000000000002
 
 ---
 
@@ -43,7 +43,7 @@ See [`DEPLOY.md`](./DEPLOY.md) for the full checklist. Minimum for a working dem
 | `VITE_SUPABASE_ANON_KEY` | Vercel | anon key from Supabase dashboard (safe in browser) |
 | `SUPABASE_URL` | Railway | same Supabase URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Railway | service_role key (**never** in Vercel) |
-| `ALLOWED_ORIGINS` | Railway | includes `https://identical-front.vercel.app` |
+| `ALLOWED_ORIGINS` | Railway | `http://localhost:8080,https://lotusapp.org,https://www.lotusapp.org,https://identical-front.vercel.app` |
 | `ALLOWED_ORIGIN_REGEX` | Railway | `^https://.*\.vercel\.app$` |
 
 **Secrets:** anon and service_role keys live in the team password manager — not in this repo.
@@ -86,7 +86,7 @@ curl https://vivacious-wisdom-production.up.railway.app/health
 # expect: {"status":"ok","supabase_configured":true}
 ```
 
-Open https://identical-front.vercel.app — no CORS errors in browser devtools when the home page loads projects.
+Open https://lotusapp.org — no CORS errors in browser devtools when the home page loads projects.
 
 ---
 
@@ -96,7 +96,7 @@ Shared account (documented in [`CAPSTONE_DEMO_LOGIN.md`](./CAPSTONE_DEMO_LOGIN.m
 
 | Field | Value |
 |-------|--------|
-| **URL** | https://identical-front.vercel.app/login |
+| **URL** | https://lotusapp.org/login |
 | **Email** | `lotus.demo@uow.edu.au` |
 | **Password** | `LotusDemo2026!` |
 
@@ -108,7 +108,7 @@ Judges may also sign up with their own email if preferred.
 
 ### Minute 0–1 — Login & home
 
-1. Open https://identical-front.vercel.app/login
+1. Open https://lotusapp.org/login
 2. Sign in with the demo account above.
 3. **Home** should list projects fetched from the Railway API (not an empty mock list).
 4. Click **eAsia MetS Demo · Full Cohort Analysis** (project `e1111111-…`).
@@ -134,7 +134,7 @@ Judges may also sign up with their own email if preferred.
 
 **Option A — show pre-computed results (recommended, ~30 s):**
 
-1. Open https://identical-front.vercel.app/runs/bbbbbbbb-0000-0000-0000-000000000002
+1. Open https://lotusapp.org/runs/bbbbbbbb-0000-0000-0000-000000000002
 2. Walk through EDA metrics, model scores, cluster summary, and prediction table.
 
 **Option B — trigger a new live run (~8–10 s on Railway):**
@@ -211,8 +211,8 @@ The AI Analysis UI stores `function_mode` on each run (`full`, `prediction_only`
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Empty home / no projects | Railway `api_storage` not seeded | `seed_local_demo.py --force` in Railway shell |
-| CORS error in console | `ALLOWED_ORIGINS` missing Vercel URL | Update Railway env, redeploy — see [`DEPLOY.md`](./DEPLOY.md) |
-| Login redirect loop | Supabase redirect URLs | Add `https://identical-front.vercel.app/**` in Supabase Auth settings |
+| CORS error in console | `ALLOWED_ORIGINS` missing custom domain | Update Railway env to include `https://lotusapp.org` — see [`DEPLOY.md`](./DEPLOY.md) |
+| Login redirect loop | Supabase redirect URLs | Add `https://lotusapp.org/**` and `https://www.lotusapp.org/**` in Supabase Auth settings |
 | Run 404 | Supabase seed not applied | Run `supabase/seed.sql` |
 | `supabase_configured: false` | Missing service role on Railway | Set `SUPABASE_SERVICE_ROLE_KEY` |
 

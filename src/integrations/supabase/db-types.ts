@@ -12,6 +12,8 @@ export interface Database {
           mets_prevalence: number | null;
           archived: boolean | null;
           status: string | null;
+          user_id: string | null;
+          is_shared: boolean | null;
         };
         Insert: {
           id?: string;
@@ -21,6 +23,8 @@ export interface Database {
           mets_prevalence?: number | null;
           archived?: boolean | null;
           status?: string | null;
+          user_id?: string | null;
+          is_shared?: boolean | null;
         };
         Update: Partial<Database["public"]["Tables"]["datasets"]["Insert"]>;
       };

@@ -239,7 +239,7 @@ function ConfidencePill({ row }: { row: MappingSuggestion }) {
   return (
     <span
       className={`${base} border-coral/30`}
-      style={{ backgroundColor: "var(--coral-tint)", color: "var(--coral)" }}
+      style={{ backgroundColor: "var(--selection-bg-subtle)", color: "var(--coral-deep)" }}
     >
       needs review · {score}
     </span>
@@ -269,8 +269,8 @@ function AnalysisTypePicker({
             className={
               "group relative flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-all min-h-[44px] focus-visible:ring-2 focus-visible:ring-coral/50 " +
               (active
-                ? "border-coral/60 bg-coral-tint shadow-[var(--shadow-card)] ring-1 ring-coral/25"
-                : "border-hairline bg-surface hover:border-coral/35 hover:bg-surface-hover/30")
+                ? "border-coral bg-selection shadow-card ring-2 ring-coral/30"
+                : "border-hairline bg-surface hover:border-coral/40 hover:bg-selection-subtle")
             }
           >
             {opt.recommended && (
@@ -286,7 +286,7 @@ function AnalysisTypePicker({
             <span
               className={
                 "flex h-10 w-10 items-center justify-center rounded-lg transition-colors " +
-                (active ? "bg-coral text-ink" : "bg-canvas text-coral-deep group-hover:bg-coral/15")
+                (active ? "bg-coral text-white" : "bg-canvas text-coral-deep group-hover:bg-coral/15")
               }
             >
               <Icon className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -469,7 +469,7 @@ function StepIndicator({
                       : isDone
                         ? "bg-coral text-white border-coral"
                         : isActive
-                          ? "bg-coral-tint text-coral border-coral/40"
+                          ? "bg-coral text-white border-coral ring-2 ring-coral/25"
                           : "bg-surface text-ink-3 border-hairline"
                   }`}
                 >
@@ -613,7 +613,7 @@ function StepShell({
                 ? "bg-coral text-white border-coral"
                 : locked
                   ? "bg-surface text-ink-3 border-hairline"
-                  : "bg-coral-tint text-coral border-coral/40"
+                  : "bg-coral text-white border-coral ring-2 ring-coral/25"
             }`}
           >
             {complete ? <Check className="h-3.5 w-3.5" strokeWidth={2.5} /> : index}
@@ -1653,7 +1653,15 @@ function AiAnalysisPage() {
           <section className="rounded-2xl border border-hairline bg-surface p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                <span className="h-7 w-7 rounded-full flex items-center justify-center border bg-coral-tint text-coral border-coral/40">
+                <span
+                  className={`h-7 w-7 rounded-full flex items-center justify-center border ${
+                    runMutation.isPending
+                      ? "bg-coral text-white border-coral"
+                      : runMutation.isError
+                        ? "bg-selection-subtle text-coral-deep border-coral/50"
+                        : "bg-coral text-white border-coral"
+                  }`}
+                >
                   {runMutation.isPending ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : runMutation.isError ? (
@@ -1857,7 +1865,7 @@ function MethodSection({
   return (
     <div
       className={`rounded-2xl border transition-all ${
-        enabled ? "border-coral/50 bg-coral-tint/30" : "border-hairline bg-surface"
+        enabled ? "border-coral/60 bg-selection-subtle" : "border-hairline bg-surface opacity-90"
       }`}
     >
       <div className="flex items-stretch gap-1 p-3 sm:p-4 sm:pr-5">
@@ -1869,7 +1877,7 @@ function MethodSection({
           <div className="flex items-center gap-3 min-w-0">
             <span
               className={`h-9 w-9 shrink-0 rounded-lg flex items-center justify-center ${
-                enabled ? "bg-coral text-white" : "bg-surface-hover text-ink-2"
+                enabled ? "bg-coral text-white" : "bg-canvas text-ink-3"
               }`}
             >
               {icon}
@@ -1919,10 +1927,10 @@ function RadioRow({
     <div
       className={`flex items-center gap-1 rounded-lg border pr-1 transition-colors ${
         disabled
-          ? "border-dashed border-hairline bg-surface opacity-50"
+          ? "border-dashed border-hairline bg-surface opacity-45"
           : checked
-            ? "border-coral/50 bg-surface"
-            : "border-hairline bg-surface"
+            ? "border-coral bg-selection ring-1 ring-coral/20"
+            : "border-hairline bg-surface hover:bg-selection-subtle"
       }`}
     >
       <button
