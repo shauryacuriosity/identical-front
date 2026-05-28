@@ -8,6 +8,13 @@ export function isPublicAuthPath(pathname: string): boolean {
   return PUBLIC_AUTH_PATHS.some((p) => pathname === p);
 }
 
+/** Client-side session read (localStorage). Used by route guards before rendering protected pages. */
+export async function getClientAuthSession() {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) console.warn("[auth] getSession:", error.message);
+  return data.session;
+}
+
 type AuthContextValue = {
   session: Session | null;
   user: User | null;

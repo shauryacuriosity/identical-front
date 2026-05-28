@@ -1,7 +1,9 @@
 import {
   Link,
+  Navigate,
   Outlet,
   createRootRouteWithContext,
+  redirect,
   useLocation,
   useRouter,
   useNavigate,
@@ -19,7 +21,7 @@ import lotusMark from "@/assets/logo_lotus.png";
 import { LotusMarkActive } from "@/components/lotus-mark-active";
 import { setProjectsQueryInvalidator } from "@/lib/projects-store";
 import { setAuthTokenGetter } from "@/lib/api/client";
-import { AuthProvider, useAuth, isPublicAuthPath, profileFromUser } from "@/lib/auth";
+import { AuthProvider, useAuth, isPublicAuthPath, profileFromUser, getClientAuthSession } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
@@ -34,6 +36,18 @@ import { Toaster } from "@/components/ui/sonner";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  /** Avoid SSR rendering protected pages (e.g. Home) before client session is known. */
+  ssr: false,
+  beforeLoad: async ({ location }) => {
+    if (isPublicAuthPath(location.pathname)) return;
+    const session = await getClientAuthSession();
+    if (!session) {
+      throw redirect({
+        to: "/login",
+        search: { redirect: location.pathname },
+      });
+    }
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -67,9 +81,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var p=location.pathname;var pub=["/login","/signup","/forgot-password"];if(pub.indexOf(p)===-1)document.documentElement.setAttribute("data-auth-pending","1");})();`,
+          }}
+        />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
     </html>
   );
 }
@@ -569,7 +593,6 @@ function SessionLoadingScreen() {
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const { pathname } = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     setAuthTokenGetter(() => session?.access_token ?? null);
@@ -577,16 +600,26 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) return;
-    const isPublic = isPublicAuthPath(pathname);
-    if (!session && !isPublic) {
-      void navigate({ to: "/login", replace: true });
-    } else if (session && isPublic) {
-      void navigate({ to: "/", replace: true });
+    const pending = document.documentElement.getAttribute("data-auth-pending");
+    if (pending) {
+      document.documentElement.removeAttribute("data-auth-pending");
     }
-  }, [loading, session, pathname, navigate]);
+  }, [loading, session, pathname]);
 
-  if (loading) return <SessionLoadingScreen />;
-  if (!session && !isPublicAuthPath(pathname)) return <SessionLoadingScreen />;
+  const isPublic = isPublicAuthPath(pathname);
+
+  if (loading && !isPublic) {
+    return <SessionLoadingScreen />;
+  }
+
+  if (!session && !isPublic) {
+    return <Navigate to="/login" search={{ redirect: pathname }} replace />;
+  }
+
+  if (session && isPublic) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 }
 
@@ -595,7 +628,7 @@ function AppShell() {
   const isAuthPage = isPublicAuthPath(pathname);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" data-app-shell="true">
       {!isAuthPage && <AppHeader />}
       <main className={isAuthPage ? "" : "flex-1 pt-2 sm:pt-4 pb-20 lg:pb-0"}>
         <Outlet />

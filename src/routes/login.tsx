@@ -5,11 +5,22 @@ import { AuthLayout, inputClass, primaryButtonClass, primaryButtonStyle } from "
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    redirect:
+      typeof s.redirect === "string" && s.redirect.startsWith("/") && !isPublicRedirect(s.redirect)
+        ? s.redirect
+        : undefined,
+  }),
   component: LoginPage,
 });
 
+function isPublicRedirect(path: string) {
+  return path === "/login" || path === "/signup" || path === "/forgot-password";
+}
+
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +40,7 @@ function LoginPage() {
     }
 
     toast.success("Signed in");
-    void navigate({ to: "/" });
+    void navigate({ to: redirectTo ?? "/" });
   };
 
   return (

@@ -202,6 +202,11 @@
 }
 
 @layer base {
+  /* Hide protected shell until client auth resolves (prevents Home flash before login). */
+  html[data-auth-pending] [data-app-shell="true"] {
+    visibility: hidden;
+  }
+
   * {
     border-color: var(--color-border);
   }
