@@ -152,7 +152,7 @@ function RowAction({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="h-7 w-7 rounded-md flex items-center justify-center text-ink-2 hover:text-coral hover:bg-surface-hover/40 transition-colors"
+      className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-md flex items-center justify-center text-ink-2 hover:text-coral hover:bg-surface-hover/40 transition-colors focus-visible:ring-2 focus-visible:ring-coral/50"
     >
       <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
     </button>
@@ -163,10 +163,75 @@ function Em() {
   return <span className="text-ink-2">—</span>;
 }
 
+function ProjectCard({
+  name,
+  files,
+  prevalence,
+  modified,
+  archived,
+  selected,
+  onToggle,
+  onOpen,
+}: {
+  name: string;
+  files: number;
+  prevalence: number | null;
+  modified: string;
+  archived?: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={`flex gap-3 px-4 py-4 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+        archived ? "opacity-75" : ""
+      }`}
+    >
+      <span className="flex items-start pt-0.5 shrink-0">
+        <RowCheckbox checked={selected} onChange={onToggle} ariaLabel={`Select ${name}`} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="h-4 w-4 text-coral shrink-0" strokeWidth={1.75} />
+          <span className="text-[14px] font-medium text-ink truncate">{name}</span>
+        </div>
+        <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[12px]">
+          <div>
+            <dt className="text-ink-3">Files</dt>
+            <dd className={`tabular ${files === 0 ? "text-ink-3" : "text-ink-2"}`}>
+              {files} file{files === 1 ? "" : "s"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-3">MetS prev.</dt>
+            <dd className="tabular text-ink-2">
+              {prevalence != null ? `${(prevalence * 100).toFixed(1)}%` : <Em />}
+            </dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-ink-3">Modified</dt>
+            <dd className="text-ink-2">{modified || <Em />}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  );
+}
+
 function SkeletonRow({ last }: { last?: boolean }) {
   return (
     <div
-      className={`grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 ${
+      className={`hidden md:grid grid-cols-[16px_1fr_120px_100px_140px_120px] items-center gap-4 px-5 py-3.5 ${
         last ? "" : "border-b border-hairline"
       }`}
     >
@@ -225,13 +290,13 @@ function Index() {
 
   return (
     <div className="relative">
-      <div className="mx-auto max-w-[1280px] px-6 pt-10 pb-16">
+      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-6 sm:pt-10 pb-16 min-w-0">
         {/* Greeting */}
-        <div className="mb-14 flex items-start gap-4">
-          <img src={lotusMark} alt="" className="h-12 w-auto mt-1 shrink-0" />
-          <div>
+        <div className="mb-10 sm:mb-14 flex items-start gap-4">
+          <img src={lotusMark} alt="" className="h-10 sm:h-12 w-auto mt-1 shrink-0" />
+          <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-[0.18em] text-ink-2 font-semibold mb-2">Workbench</div>
-            <h1 className="text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">Welcome back</h1>
+            <h1 className="text-[32px] sm:text-[44px] font-bold text-ink leading-[1.05] tracking-[-0.02em]">Welcome back</h1>
             <p className="text-[15px] text-ink-2 mt-3 max-w-[520px] leading-relaxed">
               Pick up where you left off, or start something new.
             </p>
@@ -272,13 +337,61 @@ function Index() {
           </div>
         </div>
 
-        {/* Unified table card */}
+        {/* Unified table card — cards on phone, table from md */}
         <div
-          className="rounded-2xl bg-surface border border-hairline overflow-hidden"
-          style={{ boxShadow: "0 1px 0 rgba(0,0,0,0.04), 0 12px 32px -16px rgba(0,0,0,0.22)" }}
+          className="rounded-2xl bg-surface border border-hairline overflow-hidden shadow-[var(--shadow-card)]"
         >
-          {/* Header row */}
-          <div className="grid grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
+          {/* Mobile list */}
+          <div className="md:hidden divide-y divide-hairline">
+            {isLoading &&
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="px-4 py-4 space-y-2">
+                  <div className="h-4 w-3/4 rounded bg-surface-hover/60 animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-surface-hover/60 animate-pulse" />
+                </div>
+              ))}
+            {!isLoading && error && (
+              <div className="px-4 py-6 flex flex-col gap-3">
+                <div className="text-[13px] text-ink-2">
+                  Couldn’t load projects — <span className="text-ink">{error.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="inline-flex items-center justify-center gap-1.5 min-h-11 px-4 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50 w-fit"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
+                    strokeWidth={1.75}
+                  />
+                  {retrying ? "Retrying…" : "Retry"}
+                </button>
+              </div>
+            )}
+            {!isLoading && !error && rows.length === 0 && (
+              <div className="px-4 py-6 text-[13px] text-ink-2">No projects yet</div>
+            )}
+            {!isLoading &&
+              !error &&
+              rows.map((f) => (
+                <ProjectCard
+                  key={f.id}
+                  name={f.name}
+                  files={f.files}
+                  prevalence={f.prevalence}
+                  modified={f.modified}
+                  archived={f.archived}
+                  selected={selected.has(f.id)}
+                  onToggle={() => toggleOne(f.id)}
+                  onOpen={() => navigate({ to: "/datasets", search: { projectId: f.id } })}
+                />
+              ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
+          <div className="grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3 text-[10.5px] uppercase tracking-[0.14em] text-ink-2 font-semibold border-b border-hairline-strong">
             <span className="flex items-center justify-center">
               {rows.length > 0 && (
                 <RowCheckbox
@@ -299,7 +412,7 @@ function Index() {
             {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
 
             {!isLoading && error && (
-              <div className="px-5 py-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="hidden md:flex px-5 py-6 flex-wrap items-center justify-between gap-3">
                 <div className="text-[13px] text-ink-2">
                   Couldn’t load projects — <span className="text-ink">{error.message}</span>
                 </div>
@@ -307,7 +420,7 @@ function Index() {
                   type="button"
                   onClick={handleRetry}
                   disabled={retrying}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
@@ -319,7 +432,7 @@ function Index() {
             )}
 
             {!isLoading && !error && rows.length === 0 && (
-              <div className="px-5 py-6 text-[13px] text-ink-2">No projects yet</div>
+              <div className="hidden md:block px-5 py-6 text-[13px] text-ink-2">No projects yet</div>
             )}
 
             {!isLoading &&
@@ -339,7 +452,7 @@ function Index() {
                         navigate({ to: "/datasets", search: { projectId: f.id } });
                       }
                     }}
-                    className={`group relative grid grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
+                    className={`group relative grid min-w-[520px] grid-cols-[16px_1fr_100px_140px_120px] items-center gap-4 px-5 py-3.5 cursor-pointer hover:bg-surface-hover/40 transition-colors ${
                       isLast ? "" : "border-b border-hairline"
                     } ${f.archived ? "opacity-75" : ""}`}
                   >
@@ -382,6 +495,7 @@ function Index() {
                   </div>
                 );
               })}
+          </div>
           </div>
         </div>
       </div>

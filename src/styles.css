@@ -76,7 +76,8 @@
   --accent-highlight: #FFFFFF;
 
   --text-primary: #1A0003;
-  --text-muted:   #673D3D;
+  --text-muted:   #5c3838;
+  --text-tertiary: #7a4f4f;
 
   --border-default: #A06B6B;
   --border-muted:   #C49090;
@@ -101,10 +102,10 @@
   --surface-hover: var(--bg-emphasis);
   --ink: var(--text-primary);
   --ink-2: var(--text-muted);
-  --ink-3: var(--text-muted);
+  --ink-3: var(--text-tertiary);
   --coral: var(--accent-primary);
   --coral-hover: var(--bg-emphasis);
-  --coral-deep: var(--text-primary);
+  --coral-deep: #8b3d38;
   --coral-muted: var(--text-muted);
   --hairline: var(--border-muted);
   --hairline-strong: var(--border-default);
@@ -211,8 +212,27 @@
   code, kbd, .mono { font-family: var(--font-sans); }
 
   :focus-visible {
-    outline: 2px solid var(--coral);
+    outline: 2px solid var(--coral-deep);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid var(--coral-deep);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
   }
 }

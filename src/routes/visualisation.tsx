@@ -430,7 +430,7 @@ function VisualisationPage() {
   const builderDisabled = !project || columns.length === 0;
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pt-8 pb-24">
+    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-6 sm:pt-8 pb-24 min-w-0">
       {/* Top bar */}
       <header className="flex flex-wrap items-end justify-between gap-4 pb-5 border-b border-hairline">
         <div className="flex items-end gap-4">
@@ -440,7 +440,7 @@ function VisualisationPage() {
               <select
                 value={projectId ?? ""}
                 onChange={(e) => setProjectId(e.target.value || null)}
-                className="appearance-none h-9 pl-3 pr-8 text-[13.5px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral min-w-[240px]"
+                className="appearance-none min-h-11 h-11 pl-3 pr-8 text-[13.5px] rounded-md border border-hairline bg-surface text-ink hover:border-coral/40 focus:outline-none focus:border-coral w-full max-w-[min(100%,280px)] sm:min-w-[240px]"
               >
                 <option value="">Select a project…</option>
                 {sortedProjects.map((p) => (
@@ -480,9 +480,9 @@ function VisualisationPage() {
       </header>
 
       {/* Three-column body */}
-      <div className="mt-6 grid grid-cols-[280px_1fr] gap-6">
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 min-w-0">
         {/* LEFT RAIL */}
-        <aside className={`flex flex-col gap-6 ${builderDisabled ? "opacity-60 pointer-events-none" : ""}`}>
+        <aside className={`flex flex-col gap-6 order-2 lg:order-none ${builderDisabled ? "opacity-60 pointer-events-none" : ""}`}>
           <section>
             <div className="text-[11px] uppercase tracking-[0.08em] text-ink-3 mb-2">Chart type</div>
             <div className="flex flex-col gap-1.5">
@@ -492,7 +492,7 @@ function VisualisationPage() {
                   <button
                     key={value}
                     onClick={() => setChartType(value)}
-                    className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border text-left transition-colors ${
+                    className={`flex items-center gap-2.5 px-2.5 py-2.5 min-h-11 rounded-lg border text-left transition-colors ${
                       active
                         ? "border-coral/50 bg-coral-tint"
                         : "border-hairline bg-surface hover:bg-surface-hover"
@@ -583,7 +583,7 @@ function VisualisationPage() {
         </aside>
 
         {/* CENTER CANVAS */}
-        <main>
+        <main className="order-1 lg:order-none min-w-0">
           <section className="rounded-2xl border border-hairline bg-surface min-h-[460px] flex flex-col">
             <div className="flex items-center justify-between px-5 py-3 border-b border-hairline/60">
               <div className="text-[12.5px] text-ink-2">
@@ -666,7 +666,7 @@ function VisualisationPage() {
                 <button
                   onClick={addCurrentToProject}
                   disabled={columns.length === 0 || !!built.error}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md bg-coral text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 min-h-11 px-4 text-[12.5px] rounded-md bg-coral text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="h-3.5 w-3.5" /> Add to project
                 </button>

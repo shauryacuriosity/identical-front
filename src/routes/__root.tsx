@@ -31,6 +31,7 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/sonner";
+import { MobileBottomNav } from "@/components/mobile-bottom-nav";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -116,11 +117,11 @@ function AppHeader() {
   const homeActive = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-30 pt-4 pb-4 px-6 overflow-visible">
+    <header className="sticky top-0 z-30 pt-3 pb-3 sm:pt-4 sm:pb-4 px-3 sm:px-6 overflow-visible">
       <div className="mx-auto max-w-[1280px]">
-        {/* Floating pill nav */}
+        {/* Floating pill nav — compact on mobile; full tabs from lg */}
         <nav
-          className="relative h-14 rounded-full bg-surface flex items-center pl-5 pr-3 border border-hairline"
+          className="relative h-12 sm:h-14 rounded-full bg-surface flex items-center pl-3 sm:pl-5 pr-2 sm:pr-3 border border-hairline"
           style={{ boxShadow: "var(--shadow-depth)" }}
         >
           {/* Brand cluster — acts as Home link */}
@@ -137,14 +138,16 @@ function AppHeader() {
             ) : (
               <img src={lotusMark} alt="" className="h-[18px] w-auto" />
             )}
-            <span className="text-[16px] font-semibold text-ink leading-none tracking-tight">Lotus</span>
+            <span className="hidden sm:inline text-[15px] sm:text-[16px] font-semibold text-ink leading-none tracking-tight">
+              Lotus
+            </span>
           </Link>
 
-          {/* Divider */}
-          <span className="mx-3 h-6 w-px bg-hairline" />
+          {/* Divider — desktop tabs only */}
+          <span className="hidden lg:block mx-3 h-6 w-px bg-hairline" />
 
-          {/* Tabs */}
-          <div className="flex items-center gap-1 h-full">
+          {/* Tabs — hidden below lg (mobile uses bottom nav) */}
+          <div className="hidden lg:flex items-center gap-1 h-full">
             {tabs.map((t) => {
               const active = pathname.startsWith(t.to);
               const Icon = t.icon;
@@ -154,7 +157,7 @@ function AppHeader() {
                   to={t.to}
                   aria-label={t.label}
                   className={
-                    "h-10 px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink " +
+                    "h-11 min-w-[44px] px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors text-ink focus-visible:ring-2 focus-visible:ring-coral/50 " +
                     (active ? "bg-coral" : "hover:bg-highlight/50")
                   }
                 >
@@ -173,7 +176,7 @@ function AppHeader() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="h-10 w-10 rounded-full bg-surface flex items-center justify-center text-ink cursor-pointer border border-hairline-strong hover:bg-surface-hover/40 transition-colors"
+                  className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-full bg-surface flex items-center justify-center text-ink cursor-pointer border border-hairline-strong hover:bg-surface-hover/40 transition-colors focus-visible:ring-2 focus-visible:ring-coral/50"
                   aria-label="Account menu"
                 >
                   <User className="h-4 w-4" strokeWidth={1.75} />
@@ -307,7 +310,7 @@ function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-surface border-hairline p-0 max-w-[900px] w-[92vw] rounded-2xl overflow-hidden shadow-[var(--shadow-elevated)] [&>button]:hidden">
-        <div className="grid grid-cols-[200px_1fr] min-h-[580px]">
+        <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] min-h-[min(580px,85vh)]">
           <aside
             className="p-5 flex flex-col gap-1"
             style={{ background: "linear-gradient(180deg, #E8928E 0%, #C49090 55%, #A06B6B 100%)" }}
@@ -594,9 +597,10 @@ function AppShell() {
   return (
     <div className="min-h-screen flex flex-col">
       {!isAuthPage && <AppHeader />}
-      <main className={isAuthPage ? "" : "flex-1 pt-4"}>
+      <main className={isAuthPage ? "" : "flex-1 pt-2 sm:pt-4 pb-20 lg:pb-0"}>
         <Outlet />
       </main>
+      {!isAuthPage && <MobileBottomNav />}
     </div>
   );
 }
@@ -604,7 +608,7 @@ function AppShell() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[13px] font-bold text-coral mb-1.5">{label}</label>
+      <label className="block text-[13px] font-bold text-coral-deep mb-1.5">{label}</label>
       {children}
     </div>
   );

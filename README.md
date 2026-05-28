@@ -115,5 +115,6 @@ cd ../CSIT321_Project && git pull && git push
 |---------|-------------|
 | `npm run dev` | Vite dev server |
 | `npm run build` | Production build |
+| `npm run test` | Vitest smoke tests (`src/**/*.test.ts`) |
 | `npm run preview` | Preview production build |
 | `./scripts/setup-env.sh` | Create `.env` from example |

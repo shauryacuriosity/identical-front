@@ -1554,7 +1554,7 @@ function DatasetsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pt-6 pb-24">
+    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-4 sm:pt-6 pb-24 min-w-0">
       <ProjectHeader
         projectId={projectId}
         effectiveName={effectiveName}
@@ -1565,10 +1565,10 @@ function DatasetsPage() {
         onNameDraftChange={setProjectNameDraft}
       />
 
-      <div className="flex gap-5">
+      <div className="flex flex-col lg:flex-row gap-5 min-w-0">
         {/* Sidebar */}
 
-        <aside className="w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-sm)] p-4 self-start sticky top-[72px] max-h-[calc(100vh-90px)] overflow-y-auto">
+        <aside className="w-full lg:w-[280px] shrink-0 bg-surface rounded-xl border border-hairline shadow-[var(--shadow-card)] p-4 lg:self-start lg:sticky lg:top-[72px] max-h-[min(280px,40vh)] lg:max-h-[calc(100vh-90px)] overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[13px] font-semibold text-ink uppercase tracking-[0.08em]">Attributes</h2>
             <span className="text-[10.5px] text-ink-2 tabular">{totalCount}</span>

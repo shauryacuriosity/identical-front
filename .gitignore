@@ -19,7 +19,6 @@ dist-ssr
 .env.local
 .env.*.local
 .env.vercel.production
-CAPSTONE_DEMO_LOGIN.md
 
 # Wrangler / Cloudflare
 .wrangler/

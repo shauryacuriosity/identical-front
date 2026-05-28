@@ -8,19 +8,19 @@
 | **API** | https://vivacious-wisdom-production.up.railway.app |
 | **API health** | https://vivacious-wisdom-production.up.railway.app/health |
 
-## Demo login (ready to use)
-
-**Pre-created account:**
+## Demo login (shared — everyone uses the same account)
 
 | | |
 |---|---|
 | **Email** | `lotus.demo@uow.edu.au` |
-| **Password** | See local `CAPSTONE_DEMO_LOGIN.md` (gitignored; created on your machine) |
+| **Password** | `LotusDemo2026!` |
+
+Also documented in [`CAPSTONE_DEMO_LOGIN.md`](./CAPSTONE_DEMO_LOGIN.md).
 
 1. Open https://identical-front.vercel.app/login
 2. Sign in → **Home** with projects
 
-You can still **Sign up** with your own email. Share the demo password only in private channels (Slack, not public repos).
+You can still **Sign up** with your own email if you prefer a personal account.
 
 ## 5-minute demo script
 
@@ -31,7 +31,9 @@ You can still **Sign up** with your own email. Share the demo password only in p
 5. **AI Analysis** → dataset `510a6e3f-…` (eAsia full cohort) → run or open seeded results:
    - https://identical-front.vercel.app/runs/bbbbbbbb-0000-0000-0000-000000000002
 
-## What we fixed (Waves 1–2)
+## What we fixed (Waves 1–3)
+
+### Waves 1–2
 
 - Vercel + Railway deploy
 - Supabase auth (login first)
@@ -39,6 +41,12 @@ You can still **Sign up** with your own email. Share the demo password only in p
 - AI Analysis age slider, labels-only, honest model copy
 - Supabase migrations + demo run seed
 - Railway auto-seeds demo on container start
+
+### Wave 3
+- Mobile bottom nav + responsive layouts ([`MOBILE.md`](./MOBILE.md))
+- UI contrast polish ([`UI_POLISH.md`](./UI_POLISH.md))
+- Demo / compliance / architecture docs ([`DEMO.md`](./DEMO.md), [`COMPLIANCE.md`](./COMPLIANCE.md), [`ARCHITECTURE.md`](./ARCHITECTURE.md))
+- CI smoke tests (`npm run test`, `pytest tests/test_smoke.py`)
 
 ## Local dev
 

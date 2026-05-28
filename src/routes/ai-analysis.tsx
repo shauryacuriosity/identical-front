@@ -140,8 +140,8 @@ function StepIndicator({
   skipped?: Set<StepKey>;
 }) {
   return (
-    <div className="sticky top-20 z-20 -mx-6 px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline">
-      <ol className="mx-auto max-w-[1280px] flex items-center gap-2">
+    <div className="sticky top-16 sm:top-20 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-canvas/85 backdrop-blur-md border-b border-hairline overflow-x-auto">
+      <ol className="mx-auto max-w-[1280px] flex items-center gap-2 min-w-[min(100%,320px)]">
         {STEPS.map((s, i) => {
           const isSkipped = skipped?.has(s.key) ?? false;
           const isDone = completed.has(s.key) && !isSkipped;
@@ -149,10 +149,10 @@ function StepIndicator({
           const isRunStepRunning = s.key === "run" && running;
           const nextSkipped = skipped?.has(STEPS[i + 1]?.key);
           return (
-            <li key={s.key} className="flex items-center gap-2 flex-1 last:flex-none">
+            <li key={s.key} className="flex items-center gap-2 flex-1 last:flex-none shrink-0">
               <div className={`flex items-center gap-2 ${isSkipped ? "opacity-50" : ""}`}>
                 <span
-                  className={`h-6 w-6 rounded-full flex items-center justify-center text-[11px] tabular border transition-colors ${
+                  className={`h-7 w-7 sm:h-6 sm:w-6 rounded-full flex items-center justify-center text-[11px] tabular border transition-colors ${
                     isSkipped
                       ? "bg-surface text-ink-3 border-dashed border-hairline"
                       : isDone
@@ -173,7 +173,7 @@ function StepIndicator({
                   )}
                 </span>
                 <span
-                  className={`text-[12.5px] font-medium ${
+                  className={`text-[12.5px] font-medium hidden sm:inline ${
                     isActive || isDone ? "text-ink" : "text-ink-3"
                   }`}
                 >
@@ -209,13 +209,13 @@ function MappingRow({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="grid grid-cols-[1fr_16px_1fr_auto] items-center gap-3 py-2.5 border-b border-hairline/60 last:border-b-0">
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_16px_1fr_auto] items-start sm:items-center gap-2 sm:gap-3 py-3 sm:py-2.5 border-b border-hairline/60 last:border-b-0">
       <span className="text-[13.5px] text-ink font-medium">{row.field}</span>
-      <ArrowRight className="h-3.5 w-3.5 text-ink-3" />
-      <div className="relative">
+      <ArrowRight className="hidden sm:block h-3.5 w-3.5 text-ink-3" />
+      <div className="relative sm:col-auto">
         <button
           onClick={() => setOpen((o) => !o)}
-          className={`mono inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[12px] border transition-colors ${
+          className={`mono inline-flex items-center gap-1.5 min-h-11 h-11 sm:min-h-0 sm:h-7 px-3 sm:px-2 rounded-md text-[12px] border transition-colors w-full sm:w-auto ${
             row.column
               ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
               : "border-dashed border-hairline text-ink-3 hover:text-ink"
@@ -675,9 +675,9 @@ function AiAnalysisPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1280px] px-6 pb-24">
+    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pb-24 min-w-0 overflow-x-hidden">
       {/* Breadcrumb + project link */}
-      <div className="pt-6 pb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="pt-4 sm:pt-6 pb-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2 text-[13px] text-ink-2">
           <span>Analysis</span>
         </div>
