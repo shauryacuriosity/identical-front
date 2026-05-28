@@ -1,4 +1,13 @@
-import { Link, Outlet, createRootRouteWithContext, useLocation, useRouter, HeadContent, Scripts } from "@tanstack/react-router";
+import {
+  Link,
+  Outlet,
+  createRootRouteWithContext,
+  useLocation,
+  useRouter,
+  useNavigate,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { User, X } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +18,9 @@ import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
 import { LotusMarkActive } from "@/components/lotus-mark-active";
 import { setProjectsQueryInvalidator } from "@/lib/projects-store";
+import { setAuthTokenGetter } from "@/lib/api/client";
+import { AuthProvider, useAuth, isPublicAuthPath, profileFromUser } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -64,47 +76,19 @@ function RootShell({ children }: { children: React.ReactNode }) {
 type SettingsSection = "general" | "security" | "linked" | "team";
 type ProfileState = { name: string; email: string; institution: string; country: string };
 
-const PROFILE_STORAGE_KEY = "lotus-profile";
-
-const DEFAULT_PROFILE: ProfileState = {
-  name: "",
-  email: "",
-  institution: "UOW eAsia",
-  country: "Australia",
-};
-
-function loadProfile(): ProfileState {
-  if (typeof window === "undefined") return DEFAULT_PROFILE;
-  try {
-    const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (!raw) return DEFAULT_PROFILE;
-    const parsed = JSON.parse(raw) as Partial<ProfileState>;
-    return { ...DEFAULT_PROFILE, ...parsed };
-  } catch {
-    return DEFAULT_PROFILE;
-  }
-}
-
-function saveProfile(profile: ProfileState) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-}
-
 function AppHeader() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const profile = profileFromUser(user);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [activeSection, setActiveSection] = useState<"general" | "security" | "linked" | "team">("general");
-  const [profile, setProfile] = useState<ProfileState>(DEFAULT_PROFILE);
 
   const openSettings = (section: SettingsSection = "general") => {
     setActiveSection(section);
     setSettingsOpen(true);
   };
-
-  useEffect(() => {
-    setProfile(loadProfile());
-  }, []);
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("lotus-theme") : null;
@@ -184,7 +168,7 @@ function AppHeader() {
           {/* Right side */}
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden sm:flex items-center text-[13px] text-ink-2 font-medium">
-              UOW eAsia
+              {profile.institution}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -223,14 +207,18 @@ function AppHeader() {
                 <DropdownMenuItem
                   className="text-ink cursor-pointer"
                   onSelect={() => {
-                    if (typeof window !== "undefined") {
-                      localStorage.removeItem("lotus-profile");
-                      localStorage.removeItem("lotus-theme");
-                      document.documentElement.classList.remove("dark");
-                    }
-                    setProfile(DEFAULT_PROFILE);
-                    setDarkMode(false);
-                    toast.success("Signed out locally");
+                    void (async () => {
+                      await signOut();
+                      if (typeof document !== "undefined") {
+                        document.documentElement.classList.remove("dark");
+                      }
+                      if (typeof window !== "undefined") {
+                        localStorage.removeItem("lotus-theme");
+                      }
+                      setDarkMode(false);
+                      toast.success("Signed out");
+                      void navigate({ to: "/login", replace: true });
+                    })();
                   }}
                 >
                   Sign out
@@ -247,13 +235,8 @@ function AppHeader() {
         activeSection={activeSection}
         setActiveSection={setActiveSection}
         profile={profile}
-        setProfile={setProfile}
         darkMode={darkMode}
         onDarkModeChange={toggleDark}
-        onSaveProfile={(next) => {
-          setProfile(next);
-          saveProfile(next);
-        }}
       />
     </header>
   );
@@ -276,37 +259,45 @@ function SettingsDialog({
   activeSection,
   setActiveSection,
   profile,
-  setProfile,
   darkMode,
   onDarkModeChange,
-  onSaveProfile,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   activeSection: SettingsSection;
   setActiveSection: (s: SettingsSection) => void;
   profile: ProfileState;
-  setProfile: React.Dispatch<React.SetStateAction<ProfileState>>;
   darkMode: boolean;
   onDarkModeChange: (v: boolean) => void;
-  onSaveProfile: (profile: ProfileState) => void;
 }) {
   const [draft, setDraft] = useState(profile);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) setDraft(profile);
   }, [open, profile]);
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     const trimmed: ProfileState = {
       ...draft,
       name: draft.name.trim(),
-      email: draft.email.trim(),
+      email: profile.email.trim(),
       country: draft.country.trim(),
     };
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        full_name: trimmed.name,
+        institution: trimmed.institution,
+        country: trimmed.country,
+      },
+    });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     setDraft(trimmed);
-    setProfile(trimmed);
-    onSaveProfile(trimmed);
     toast.success("Profile saved");
   };
 
@@ -374,9 +365,9 @@ function SettingsDialog({
                     <input
                       type="email"
                       value={draft.email}
-                      onChange={(e) => setDraft((p) => ({ ...p, email: e.target.value }))}
+                      readOnly
                       placeholder="you@university.edu.au"
-                      className={inputClass}
+                      className={inputClass + " bg-surface-hover/50 text-ink-2 cursor-not-allowed"}
                     />
                   </Field>
                   <Field label="Institution">
@@ -398,12 +389,7 @@ function SettingsDialog({
                 </div>
               )}
 
-              {activeSection === "security" && (
-                <SettingsPlaceholder
-                  title="Account security"
-                  description="Password changes, two-factor authentication, and session management will be available once sign-in is connected to your Lotus account."
-                />
-              )}
+              {activeSection === "security" && <SecuritySection />}
 
               {activeSection === "linked" && (
                 <SettingsPlaceholder
@@ -448,11 +434,12 @@ function SettingsDialog({
               <div className="px-8 py-4 border-t border-hairline shrink-0">
                 <button
                   type="button"
-                  onClick={handleSaveProfile}
-                  className="h-9 px-5 rounded-lg text-white text-[13px] font-semibold shadow-sm"
+                  onClick={() => void handleSaveProfile()}
+                  disabled={saving}
+                  className="h-9 px-5 rounded-lg text-white text-[13px] font-semibold shadow-sm disabled:opacity-60"
                   style={{ background: "linear-gradient(180deg, #E8928E 0%, #C49090 100%)" }}
                 >
-                  Save Changes
+                  {saving ? "Saving…" : "Save Changes"}
                 </button>
               </div>
             )}
@@ -516,6 +503,104 @@ function SettingsPlaceholder({ title, description }: { title: string; descriptio
   );
 }
 
+function SecuritySection() {
+  const [enrolling, setEnrolling] = useState(false);
+
+  const handleEnrollMfa = async () => {
+    setEnrolling(true);
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "Authenticator app",
+    });
+    setEnrolling(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (data?.totp?.qr_code) {
+      toast.info("TOTP enrollment started — scan the QR code in your authenticator app.");
+    } else {
+      toast.success("Authenticator enrollment initiated.");
+    }
+  };
+
+  return (
+    <div className="max-w-md py-2 space-y-5">
+      <div>
+        <h3 className="text-[15px] font-bold text-ink">Two-factor authentication</h3>
+        <p className="mt-2 text-[14px] text-ink-2 leading-relaxed">
+          Add a TOTP authenticator app for an extra layer of protection on your Lotus account.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => void handleEnrollMfa()}
+        disabled={enrolling}
+        className="h-9 px-5 rounded-lg text-white text-[13px] font-semibold shadow-sm disabled:opacity-60"
+        style={{ background: "linear-gradient(180deg, #E8928E 0%, #C49090 100%)" }}
+      >
+        {enrolling ? "Starting enrollment…" : "Set up authenticator app"}
+      </button>
+      <p className="text-[12px] text-ink-3 leading-relaxed">
+        Password changes are handled via the reset link on the sign-in page. MFA requires TOTP to be enabled in the
+        Supabase project (configured by your team admin).
+      </p>
+    </div>
+  );
+}
+
+function SessionLoadingScreen() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-canvas">
+      <img src={lotusMark} alt="" className="h-8 w-auto opacity-90" />
+      <div
+        className="h-5 w-5 rounded-full border-2 border-coral border-t-transparent animate-spin"
+        aria-label="Loading session"
+      />
+    </div>
+  );
+}
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { session, loading } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    setAuthTokenGetter(() => session?.access_token ?? null);
+  }, [session]);
+
+  useEffect(() => {
+    if (loading) return;
+    const isPublic = isPublicAuthPath(pathname);
+    if (!session && !isPublic) {
+      void navigate({ to: "/login", replace: true });
+    } else if (session && isPublic) {
+      void navigate({ to: "/", replace: true });
+    }
+  }, [loading, session, pathname, navigate]);
+
+  if (loading) return <SessionLoadingScreen />;
+  if (!session && !isPublicAuthPath(pathname)) return <SessionLoadingScreen />;
+  return children;
+}
+
+function AppShell() {
+  const { pathname } = useLocation();
+  const isAuthPage = isPublicAuthPath(pathname);
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {!isAuthPage && <AppHeader />}
+      <main className={isAuthPage ? "" : "flex-1 pt-4"}>
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -543,12 +628,11 @@ function RootComponent() {
   }, [queryClient]);
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen flex flex-col">
-        <AppHeader />
-        <main className="flex-1 pt-4">
-          <Outlet />
-        </main>
-      </div>
+      <AuthProvider>
+        <AuthGate>
+          <AppShell />
+        </AuthGate>
+      </AuthProvider>
       <Toaster />
     </QueryClientProvider>
   );

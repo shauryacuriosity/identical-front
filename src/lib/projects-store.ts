@@ -52,14 +52,59 @@ function notifyProjectsQuery() {
 const listeners = new Set<() => void>();
 let projects: Project[] = REAL_API_MODE ? [] : [...MOCK_SEED_PROJECTS];
 
-async function hydrateProjectsFromApi() {
-  if (!REAL_API_MODE) return;
+// ─── Hydration state (real-mode only) ─────────────────────────────────────
+// Lets UI render a skeleton while the first /projects fetch is in flight,
+// and an error state (with Retry) when it fails.
+
+export type HydrationStatus = "idle" | "loading" | "success" | "error";
+export type HydrationState = { status: HydrationStatus; error: Error | null };
+
+const hydrationListeners = new Set<() => void>();
+let hydrationState: HydrationState = REAL_API_MODE
+  ? { status: "loading", error: null }
+  : { status: "success", error: null };
+
+function emitHydration() {
+  for (const l of hydrationListeners) l();
+}
+function subscribeHydration(l: () => void) {
+  hydrationListeners.add(l);
+  return () => {
+    hydrationListeners.delete(l);
+  };
+}
+function getHydrationSnapshot() {
+  return hydrationState;
+}
+function setHydrationState(next: HydrationState) {
+  hydrationState = next;
+  emitHydration();
+}
+
+export function useProjectsHydration(): HydrationState {
+  return useSyncExternalStore(subscribeHydration, getHydrationSnapshot, getHydrationSnapshot);
+}
+
+export async function hydrateProjectsFromApi(): Promise<void> {
+  if (!REAL_API_MODE) {
+    setHydrationState({ status: "success", error: null });
+    return;
+  }
+  setHydrationState({ status: "loading", error: null });
   try {
     await api.list();
+    setHydrationState({ status: "success", error: null });
     notifyProjectsQuery();
   } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    setHydrationState({ status: "error", error });
     console.error("[projects-store] Failed to hydrate projects from API:", err);
   }
+}
+
+/** Public alias suitable for a "Retry" button on the home page. */
+export function refetchProjects(): Promise<void> {
+  return hydrateProjectsFromApi();
 }
 
 void hydrateProjectsFromApi();
@@ -178,11 +223,51 @@ export function __mockPatchProject(id: string, patch: Partial<Project>) {
 // which in turn either hits the backend or the mock implementations above.
 
 export function createProject(seed?: Partial<Project>): string {
-  // Sync-return contract for callers that need to navigate immediately.
-  // Mock mode: mutate locally and return the new ID.
-  // Real mode: callers that need server-issued IDs should use
-  //   `await api.projects.create(seed)` directly and navigate on resolve.
-  return __mockCreateProject(seed);
+  // Sync-return contract preserved for callers that navigate immediately
+  // off the returned id (e.g. the "New project" dropdown on Datasets).
+  //
+  // Mock mode: local insert is the source of truth.
+  // Real mode: optimistically insert locally so the UI updates instantly,
+  // then persist via the API in the background. On API success we drop the
+  // optimistic placeholder (the server's row was upserted into the cache by
+  // api.create). On API failure we roll back the optimistic insert.
+  //
+  // Callers that need the server-issued id can use createProjectAsync().
+  const tempId = __mockCreateProject(seed);
+  if (!REAL_API_MODE) return tempId;
+
+  void api
+    .create(seed)
+    .then(() => {
+      __cacheRemove(tempId);
+    })
+    .catch((err) => {
+      __cacheRemove(tempId);
+      console.error(
+        "[projects-store] createProject API call failed; rolled back optimistic insert:",
+        err,
+      );
+    });
+
+  return tempId;
+}
+
+/**
+ * Async variant of createProject. Resolves with the server-issued id in
+ * real-API mode (or the local mock id in mock mode). Additive helper for
+ * future callers that want to await the persistence step before navigating.
+ */
+export async function createProjectAsync(seed?: Partial<Project>): Promise<string> {
+  if (!REAL_API_MODE) return __mockCreateProject(seed);
+  const tempId = __mockCreateProject(seed);
+  try {
+    const realId = await api.create(seed);
+    __cacheRemove(tempId);
+    return realId;
+  } catch (err) {
+    __cacheRemove(tempId);
+    throw err;
+  }
 }
 
 export function renameProject(id: string, name: string) {

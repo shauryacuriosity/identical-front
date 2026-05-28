@@ -10,6 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as VisualisationRouteImport } from './routes/visualisation'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as DatasetsRouteImport } from './routes/datasets'
 import { Route as AiAnalysisRouteImport } from './routes/ai-analysis'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +22,21 @@ import { Route as AiAnalysisResultsRouteImport } from './routes/ai-analysis.resu
 const VisualisationRoute = VisualisationRouteImport.update({
   id: '/visualisation',
   path: '/visualisation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DatasetsRoute = DatasetsRouteImport.update({
@@ -51,6 +69,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai-analysis': typeof AiAnalysisRouteWithChildren
   '/datasets': typeof DatasetsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
   '/runs/$runId': typeof RunsRunIdRoute
@@ -59,6 +80,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai-analysis': typeof AiAnalysisRouteWithChildren
   '/datasets': typeof DatasetsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
   '/runs/$runId': typeof RunsRunIdRoute
@@ -68,6 +92,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/ai-analysis': typeof AiAnalysisRouteWithChildren
   '/datasets': typeof DatasetsRoute
+  '/forgot-password': typeof ForgotPasswordRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
   '/visualisation': typeof VisualisationRoute
   '/ai-analysis/results': typeof AiAnalysisResultsRoute
   '/runs/$runId': typeof RunsRunIdRoute
@@ -78,6 +105,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-analysis'
     | '/datasets'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
     | '/visualisation'
     | '/ai-analysis/results'
     | '/runs/$runId'
@@ -86,6 +116,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-analysis'
     | '/datasets'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
     | '/visualisation'
     | '/ai-analysis/results'
     | '/runs/$runId'
@@ -94,6 +127,9 @@ export interface FileRouteTypes {
     | '/'
     | '/ai-analysis'
     | '/datasets'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
     | '/visualisation'
     | '/ai-analysis/results'
     | '/runs/$runId'
@@ -103,6 +139,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiAnalysisRoute: typeof AiAnalysisRouteWithChildren
   DatasetsRoute: typeof DatasetsRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
   VisualisationRoute: typeof VisualisationRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
 }
@@ -114,6 +153,27 @@ declare module '@tanstack/react-router' {
       path: '/visualisation'
       fullPath: '/visualisation'
       preLoaderRoute: typeof VisualisationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/datasets': {
@@ -170,6 +230,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiAnalysisRoute: AiAnalysisRouteWithChildren,
   DatasetsRoute: DatasetsRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
   VisualisationRoute: VisualisationRoute,
   RunsRunIdRoute: RunsRunIdRoute,
 }

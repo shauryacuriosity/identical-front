@@ -18,6 +18,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+.env.vercel.production
+CAPSTONE_DEMO_LOGIN.md
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -33,3 +35,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.vercel

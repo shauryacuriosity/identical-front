@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useEffect, useState } from "react";
-import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight } from "lucide-react";
-import { useProjects, formatRelative } from "@/lib/projects-store";
+import { FilePlus, Shapes, Box, FileText, SquareArrowOutUpRight, RefreshCw } from "lucide-react";
+import {
+  useProjects,
+  useProjectsHydration,
+  refetchProjects,
+  formatRelative,
+} from "@/lib/projects-store";
 import lotusMark from "@/assets/logo_lotus.png";
 
 export const Route = createFileRoute("/")({
@@ -177,6 +182,7 @@ function SkeletonRow({ last }: { last?: boolean }) {
 
 function Index() {
   const projects = useProjects();
+  const hydration = useProjectsHydration();
 
   const rows = projects.map((p) => ({
     id: p.id,
@@ -186,8 +192,19 @@ function Index() {
     modified: formatRelative(p.modifiedAt),
     archived: false,
   }));
-  const isLoading = false;
-  const error: Error | null = null;
+  // Skeleton on initial load only — if we already have a populated cache,
+  // a background refresh shouldn't blank the table.
+  const isLoading = hydration.status === "loading" && rows.length === 0;
+  const error: Error | null = hydration.status === "error" ? hydration.error : null;
+  const [retrying, setRetrying] = useState(false);
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await refetchProjects();
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -282,7 +299,23 @@ function Index() {
             {isLoading && Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} last={i === 4} />)}
 
             {!isLoading && error && (
-              <div className="px-5 py-6 text-[13px] text-ink-2">Failed to load — {(error as Error).message}</div>
+              <div className="px-5 py-6 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-[13px] text-ink-2">
+                  Couldn’t load projects — <span className="text-ink">{error.message}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-hairline bg-surface text-[12.5px] text-ink hover:border-coral/40 hover:text-coral transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${retrying ? "animate-spin" : ""}`}
+                    strokeWidth={1.75}
+                  />
+                  {retrying ? "Retrying…" : "Retry"}
+                </button>
+              </div>
             )}
 
             {!isLoading && !error && rows.length === 0 && (

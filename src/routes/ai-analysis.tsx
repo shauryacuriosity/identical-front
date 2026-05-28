@@ -20,6 +20,7 @@ import { USE_MOCK } from "@/lib/api/client";
 import { ProjectSaveBar } from "@/components/project-save-bar";
 import { useProjects, useProject, formatRelative } from "@/lib/projects-store";
 import { saveProjectWork, type AnalysisDraft } from "@/lib/project-work";
+import { Slider } from "@/components/ui/slider";
 import {
   autoMapAnalysisFields,
   CLINICAL_FIELDS,
@@ -34,6 +35,14 @@ export const Route = createFileRoute("/ai-analysis")({
   }),
   component: AiAnalysisPage,
 });
+
+// C3:MOCK_GUARD — narrow check for the explicitly-forced mock flag (separate
+// from the broader USE_MOCK, which also matches "no VITE_API_BASE_URL" mode).
+const MOCK_API_FORCED = import.meta.env.VITE_USE_MOCK_API === "true";
+
+/** Backend always runs EDA → both models → clustering; UI choices are stored but not applied yet. */
+const PIPELINE_HONESTY =
+  "The server currently runs the full pipeline (EDA, logistic + XGBoost, K-Means clustering) on every run. Function mode and most method settings below are saved for your record but not applied yet.";
 
 // ---------- Mock data ----------
 
@@ -382,7 +391,7 @@ function AiAnalysisPage() {
 
   // Prediction section
   const [predictOn, setPredictOn] = useState(true);
-  const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("xgb");
+  const [predictModel, setPredictModel] = useState<"xgb" | "logreg" | "both">("both");
 
   // Subgroup discovery section
   const [subgroupOn, setSubgroupOn] = useState(true);
@@ -448,6 +457,48 @@ function AiAnalysisPage() {
   });
 
   const runSubmitting = runMutation.isPending;
+  const labelsRunTriggered = useRef(false);
+
+  const canStartRun =
+    !MOCK_API_FORCED &&
+    !!selectedDatasetId &&
+    !runMutation.isPending &&
+    (methodSkipped || (predictOn || subgroupOn));
+
+  const startRun = () => {
+    if (MOCK_API_FORCED || !selectedDatasetId || runMutation.isPending) return;
+    if (!methodSkipped && !predictOn && !subgroupOn) return;
+    runMutation.mutate();
+  };
+
+  // Labels-only skips Method — start the run when landing on the Run step.
+  useEffect(() => {
+    if (
+      currentStep !== "run" ||
+      !methodSkipped ||
+      MOCK_API_FORCED ||
+      !selectedDatasetId ||
+      runMutation.isPending ||
+      runMutation.isSuccess ||
+      labelsRunTriggered.current
+    ) {
+      return;
+    }
+    labelsRunTriggered.current = true;
+    runMutation.mutate();
+  }, [
+    currentStep,
+    methodSkipped,
+    selectedDatasetId,
+    runMutation.isPending,
+    runMutation.isSuccess,
+  ]);
+
+  useEffect(() => {
+    if (currentStep !== "run") {
+      labelsRunTriggered.current = false;
+    }
+  }, [currentStep]);
 
   // Derived cohort numbers
   const totalRows = selectedDataset?.row_count ?? FALLBACK_TOTAL_ROWS;
@@ -478,13 +529,13 @@ function AiAnalysisPage() {
 
   const predictSummary = (() => {
     if (!showPredict || !predictOn) return null;
-    if (predictModel === "xgb") return "XGBoost";
-    if (predictModel === "logreg") return "Logistic Regression";
-    return "XGBoost + LogReg";
+    if (predictModel === "xgb") return "XGBoost (UI only — server runs both)";
+    if (predictModel === "logreg") return "Logistic Regression (UI only — server runs both)";
+    return "Logistic + XGBoost (matches server)";
   })();
   const subgroupSummary = (() => {
     if (!showSubgroup || !subgroupOn) return null;
-    return `K-Means (k=4 elbow, ${dimRed.toUpperCase()})`;
+    return "K-Means k=4 on DR1I · PCA + t-SNE figures (server default)";
   })();
   const methodSummary = [predictSummary, subgroupSummary].filter(Boolean).join(" · ");
 
@@ -691,29 +742,33 @@ function AiAnalysisPage() {
               <div className="flex flex-wrap gap-1.5">
                 {(
                   [
-                    ["full", "Full analysis", "predict + discover"],
-                    ["predict", "Prediction only", null],
-                    ["discover", "Subgroup discovery only", null],
-                    ["labels", "Generate labels only", null],
+                    ["full", "Full analysis", "predict + discover", "Runs EDA, both models, and clustering (server default pipeline)."],
+                    ["predict", "Prediction only", null, "UI preview — server still runs the full pipeline today."],
+                    ["discover", "Subgroup discovery only", null, "UI preview — server still runs the full pipeline today."],
+                    ["labels", "Generate labels only", null, "Skips method step; server still runs EDA + models + clustering."],
                   ] as const
-                ).map(([key, label, hint]) => {
+                ).map(([key, label, hint, description]) => {
                   const active = fnMode === key;
                   return (
                     <button
                       key={key}
                       onClick={() => setFnMode(key)}
-                      className={`h-7 px-3 rounded-full text-[12.5px] border transition-colors ${
+                      title={description}
+                      className={`h-auto min-h-7 px-3 py-1.5 rounded-full text-[12.5px] border transition-colors text-left ${
                         active
                           ? "bg-coral text-white border-coral"
                           : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
                       }`}
                     >
-                      {label}
+                      <span className="block">{label}</span>
                       {hint && (
-                        <span className={`ml-1.5 text-[11px] ${active ? "text-white/75" : "text-ink-3"}`}>
-                          · {hint}
+                        <span className={`block text-[11px] ${active ? "text-white/75" : "text-ink-3"}`}>
+                          {hint}
                         </span>
                       )}
+                      <span className={`block text-[11px] mt-0.5 ${active ? "text-white/70" : "text-ink-3"}`}>
+                        {description}
+                      </span>
                     </button>
                   );
                 })}
@@ -745,6 +800,20 @@ function AiAnalysisPage() {
                 </p>
               )}
             </div>
+
+            {/* C3:BANNER START — column-mapping disclaimer (owned by C3; C2 may relocate as a whole) */}
+            <div
+              role="note"
+              aria-label="Column mappings preview disclaimer"
+              className="flex items-start gap-2.5 rounded-lg border border-dashed border-coral/40 bg-coral-tint/50 px-3 py-2.5"
+            >
+              <Info className="h-4 w-4 text-coral mt-0.5 shrink-0" strokeWidth={1.75} />
+              <p className="text-[12.5px] text-ink leading-snug">
+                <span className="font-medium">Preview only</span>
+                <span className="text-ink-2"> — column mappings are not yet applied to the ML run.</span>
+              </p>
+            </div>
+            {/* C3:BANNER END */}
 
             {/* Group A — MetS Clinical */}
             <div>
@@ -897,27 +966,17 @@ function AiAnalysisPage() {
                     onChange={(e) => setAgeMin(Math.min(Number(e.target.value), ageMax - 1))}
                     className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50"
                   />
-                  <div className="flex-1 relative h-6 flex items-center">
-                    <div className="absolute inset-x-0 h-1 rounded-full bg-hairline" />
-                    <div
-                      className="absolute h-1 rounded-full bg-coral"
-                      style={{ left: `${ageMin}%`, right: `${100 - ageMax}%` }}
-                    />
-                    <input
-                      type="range"
+                  <div className="flex-1 px-1">
+                    <Slider
                       min={0}
                       max={100}
-                      value={ageMin}
-                      onChange={(e) => setAgeMin(Math.min(Number(e.target.value), ageMax - 1))}
-                      className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
-                    />
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={ageMax}
-                      onChange={(e) => setAgeMax(Math.max(Number(e.target.value), ageMin + 1))}
-                      className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-coral"
+                      step={1}
+                      minStepsBetweenThumbs={1}
+                      value={[ageMin, ageMax]}
+                      onValueChange={([min, max]) => {
+                        setAgeMin(min);
+                        setAgeMax(max);
+                      }}
                     />
                   </div>
                   <input
@@ -1029,6 +1088,11 @@ function AiAnalysisPage() {
             onExpand={() => reopen("method")}
           >
             <div className="space-y-4 pt-4">
+              <div className="flex items-start gap-2.5 rounded-lg border border-dashed border-hairline bg-canvas/40 px-3 py-2.5">
+                <Info className="h-4 w-4 text-ink-3 mt-0.5 shrink-0" strokeWidth={1.75} />
+                <p className="text-[12.5px] text-ink-2 leading-snug">{PIPELINE_HONESTY}</p>
+              </div>
+
               {/* SECTION A — Prediction */}
               {showPredict && (
                 <MethodSection
@@ -1045,22 +1109,26 @@ function AiAnalysisPage() {
                       </div>
                       <div className="space-y-1.5">
                         <RadioRow
+                          checked={predictModel === "both"}
+                          onSelect={() => setPredictModel("both")}
+                          title="Compare both"
+                          hint="matches server — trains logistic regression and XGBoost every run"
+                        />
+                        <RadioRow
                           checked={predictModel === "xgb"}
                           onSelect={() => setPredictModel("xgb")}
-                          title="XGBoost"
-                          hint="recommended — handles non-linearities and missing data well"
+                          title="XGBoost only"
+                          hint="gradient-boosted trees with SHAP importance"
+                          disabled
+                          tooltip="Coming soon — server currently trains both models every run"
                         />
                         <RadioRow
                           checked={predictModel === "logreg"}
                           onSelect={() => setPredictModel("logreg")}
-                          title="Logistic Regression"
-                          hint="more interpretable, smaller sample sizes"
-                        />
-                        <RadioRow
-                          checked={predictModel === "both"}
-                          onSelect={() => setPredictModel("both")}
-                          title="Compare both"
-                          hint="runs side-by-side, shows comparative metrics"
+                          title="Logistic Regression only"
+                          hint="L2-regularised, interpretable coefficients"
+                          disabled
+                          tooltip="Coming soon — server currently trains both models every run"
                         />
                       </div>
                     </div>
@@ -1077,9 +1145,9 @@ function AiAnalysisPage() {
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces test-set AUC + sensitivity + specificity, SHAP feature ranking
-                      (XGBoost), gain importance + permutation importance + coefficient odds ratios
-                      depending on model, per-subject predictions.
+                      Server output: weighted test AUC, accuracy, precision, recall, F1 for both
+                      models; SHAP top features (XGBoost); logistic coefficients; per-subject
+                      predictions saved to the run.
                     </p>
                   </div>
                 </MethodSection>
@@ -1104,10 +1172,22 @@ function AiAnalysisPage() {
                           checked={clusterAlg === "kmeans"}
                           onSelect={() => setClusterAlg("kmeans")}
                           title="K-Means"
-                          hint="default k=4 with elbow search over [2, 3, 4, 5]"
+                          hint="server default — k=4 with elbow curve for k ∈ {2, 3, 4, 5} on dietary (DR1I) features"
                         />
-                        <RadioRow disabled title="Hierarchical clustering — coming in v2" soon />
-                        <RadioRow disabled title="DBSCAN — coming in v2" soon />
+                        <RadioRow
+                          disabled
+                          title="Hierarchical clustering"
+                          hint="agglomerative clustering on dietary features"
+                          tooltip="Coming soon"
+                          soon
+                        />
+                        <RadioRow
+                          disabled
+                          title="DBSCAN"
+                          hint="density-based clusters without fixed k"
+                          tooltip="Coming soon"
+                          soon
+                        />
                       </div>
                     </div>
 
@@ -1120,52 +1200,85 @@ function AiAnalysisPage() {
                           checked={dimRed === "pca"}
                           onSelect={() => setDimRed("pca")}
                           title="PCA"
-                          hint="variance curve + 2D plot"
+                          hint="variance curve + 2D scatter coloured by MetS"
+                          disabled
+                          tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
                         />
                         <RadioRow
                           checked={dimRed === "tsne"}
                           onSelect={() => setDimRed("tsne")}
                           title="t-SNE"
-                          hint="2D visualisation"
+                          hint="2D embedding on a dietary-feature sample (≤2000 rows)"
+                          disabled
+                          tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
                         />
-                        <RadioRow disabled title="UMAP — coming in v2" soon />
+                        <RadioRow
+                          disabled
+                          title="UMAP"
+                          hint="non-linear 2D projection"
+                          tooltip="Coming soon"
+                          soon
+                        />
                       </div>
+                      <p className="text-[12px] text-ink-3 mt-2">
+                        Server always produces PCA variance curve, PCA scatter, K-Means cluster map,
+                        and t-SNE plot — projection choice here is not applied yet.
+                      </p>
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Produces cluster profiles, 2D scatter (PCA or t-SNE), per-cluster MetS
-                      prevalence.
+                      Server output: cluster assignments, per-cluster clinical means, MetS
+                      prevalence by cluster, elbow curve, PCA + t-SNE figures.
                     </p>
                   </div>
                 </MethodSection>
               )}
             </div>
 
+            {/* C3:MOCK_GUARD START — block Run when VITE_USE_MOCK_API=true so we don't silently pretend AI works (owned by C3) */}
             <div className="flex flex-col items-end gap-2 mt-6">
               <button
                 onClick={() => {
+                  if (MOCK_API_FORCED) return;
                   advanceFrom("method", "run");
-                  runMutation.mutate();
+                  startRun();
                 }}
-                disabled={
-                  !selectedDatasetId ||
-                  runMutation.isPending ||
-                  ((!predictOn || !showPredict) && (!subgroupOn || !showSubgroup))
+                disabled={!canStartRun}
+                title={
+                  MOCK_API_FORCED
+                    ? "Mock API mode — analysis cannot run. Set VITE_USE_MOCK_API=false to run real analyses."
+                    : undefined
                 }
                 className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {runMutation.isPending ? "Submitting…" : "Run Analysis"}
               </button>
-              {!selectedDatasetId && (
-                <span className="text-[12px] text-ink-3">Select a dataset in Step 1 to run.</span>
-              )}
-              {USE_MOCK && (
-                <span className="text-[12px] text-ink-3">Analysis runs require the API (set VITE_API_BASE_URL).</span>
+              {MOCK_API_FORCED ? (
+                <span className="text-[12px] text-coral">
+                  Mock API mode — analysis cannot run. Set{" "}
+                  <span className="mono">VITE_USE_MOCK_API=false</span> to run real analyses.
+                </span>
+              ) : (
+                <>
+                  {!selectedDatasetId && (
+                    <span className="text-[12px] text-ink-3">
+                      Select a dataset in Step 1 to run.
+                    </span>
+                  )}
+                  {USE_MOCK && (
+                    <span className="text-[12px] text-ink-3">
+                      Analysis runs require the API (set VITE_API_BASE_URL).
+                    </span>
+                  )}
+                </>
               )}
               {runMutation.error && (
-                <span className="text-[12px] text-ink-3">Failed to start — {(runMutation.error as Error).message}</span>
+                <span className="text-[12px] text-ink-3">
+                  Failed to start — {(runMutation.error as Error).message}
+                </span>
               )}
             </div>
+            {/* C3:MOCK_GUARD END */}
           </StepShell>
         )}
 
@@ -1173,20 +1286,73 @@ function AiAnalysisPage() {
         {/* STEP 4 — Run (brief state before redirect to /runs/:id) */}
         {(currentStep === "run" || completed.has("run")) && (
           <section className="rounded-2xl border border-hairline bg-surface p-6">
-            <div className="flex items-center gap-3">
-              <span className="h-7 w-7 rounded-full flex items-center justify-center border bg-coral-tint text-coral border-coral/40">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              </span>
-              <div>
-                <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
-                  {runMutation.isError ? "Could not start run" : "Starting analysis…"}
-                </h2>
-                <p className="mt-1 text-[12.5px] text-ink-3">
-                  {runMutation.isError
-                    ? (runMutation.error as Error).message
-                    : "Opening your results page. Progress updates automatically while the pipeline runs."}
-                </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="h-7 w-7 rounded-full flex items-center justify-center border bg-coral-tint text-coral border-coral/40">
+                  {runMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : runMutation.isError ? (
+                    <Info className="h-3.5 w-3.5" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                  )}
+                </span>
+                <div>
+                  <h2 className="text-[15px] font-medium text-ink" style={{ letterSpacing: "-0.01em" }}>
+                    {runMutation.isError
+                      ? "Could not start run"
+                      : runMutation.isPending
+                        ? "Starting analysis…"
+                        : methodSkipped
+                          ? "Ready to run"
+                          : "Starting analysis…"}
+                  </h2>
+                  <p className="mt-1 text-[12.5px] text-ink-3">
+                    {runMutation.isError
+                      ? (runMutation.error as Error).message
+                      : runMutation.isPending
+                        ? "Opening your results page. Progress updates automatically while the pipeline runs."
+                        : methodSkipped
+                          ? "Labels-only flow skips method selection; confirm to start the server pipeline."
+                          : "Opening your results page. Progress updates automatically while the pipeline runs."}
+                  </p>
+                </div>
               </div>
+
+              {/* C3:MOCK_GUARD START — labels-only / run-step retry (C2-owned panel; same MOCK_API_FORCED guard) */}
+              {(runMutation.isIdle || runMutation.isError) && methodSkipped && (
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    onClick={() => {
+                      if (MOCK_API_FORCED) return;
+                      labelsRunTriggered.current = true;
+                      startRun();
+                    }}
+                    disabled={!canStartRun}
+                    title={
+                      MOCK_API_FORCED
+                        ? "Mock API mode — analysis cannot run. Set VITE_USE_MOCK_API=false to run real analyses."
+                        : undefined
+                    }
+                    className="h-11 px-6 rounded-lg bg-coral text-white text-[14px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {runMutation.isPending ? "Submitting…" : "Run Analysis"}
+                  </button>
+                  {MOCK_API_FORCED ? (
+                    <span className="text-[12px] text-coral">
+                      Mock API mode — analysis cannot run. Set{" "}
+                      <span className="mono">VITE_USE_MOCK_API=false</span> to run real analyses.
+                    </span>
+                  ) : (
+                    !selectedDatasetId && (
+                      <span className="text-[12px] text-ink-3">
+                        Select a dataset in Step 1 to run.
+                      </span>
+                    )
+                  )}
+                </div>
+              )}
+              {/* C3:MOCK_GUARD END */}
             </div>
           </section>
         )}
@@ -1309,6 +1475,7 @@ function RadioRow({
   hint,
   disabled,
   soon,
+  tooltip,
 }: {
   checked?: boolean;
   onSelect?: () => void;
@@ -1316,6 +1483,7 @@ function RadioRow({
   hint?: string;
   disabled?: boolean;
   soon?: boolean;
+  tooltip?: string;
 }) {
   return (
     <button
@@ -1325,7 +1493,8 @@ function RadioRow({
         if (!disabled) onSelect?.();
       }}
       disabled={disabled}
-      className={`w-full flex items-center gap-3 px-3 h-10 rounded-lg border text-left transition-colors ${
+      title={tooltip}
+      className={`w-full flex items-center gap-3 px-3 min-h-10 py-2 rounded-lg border text-left transition-colors ${
         disabled
           ? "border-dashed border-hairline bg-surface opacity-50 cursor-not-allowed"
           : checked
@@ -1340,10 +1509,12 @@ function RadioRow({
       >
         {checked && <span className="h-2 w-2 rounded-full bg-coral" />}
       </span>
-      <span className="text-[13px] text-ink font-medium">{title}</span>
-      {hint && <span className="text-[12px] text-ink-3">· {hint}</span>}
+      <span className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-[13px] text-ink font-medium">{title}</span>
+        {hint && <span className="text-[12px] text-ink-3 leading-snug">{hint}</span>}
+      </span>
       {soon && (
-        <span className="ml-auto text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5">
+        <span className="ml-auto text-[10px] uppercase tracking-[0.08em] text-ink-3 border border-hairline rounded-full px-2 py-0.5 shrink-0">
           coming soon
         </span>
       )}

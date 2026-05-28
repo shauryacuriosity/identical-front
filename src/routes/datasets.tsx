@@ -1176,23 +1176,92 @@ function DatasetsPage() {
     return out;
   }, [datasetsListQ.data]);
 
-  // When switching projects, reseed slots + pipeline + selectedAttrs.
+  // Hydrate dataset slots / pipeline steps / attribute selections from the
+  // project record once it's loaded for this projectId. Without this, the page
+  // used to reinitialise from local defaults whenever it remounted (e.g.
+  // Home → Datasets → Visualisation → back to Datasets), silently dropping
+  // any unsaved pipeline/preview configuration the user had just done.
+  // We guard with draftHydratedFor so subsequent store updates (caused by our
+  // own debounced auto-save below) don't clobber active edits.
+  const draftHydratedFor = useRef<string | null>(null);
+  const pendingSaveFlushRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
-    if (project) {
-      setDatasetSlots(project.datasets);
-      if (project.pipelineSteps && project.pipelineSteps.length > 0) {
-        setSteps(project.pipelineSteps);
-      }
-      if (project.selectedAttrs) {
-        const map: Record<string, Set<string>> = {};
-        for (const [k, v] of Object.entries(project.selectedAttrs)) map[k] = new Set(v);
-        setSelectedAttrs(map);
-      }
-    } else {
+    if (!projectId) {
+      draftHydratedFor.current = null;
       setDatasetSlots((prev) => (prev.length === 0 ? prev : []));
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    if (draftHydratedFor.current === projectId) return;
+    if (!project) return; // wait for the project record to arrive (real API mode)
+    draftHydratedFor.current = projectId;
+    setDatasetSlots(project.datasets ?? []);
+    if (project.pipelineSteps && project.pipelineSteps.length > 0) {
+      setSteps(project.pipelineSteps);
+    }
+    if (project.selectedAttrs) {
+      const map: Record<string, Set<string>> = {};
+      for (const [k, v] of Object.entries(project.selectedAttrs)) map[k] = new Set(v);
+      setSelectedAttrs(map);
+    }
+  }, [projectId, project]);
+
+  // Debounced auto-save of pipeline / dataset / attribute changes back to the
+  // project record. saveProjectWork already routes through the mock store in
+  // VITE_USE_MOCK_API mode and PATCH /projects/:id otherwise, so this is safe
+  // in both modes. We only run AFTER hydration to avoid re-saving the very
+  // values we just read.
+  useEffect(() => {
+    if (!projectId || !project) return;
+    if (draftHydratedFor.current !== projectId) return;
+
+    const selObj: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(selectedAttrs)) selObj[k] = [...v];
+
+    const cur = JSON.stringify({
+      datasets: datasetSlots,
+      pipelineSteps: steps,
+      selectedAttrs: selObj,
+    });
+    const saved = JSON.stringify({
+      datasets: project.datasets ?? [],
+      pipelineSteps: project.pipelineSteps ?? [],
+      selectedAttrs: project.selectedAttrs ?? {},
+    });
+    if (cur === saved) {
+      pendingSaveFlushRef.current = null;
+      return;
+    }
+
+    let fired = false;
+    const doSave = () => {
+      if (fired) return;
+      fired = true;
+      pendingSaveFlushRef.current = null;
+      void saveProjectWork(projectId, {
+        datasets: datasetSlots,
+        pipelineSteps: steps,
+        selectedAttrs: selObj,
+      }).catch((err) => {
+        toast.error("Couldn't auto-save changes", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      });
+    };
+    pendingSaveFlushRef.current = doSave;
+    const t = setTimeout(doSave, 700);
+    return () => clearTimeout(t);
+  }, [projectId, project, datasetSlots, steps, selectedAttrs]);
+
+  // On unmount, flush any pending debounced save so that route-switching away
+  // from /datasets immediately after an edit doesn't drop the edit on the
+  // floor. In mock mode the store is updated synchronously; in real-API mode
+  // this is a best-effort fire-and-forget PATCH.
+  useEffect(() => {
+    return () => {
+      pendingSaveFlushRef.current?.();
+    };
+  }, []);
 
   // Default-select all attrs for newly added slots; drop selections for removed slots.
   useEffect(() => {
