@@ -54,9 +54,8 @@ export const Route = createFileRoute("/ai-analysis")({
 // True only when VITE_USE_MOCK_API is explicitly set (not when API URL is merely unset).
 const MOCK_API_FORCED = import.meta.env.VITE_USE_MOCK_API === "true";
 
-/** Backend always runs EDA → both models → clustering; UI choices are stored but not applied yet. */
 const PIPELINE_HONESTY =
-  "Every run today uses the same server pipeline (EDA, logistic + XGBoost, and clustering). Your selections are saved on the run record; selective modes are on the roadmap.";
+  "Prediction uses the model(s) you select below (logistic, XGBoost, or both). K-Means clustering and PCA/t-SNE plots always run for exploration. Pairwise association (correlation) is on the Visualisation page as a heatmap.";
 
 type FnMode = "full" | "predict" | "discover" | "labels";
 
@@ -64,84 +63,95 @@ type ClinicalInfo = {
   title: string;
   what: string;
   why: string;
+  /** One-line label: what this method does in Lotus (prediction, ranking, clustering, etc.). */
+  usedFor?: string;
   note?: string;
 };
 
 const METHOD_CLINICAL_INFO = {
   selectMethod: {
     title: "Selecting analysis methods",
-    what: "After you define the cohort, Lotus can run supervised risk models (who is likely to meet Metabolic Syndrome criteria) and/or unsupervised clustering (which dietary patterns group together).",
-    why: "Population-health teams often need both angles: prediction supports screening and resource planning; clustering reveals subgroups that averages hide — for example, high MetS prevalence in one dietary cluster but not another.",
-    note: "Research use only — not for individual diagnosis or treatment decisions.",
+    what: "Lotus runs supervised MetS prediction (logistic and/or XGBoost) and unsupervised dietary clustering (K-Means). Each method has a distinct role — see the (i) on each option.",
+    why: "Prediction supports screening-style risk scores; clustering reveals dietary subgroups; feature ranking on the results page shows which inputs drove the model.",
+    usedFor: "Overview — prediction vs clustering vs ranking (on results)",
+    note: "Exploratory correlation (association) between variables: Visualisation → Heatmap. Research use only — not for individual diagnosis.",
   },
   modelGroup: {
     title: "Choosing a prediction model",
-    what: "Lotus can fit logistic regression (linear, coefficient-based), XGBoost (non-linear trees with SHAP explanations), or both on the same train/test split.",
-    why: "Clinical collaborators often want interpretable odds ratios; reviewers expect strong ML benchmarks — comparing both supports multidisciplinary discussion without committing to one approach upfront.",
+    what: "Pick which supervised model(s) train on your cohort and produce per-person MetS probabilities plus a feature-importance ranking on the results page.",
+    why: "Logistic regression is auditable (coefficients); XGBoost often captures non-linear patterns (SHAP ranking). Compare both when you want metrics side by side.",
+    usedFor: "Controls prediction model(s) for this run",
   },
   prediction: {
     title: "MetS risk prediction",
-    what: "Supervised machine learning estimates each participant's probability of meeting Metabolic Syndrome (MetS) criteria using mapped clinical and dietary variables.",
-    why: "Helps prioritise follow-up in research cohorts and quantify which factors (waist, lipids, glucose, diet patterns) drive risk. Outputs include calibrated scores and explainability for discussion with clinical collaborators.",
+    what: "Supervised learning estimates each participant's probability of Metabolic Syndrome from mapped dietary and demographic inputs (clinical MetS-defining labs are excluded to avoid leakage).",
+    why: "Supports cohort screening narratives and shows which lifestyle factors align with higher risk — without requiring fresh blood work in the model.",
+    usedFor: "Prediction — per-person MetS risk scores on the results page",
   },
   predictBoth: {
     title: "Compare logistic regression & XGBoost",
-    what: "Trains two models on the same train/test split: logistic regression (linear, coefficient-based) and XGBoost (gradient-boosted trees, handles non-linear effects).",
-    why: "Logistic regression is familiar and auditable for clinicians; XGBoost often improves discrimination when relationships are complex. Running both supports side-by-side comparison in reports.",
-    note: "Current server default — both models always run today.",
+    what: "Trains logistic regression and XGBoost on the same 80/20 split. Test-set AUC/accuracy for both appear on results; per-person scores use XGBoost.",
+    why: "Side-by-side metrics for clinical vs ML audiences. Logistic supplies coefficient ranking; XGBoost supplies SHAP ranking.",
+    usedFor: "Prediction (scores: XGBoost) · Ranking (logistic coefficients + XGBoost SHAP)",
   },
   logreg: {
     title: "Logistic regression",
-    what: "A linear model for binary outcomes: log-odds of MetS ≈ weighted sum of inputs, with L2 regularisation to limit overfitting on correlated nutrition variables.",
-    why: "Coefficients show direction and relative strength (e.g. waist circumference vs HDL). Preferred when interpretability and transparency matter more than marginal AUC gains.",
-    note: "Single-model selection coming soon; server trains both models now.",
+    what: "L2-regularised logistic regression: linear log-odds of MetS from inputs. Outputs test metrics, per-person probabilities, and a top-10 feature list ranked by absolute coefficient.",
+    why: "Transparent, familiar epidemiology-style model — easy to explain direction of effect to clinicians.",
+    usedFor: "Prediction · Ranking (absolute coefficients, not SHAP)",
   },
   xgb: {
     title: "XGBoost",
-    what: "An ensemble of decision trees that learns non-linear and interaction effects between diet, anthropometry, and MetS labels.",
-    why: "Useful when risk is not a simple linear combination — e.g. threshold effects or feature interactions. SHAP values summarise which variables pushed predictions up or down per person.",
-    note: "Single-model selection coming soon; server trains both models now.",
+    what: "Gradient-boosted trees for MetS probability. Outputs test metrics, per-person probabilities, and a top-10 SHAP importance ranking (mean |SHAP| per feature).",
+    why: "Handles non-linear and interaction effects; SHAP summarises which variables pushed each person's score up or down.",
+    usedFor: "Prediction · Ranking (SHAP importance)",
   },
   subgroup: {
     title: "Subgroup discovery (clustering)",
-    what: "Unsupervised learning groups participants by similarity in dietary intake features, without using the MetS label to form clusters.",
-    why: "Shows heterogeneity in the cohort: clusters with higher MetS prevalence may reflect distinct dietary phenotypes worth separate public-health messaging or further study.",
+    what: "K-Means groups participants by dietary similarity. MetS is not used to form clusters — only summarised per cluster afterward.",
+    why: "Reveals dietary phenotypes (e.g. high-fat vs high-carb clusters) and how MetS prevalence differs between them.",
+    usedFor: "Clustering only — not used for MetS prediction scores",
   },
   kmeans: {
     title: "K-Means clustering",
-    what: "Splits the cohort into k groups (default k=4) so members within a cluster have similar dietary profiles; an elbow plot helps assess k=2–5.",
-    why: "Fast and interpretable on large surveys (NHANES-style). Cluster means and MetS rates by cluster are easy to present to non-technical stakeholders.",
-    note: "Server default — k=4 on dietary features.",
+    what: "Partitions the cohort into k=4 dietary clusters; elbow plot for k=2–5. Cluster table includes size, mean nutrients, and MetS prevalence.",
+    why: "Default unsupervised method — fast and easy to present as “four dietary patterns in this cohort.”",
+    usedFor: "Subgroup labels (K-Means, k=4 on dietary features)",
   },
   hierarchical: {
     title: "Hierarchical clustering",
-    what: "Builds a tree of nested clusters by progressively merging similar dietary profiles (agglomerative approach).",
-    why: "Useful when you want to see how clusters merge at different scales, not only a single k.",
-    note: "Not available in this release.",
+    what: "Agglomerative nested clusters on dietary features.",
+    why: "Alternative when you need a hierarchy of merges, not a single k.",
+    usedFor: "Not available in this release",
+    note: "Coming soon — server uses K-Means today.",
   },
   dbscan: {
     title: "DBSCAN",
-    what: "Density-based clustering: finds tight groups and flags sparse points as outliers without fixing k in advance.",
-    why: "Helpful when you suspect rare dietary patterns or noise; less common in survey pipelines than K-Means.",
-    note: "Not available in this release.",
+    what: "Density-based clusters without fixing k; can flag outliers.",
+    why: "For rare dietary patterns or noise-heavy cohorts.",
+    usedFor: "Not available in this release",
+    note: "Coming soon — server uses K-Means today.",
   },
   pca: {
     title: "PCA (principal components)",
-    what: "Reduces many dietary variables to two orthogonal axes that capture the most variance, then plots participants coloured by MetS status.",
-    why: "Gives a single visual summary of how dietary variation aligns with MetS in the cohort — good for exploratory talks and posters.",
-    note: "Server generates PCA and t-SNE plots every run.",
+    what: "Linear 2D projection of dietary variables plus a variance-explained curve. Points coloured by MetS status.",
+    why: "Quick visual of how diet variance lines up with MetS in one slide-friendly chart.",
+    usedFor: "Exploratory visualisation only — not prediction or ranking",
+    note: "PCA and t-SNE plots are generated every run regardless of this toggle.",
   },
   tsne: {
     title: "t-SNE embedding",
-    what: "A non-linear 2D map where similar dietary profiles appear closer together; typically run on a sample for large datasets.",
-    why: "Can reveal local structure (subgroups, outliers) that linear PCA smooths over — useful for hypothesis generation, not for formal inference alone.",
-    note: "Server generates PCA and t-SNE plots every run.",
+    what: "Non-linear 2D map of dietary similarity (sampled if the cohort is large).",
+    why: "Highlights local subgroups that linear PCA may blur — good for exploration, not formal inference alone.",
+    usedFor: "Exploratory visualisation only — not prediction or ranking",
+    note: "Generated every run alongside PCA.",
   },
   umap: {
     title: "UMAP",
-    what: "Another non-linear dimension reduction method, often preserving both local and global structure better than t-SNE on some datasets.",
-    why: "Alternative embedding for exploratory visuals when comparing dietary phenotypes.",
-    note: "Not available in this release.",
+    what: "Non-linear dimension reduction for dietary phenotype maps.",
+    why: "Alternative embedding when comparing cluster structure visually.",
+    usedFor: "Not available in this release",
+    note: "Coming soon — server generates PCA and t-SNE today.",
   },
 } as const satisfies Record<string, ClinicalInfo>;
 
@@ -1611,14 +1621,20 @@ function AiAnalysisPage() {
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Server trains only the model(s) you select. Per-subject risk scores use{" "}
+                      <strong className="font-medium text-ink-2 not-italic">Prediction:</strong>{" "}
                       {predictModel === "logreg"
                         ? "logistic regression"
                         : predictModel === "xgb"
                           ? "XGBoost"
-                          : "XGBoost when both are run"}
-                      . Metrics, SHAP (XGBoost), and coefficients (logistic) appear on the
-                      results page.
+                          : "XGBoost (when both are selected)"}{" "}
+                      produces per-person MetS risk scores.{" "}
+                      <strong className="font-medium text-ink-2 not-italic">Ranking:</strong>{" "}
+                      {predictModel === "logreg"
+                        ? "coefficient ranking on results"
+                        : predictModel === "xgb"
+                          ? "SHAP ranking on results"
+                          : "SHAP (XGBoost) + coefficients (logistic) on results"}
+                      . Clustering is separate (K-Means).
                     </p>
                   </div>
                 </MethodSection>
@@ -1921,6 +1937,16 @@ function ClinicalInfoButton({ info, ariaLabel }: { info: ClinicalInfo; ariaLabel
           <h4 className="text-[14px] font-semibold text-ink mt-0.5 leading-snug">{info.title}</h4>
         </div>
         <div className="px-4 py-3 space-y-3 max-h-[min(70vh,320px)] overflow-y-auto">
+          {info.usedFor && (
+            <div className="rounded-lg border border-coral/25 bg-coral-tint/50 px-3 py-2">
+              <p className="text-[10px] uppercase tracking-[0.1em] text-coral-deep font-semibold">
+                Used for
+              </p>
+              <p className="text-[12.5px] text-ink font-medium leading-snug mt-0.5">
+                {info.usedFor}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-[10px] uppercase tracking-[0.1em] text-ink-3 font-semibold">
               What it is
