@@ -18,8 +18,18 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import * as apiDatasets from "@/lib/api/datasets";
+import * as apiPipeline from "@/lib/api/pipeline";
 import { ensureDatasetInSupabase } from "@/lib/dataset-catalog";
 import { processRun } from "@/lib/api/runs";
+import { saveDerivedDataset } from "@/lib/save-derived-dataset";
+import {
+  PIPELINE_MERGED_DATASET_ID,
+  isPipelineMergedDatasetId,
+  pipelineHasOutput,
+  pipelineMergedLabel,
+  projectHasPipelineWork,
+  projectSelectedCols,
+} from "@/lib/merged-datasets";
 import { USE_MOCK } from "@/lib/api/client";
 import { ProjectSaveBar } from "@/components/project-save-bar";
 import { useProjects, useProject, formatRelative } from "@/lib/projects-store";
@@ -674,7 +684,7 @@ function AiAnalysisPage() {
 
   // Live dataset selection (Step 1)
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  type DatasetOption = { id: string; name: string; row_count: number | null };
+  type DatasetOption = { id: string; name: string; row_count: number | null; badge?: string };
   const datasetsQ = useQuery({
     queryKey: ["datasets", "ready"],
     queryFn: async () => {
@@ -692,25 +702,71 @@ function AiAnalysisPage() {
     },
   });
 
+  const pipelineMergedQ = useQuery({
+    queryKey: [
+      "pipeline",
+      "ai-analysis-merged",
+      projectId,
+      project?.pipelineSteps,
+      project?.selectedAttrs,
+    ],
+    queryFn: () =>
+      apiPipeline.preview({
+        steps: project!.pipelineSteps!,
+        selectedCols: projectSelectedCols(project!),
+        limit: 200,
+      }),
+    enabled: !!projectId && !!project && projectHasPipelineWork(project),
+    staleTime: 10_000,
+  });
+
   const visibleDatasets = useMemo(() => {
     const all = datasetsQ.data ?? [];
     if (projectId && project) {
       const allowed = new Set(project.datasets);
-      return all.filter((d) => allowed.has(d.id));
+      const options: DatasetOption[] = [];
+      for (const d of all) {
+        if (allowed.has(d.id)) {
+          options.push({
+            ...d,
+            badge: d.id.startsWith("derived:") || d.name.includes("(merged)") ? "saved" : undefined,
+          });
+        }
+      }
+      for (const id of project.datasets) {
+        if (!options.some((o) => o.id === id)) {
+          options.push({ id, name: id, row_count: null });
+        }
+      }
+      if (pipelineHasOutput(pipelineMergedQ.data)) {
+        options.unshift({
+          id: PIPELINE_MERGED_DATASET_ID,
+          name: pipelineMergedLabel(project.name),
+          row_count: pipelineMergedQ.data!.totalRows,
+          badge: "pipeline",
+        });
+      }
+      return options;
     }
-    return all.filter((d) => !datasetsInAnyProject.has(d.id));
-  }, [datasetsQ.data, projectId, project, datasetsInAnyProject]);
+    return all
+      .filter((d) => !datasetsInAnyProject.has(d.id))
+      .map((d) => ({ ...d, badge: undefined as string | undefined }));
+  }, [datasetsQ.data, projectId, project, datasetsInAnyProject, pipelineMergedQ.data]);
 
   useEffect(() => {
     if (!projectId || !project) return;
-    if (project.datasets.length === 0) {
+    const hasPipeline = pipelineHasOutput(pipelineMergedQ.data);
+    if (project.datasets.length === 0 && !hasPipeline) {
       setSelectedDatasetId(null);
       return;
     }
-    setSelectedDatasetId((current) =>
-      current && project.datasets.includes(current) ? current : project.datasets[0],
-    );
-  }, [projectId, project]);
+    setSelectedDatasetId((current) => {
+      if (current === PIPELINE_MERGED_DATASET_ID && hasPipeline) return current;
+      if (current && project.datasets.includes(current)) return current;
+      if (hasPipeline) return PIPELINE_MERGED_DATASET_ID;
+      return project.datasets[0] ?? null;
+    });
+  }, [projectId, project, pipelineMergedQ.data]);
 
   useEffect(() => {
     if (projectId) return;
@@ -723,9 +779,28 @@ function AiAnalysisPage() {
   const previewQ = useQuery({
     queryKey: ["datasets", "preview", selectedDatasetId],
     queryFn: () => apiDatasets.preview(selectedDatasetId!, 200),
-    enabled: !!selectedDatasetId,
+    enabled: !!selectedDatasetId && !isPipelineMergedDatasetId(selectedDatasetId),
   });
-  const datasetColumns = previewQ.data?.columns ?? [];
+
+  const activePreview = useMemo(() => {
+    if (isPipelineMergedDatasetId(selectedDatasetId) && pipelineMergedQ.data) {
+      return {
+        id: PIPELINE_MERGED_DATASET_ID,
+        columns: pipelineMergedQ.data.columns,
+        rows: pipelineMergedQ.data.rows,
+        totalRows: pipelineMergedQ.data.totalRows,
+        truncated: pipelineMergedQ.data.truncated,
+      };
+    }
+    return previewQ.data ?? null;
+  }, [selectedDatasetId, previewQ.data, pipelineMergedQ.data]);
+
+  const previewLoading =
+    isPipelineMergedDatasetId(selectedDatasetId)
+      ? pipelineMergedQ.isLoading || pipelineMergedQ.isFetching
+      : previewQ.isLoading;
+
+  const datasetColumns = activePreview?.columns ?? [];
 
   const [clinical, setClinical] = useState(() => emptyMappings(CLINICAL_FIELDS));
   const [dietary, setDietary] = useState(() => emptyMappings(DIETARY_FIELDS));
@@ -768,14 +843,40 @@ function AiAnalysisPage() {
     mutationFn: async () => {
       if (!projectId) throw new Error("Select a project in the header first.");
       if (!selectedDatasetId) throw new Error("Select a dataset from the linked project.");
-      if (project && !project.datasets.includes(selectedDatasetId)) {
+      if (
+        project &&
+        !project.datasets.includes(selectedDatasetId) &&
+        !isPipelineMergedDatasetId(selectedDatasetId)
+      ) {
         throw new Error("That dataset is not part of the selected project.");
       }
-      const datasetMeta = selectedDataset ?? {
+
+      let datasetId = selectedDatasetId;
+      let datasetMeta = selectedDataset ?? {
         id: selectedDatasetId,
         name: selectedDatasetId,
         row_count: null,
       };
+
+      if (isPipelineMergedDatasetId(selectedDatasetId) && project) {
+        const full = await apiPipeline.preview({
+          steps: project.pipelineSteps ?? [],
+          selectedCols: projectSelectedCols(project),
+          limit: Number.POSITIVE_INFINITY,
+        });
+        const saveName = `${project.name?.trim() || "Project"} (merged)`;
+        const saved = await saveDerivedDataset({ name: saveName, result: full });
+        datasetId = saved.id;
+        datasetMeta = {
+          id: saved.id,
+          name: saved.name,
+          row_count: saved.rowCount,
+        };
+        if (!project.datasets.includes(saved.id)) {
+          await saveProjectWork(projectId, { datasets: [...project.datasets, saved.id] });
+        }
+      }
+
       await ensureDatasetInSupabase({
         id: datasetMeta.id,
         name: datasetMeta.name,
@@ -783,7 +884,7 @@ function AiAnalysisPage() {
         status: "ready",
       });
       const payload = {
-        dataset_id: selectedDatasetId,
+        dataset_id: datasetId,
         name: runName,
         function_mode: fnModeEnum(fnMode),
         cohort_filter: {
@@ -885,9 +986,9 @@ function AiAnalysisPage() {
 
   const predictSummary = (() => {
     if (!showPredict || !predictOn) return null;
-    if (predictModel === "xgb") return "XGBoost (UI only — server runs both)";
-    if (predictModel === "logreg") return "Logistic Regression (UI only — server runs both)";
-    return "Logistic + XGBoost (matches server)";
+    if (predictModel === "xgb") return "XGBoost only";
+    if (predictModel === "logreg") return "Logistic Regression only";
+    return "Logistic + XGBoost (compare both; scores use XGBoost)";
   })();
   const subgroupSummary = (() => {
     if (!showSubgroup || !subgroupOn) return null;
@@ -946,20 +1047,20 @@ function AiAnalysisPage() {
       setMetsLabelCol(null);
       return;
     }
-    if (!previewQ.data || previewQ.data.id !== selectedDatasetId) return;
+    if (!activePreview) return;
     if (skipAutoMapOnce.current) {
       skipAutoMapOnce.current = false;
       return;
     }
-    const mapped = autoMapAnalysisFields(previewQ.data.columns, previewQ.data.rows);
+    const mapped = autoMapAnalysisFields(activePreview.columns, activePreview.rows);
     setClinical(mapped.clinical);
     setDietary(mapped.dietary);
     const metsCol =
-      previewQ.data.columns.find((c) => compactColumn(c) === "mets") ??
-      previewQ.data.columns.find((c) => compactColumn(c).includes("mets")) ??
+      activePreview.columns.find((c) => compactColumn(c) === "mets") ??
+      activePreview.columns.find((c) => compactColumn(c).includes("mets")) ??
       null;
     setMetsLabelCol(metsCol);
-  }, [selectedDatasetId, previewQ.data]);
+  }, [selectedDatasetId, activePreview]);
 
   useEffect(() => {
     if (!projectId || !project?.analysisDraft) return;
@@ -1087,14 +1188,18 @@ function AiAnalysisPage() {
                   Link a project in the header for analysis on the full cohort.
                 </p>
               )}
-              {projectId && project && project.datasets.length === 0 && (
-                <p className="mb-2 text-[12px] text-ink-3">
-                  This project has no datasets yet — add files on the Datasets page first.
-                </p>
-              )}
+              {projectId &&
+                project &&
+                project.datasets.length === 0 &&
+                !pipelineHasOutput(pipelineMergedQ.data) && (
+                  <p className="mb-2 text-[12px] text-ink-3">
+                    This project has no datasets yet — add files on the Datasets page, or build a
+                    merged table with the pipeline.
+                  </p>
+                )}
               <DatasetSelector
                 datasets={visibleDatasets}
-                isLoading={datasetsQ.isLoading}
+                isLoading={datasetsQ.isLoading || (!!projectId && pipelineMergedQ.isLoading)}
                 error={datasetsQ.error as Error | null}
                 value={selectedDatasetId}
                 onChange={setSelectedDatasetId}
@@ -1104,16 +1209,22 @@ function AiAnalysisPage() {
                     : "No unassigned datasets available"
                 }
               />
-              {selectedDatasetId && previewQ.isLoading && (
+              {selectedDatasetId && previewLoading && (
                 <p className="mt-2 text-[12px] text-ink-3 flex items-center gap-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Auto-mapping columns…
                 </p>
               )}
-              {selectedDatasetId && !previewQ.isLoading && previewQ.data && (
+              {selectedDatasetId && !previewLoading && activePreview && (
                 <p className="mt-2 text-[12px] text-ink-3">
-                  Mapped from {previewQ.data.columns.length} columns · scores reflect name + value
+                  Mapped from {activePreview.columns.length} columns · scores reflect name + value
                   checks
+                  {isPipelineMergedDatasetId(selectedDatasetId) && (
+                    <span className="block text-ink-3/90">
+                      Live pipeline output — saved automatically when you start a run, or use Save
+                      as dataset on the Datasets page.
+                    </span>
+                  )}
                 </p>
               )}
             </div>
@@ -1257,7 +1368,7 @@ function AiAnalysisPage() {
             <div className="flex flex-col items-end gap-2">
               <button
                 onClick={() => advanceFrom("map", "cohort")}
-                disabled={!selectedDatasetId || previewQ.isLoading}
+                disabled={!selectedDatasetId || previewLoading}
                 className="min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Continue to Cohort →
@@ -1476,8 +1587,6 @@ function AiAnalysisPage() {
                           onSelect={() => setPredictModel("xgb")}
                           title="XGBoost only"
                           hint="Gradient-boosted trees with SHAP importance"
-                          disabled
-                          tooltip="Coming soon — server currently trains both models every run"
                           info={METHOD_CLINICAL_INFO.xgb}
                         />
                         <RadioRow
@@ -1485,8 +1594,6 @@ function AiAnalysisPage() {
                           onSelect={() => setPredictModel("logreg")}
                           title="Logistic Regression only"
                           hint="L2-regularised, interpretable coefficients"
-                          disabled
-                          tooltip="Coming soon — server currently trains both models every run"
                           info={METHOD_CLINICAL_INFO.logreg}
                         />
                       </div>
@@ -1504,9 +1611,14 @@ function AiAnalysisPage() {
                     </div>
 
                     <p className="text-[12.5px] text-ink-3 italic">
-                      Server output: weighted test AUC, accuracy, precision, recall, F1 for both
-                      models; SHAP top features (XGBoost); logistic coefficients; per-subject
-                      predictions saved to the run.
+                      Server trains only the model(s) you select. Per-subject risk scores use{" "}
+                      {predictModel === "logreg"
+                        ? "logistic regression"
+                        : predictModel === "xgb"
+                          ? "XGBoost"
+                          : "XGBoost when both are run"}
+                      . Metrics, SHAP (XGBoost), and coefficients (logistic) appear on the
+                      results page.
                     </p>
                   </div>
                 </MethodSection>
@@ -1566,8 +1678,6 @@ function AiAnalysisPage() {
                           onSelect={() => setDimRed("pca")}
                           title="PCA"
                           hint="Variance curve + 2D scatter coloured by MetS"
-                          disabled
-                          tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
                           info={METHOD_CLINICAL_INFO.pca}
                         />
                         <RadioRow
@@ -1575,8 +1685,6 @@ function AiAnalysisPage() {
                           onSelect={() => setDimRed("tsne")}
                           title="t-SNE"
                           hint="2D embedding on a dietary sample (≤2000 rows)"
-                          disabled
-                          tooltip="Coming soon — server currently generates both PCA and t-SNE plots"
                           info={METHOD_CLINICAL_INFO.tsne}
                         />
                         <RadioRow
@@ -1979,7 +2087,7 @@ function DatasetSelector({
   onChange,
   emptyLabel = "No ready datasets",
 }: {
-  datasets: { id: string; name: string; row_count: number | null }[];
+  datasets: { id: string; name: string; row_count: number | null; badge?: string }[];
   isLoading: boolean;
   error: Error | null;
   value: string | null;
@@ -2024,7 +2132,15 @@ function DatasetSelector({
                 d.id === value ? "text-coral" : "text-ink"
               }`}
             >
-              <span className="mono truncate">{d.name}</span>
+              <span className="min-w-0 flex flex-col">
+                <span className="mono truncate">{d.name}</span>
+                {d.badge === "pipeline" && (
+                  <span className="text-[10px] text-ink-3 font-sans">From Datasets pipeline</span>
+                )}
+                {d.badge === "saved" && (
+                  <span className="text-[10px] text-ink-3 font-sans">Saved merged dataset</span>
+                )}
+              </span>
               <span className="text-[11px] text-ink-3 tabular shrink-0">
                 {d.row_count != null ? `${d.row_count.toLocaleString()} rows` : "—"}
               </span>

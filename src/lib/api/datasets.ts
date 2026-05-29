@@ -7,7 +7,7 @@ import { registerDatasetTable, getDatasetTables } from "@/lib/dataset-tables";
 // In real mode, the backend owns schemas. In mock mode we keep a tiny
 // in-memory registry so /datasets can render hardcoded + uploaded shapes.
 
-import type { Attr } from "@/lib/dataset-import";
+import type { Attr, Row } from "@/lib/dataset-import";
 
 const mockSchemas = new Map<string, Attr[]>();
 const mockMeta = new Map<string, { rowCount: number | null; uploadedAt: string | null }>();
@@ -79,6 +79,39 @@ export async function preview(id: string, limit = 200): Promise<DatasetPreview> 
   }
   return apiFetch<DatasetPreview>(`/datasets/${encodeURIComponent(id)}/preview`, {
     query: { limit },
+  });
+}
+
+export async function saveFromResult(params: {
+  name: string;
+  columns: string[];
+  rows: Row[];
+  totalRows: number;
+}): Promise<DatasetSummary> {
+  if (USE_MOCK) {
+    const id = `derived:${params.name.replace(/\s+/g, "_")}:${Date.now().toString(36)}`;
+    const attrs = params.columns.map((name) => ({
+      name,
+      type: "cat" as const,
+    }));
+    mockSchemas.set(id, attrs);
+    mockMeta.set(id, { rowCount: params.totalRows, uploadedAt: new Date().toISOString() });
+    registerDatasetTable(id, params.rows);
+    return {
+      id,
+      name: params.name,
+      rowCount: params.totalRows,
+      uploadedAt: new Date().toISOString(),
+      status: "ready",
+    };
+  }
+  return apiFetch<DatasetSummary>("/datasets/from-result", {
+    method: "POST",
+    body: {
+      name: params.name,
+      columns: params.columns,
+      rows: params.rows,
+    },
   });
 }
 

@@ -15,8 +15,10 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { parseDatasetFile, type Row } from "@/lib/dataset-import";
+import { exportRunResult, EXPORT_FORMATS } from "@/lib/dataset-export";
+import { saveDerivedDataset } from "@/lib/save-derived-dataset";
+import { pipelineHasOutput } from "@/lib/merged-datasets";
 import type { Step, StepKind, RunResult } from "@/lib/pipeline-exec";
 import * as api from "@/lib/api";
 import { USE_MOCK } from "@/lib/api/client";
@@ -25,7 +27,7 @@ import { __mockSeedSchema } from "@/lib/api/datasets";
 import { ProjectSaveBar } from "@/components/project-save-bar";
 import { saveProjectWork } from "@/lib/project-work";
 
-import { useProjects, useProject, createProjectAsync } from "@/lib/projects-store";
+import { useProjects, useProject, createProjectAsync, getProject } from "@/lib/projects-store";
 import {
   buildDatasetLabelMap,
   slotLabel,
@@ -1161,53 +1163,112 @@ function PreviewTable({ result }: { result: RunResult }) {
   );
 }
 
-const EXPORT_FORMATS = [
-  { ext: "csv", label: "CSV (.csv)", disabled: false },
-  { ext: "tsv", label: "TSV (.tsv)", disabled: false },
-  { ext: "json", label: "JSON (.json)", disabled: false },
-  { ext: "xlsx", label: "Excel (.xlsx)", disabled: false },
-  { ext: "xpt", label: "SAS XPORT (.xpt)", disabled: true },
-] as const;
+function SaveAsDatasetButton({
+  result,
+  defaultName,
+  projectId,
+  projectDatasets,
+  onSaved,
+}: {
+  result: RunResult;
+  defaultName: string;
+  projectId: string | undefined;
+  projectDatasets: string[];
+  onSaved: (datasetId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(defaultName);
+  const [saving, setSaving] = useState(false);
+  const disabled = !pipelineHasOutput(result);
 
-function downloadBlob(content: BlobPart, filename: string, mime: string) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
+  useEffect(() => {
+    if (open) setName(defaultName);
+  }, [open, defaultName]);
 
-function csvEscape(v: unknown, delim: string): string {
-  if (v === null || v === undefined) return "";
-  const s = String(v);
-  if (s.includes(delim) || s.includes("\n") || s.includes('"')) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
-
-function exportResult(result: RunResult, baseName: string, ext: string) {
-  const cleanName = baseName.replace(/[^\w\- ]+/g, "").trim() || "dataset";
-  const filename = `${cleanName}.${ext}`;
-  if (ext === "csv" || ext === "tsv") {
-    const delim = ext === "csv" ? "," : "\t";
-    const lines = [result.columns.join(delim)];
-    for (const r of result.rows) {
-      lines.push(result.columns.map((c) => csvEscape(r[c], delim)).join(delim));
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const summary = await saveDerivedDataset({ name, result });
+      if (projectId) {
+        const next = projectDatasets.includes(summary.id)
+          ? projectDatasets
+          : [...projectDatasets, summary.id];
+        await saveProjectWork(projectId, { datasets: next });
+      }
+      onSaved(summary.id);
+      setOpen(false);
+      toast.success("Dataset saved", {
+        description: `${summary.name} · ${(summary.rowCount ?? result.totalRows).toLocaleString()} rows`,
+      });
+    } catch (err) {
+      toast.error("Couldn't save dataset", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setSaving(false);
     }
-    downloadBlob("\uFEFF" + lines.join("\n"), filename, `text/${ext}`);
-  } else if (ext === "json") {
-    downloadBlob(JSON.stringify(result.rows, null, 2), filename, "application/json");
-  } else if (ext === "xlsx") {
-    const ws = XLSX.utils.json_to_sheet(result.rows, { header: result.columns });
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-    XLSX.writeFile(wb, filename);
-  }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        title={disabled ? "Configure the pipeline to produce rows first" : "Save merged table in Lotus"}
+        className="min-h-11 h-11 px-4 rounded-lg border border-hairline bg-surface text-[13px] font-medium text-ink hover:text-coral hover:border-coral/35 transition flex items-center gap-1.5 shadow-[var(--shadow-sm)] disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Save as dataset
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/20 p-4"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-hairline bg-surface shadow-[var(--shadow-lg)] p-5"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-[15px] font-semibold text-ink">Save as dataset</h3>
+            <p className="text-[12.5px] text-ink-2 mt-1">
+              Stores this merged table in your project catalog (not a file on your device). Use Export
+              to download a copy.
+            </p>
+            <label className="block mt-4 text-[12px] font-medium text-ink-2">Dataset name</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1 w-full min-h-10 px-3 rounded-lg border border-hairline bg-surface-hover text-[13px] font-mono"
+              placeholder="e.g. Cohort merged inner"
+              autoFocus
+            />
+            <p className="text-[11px] text-ink-3 mt-2 tabular">
+              {result.totalRows.toLocaleString()} rows · {result.columns.length} columns
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="min-h-10 px-4 rounded-lg border border-hairline text-[13px] text-ink-2 hover:text-ink"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving || !name.trim()}
+                onClick={() => void handleSave()}
+                className="min-h-10 px-4 rounded-lg bg-coral text-white text-[13px] font-medium disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function ExportMenu({ result, baseName }: { result: RunResult; baseName: string }) {
@@ -1241,7 +1302,7 @@ function ExportMenu({ result, baseName }: { result: RunResult; baseName: string 
               disabled={f.disabled}
               onClick={() => {
                 setOpen(false);
-                exportResult(result, baseName, f.ext);
+                exportRunResult(result, baseName, f.ext);
                 toast.success(`Exported as ${f.ext.toUpperCase()}`);
               }}
               className={`block w-full text-left px-3 py-2 text-[12.5px] transition ${
@@ -1358,7 +1419,6 @@ function DatasetsPage() {
   useEffect(() => {
     if (!projectId) {
       draftHydratedFor.current = null;
-      setDatasetSlots((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     if (draftHydratedFor.current === projectId) return;
@@ -1403,23 +1463,31 @@ function DatasetsPage() {
     }
 
     let fired = false;
+    const saveFor = projectId;
     const doSave = () => {
       if (fired) return;
+      if (!getProject(saveFor)) {
+        pendingSaveFlushRef.current = null;
+        return;
+      }
       fired = true;
       pendingSaveFlushRef.current = null;
-      void saveProjectWork(projectId, {
+      void saveProjectWork(saveFor, {
         datasets: datasetSlots,
         pipelineSteps: steps,
         selectedAttrs: selObj,
       }).catch((err) => {
-        toast.error("Couldn't auto-save changes", {
-          description: err instanceof Error ? err.message : String(err),
-        });
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Project not found") || msg.includes("NOT_FOUND")) return;
+        toast.error("Couldn't auto-save changes", { description: msg });
       });
     };
     pendingSaveFlushRef.current = doSave;
     const t = setTimeout(doSave, 700);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      pendingSaveFlushRef.current = null;
+    };
   }, [projectId, project, datasetSlots, steps, selectedAttrs]);
 
   // On unmount, flush any pending debounced save so that route-switching away
@@ -1898,6 +1966,19 @@ function DatasetsPage() {
             <ArrowRight className="h-3.5 w-3.5" />
           </span>
         )}
+        <SaveAsDatasetButton
+          result={fullResult}
+          defaultName={
+            effectiveName?.trim()
+              ? `${effectiveName.trim()} (merged)`
+              : "Merged dataset"
+          }
+          projectId={projectId}
+          projectDatasets={project?.datasets ?? datasetSlots.filter(Boolean)}
+          onSaved={() => {
+            void queryClient.invalidateQueries({ queryKey: ["datasets"] });
+          }}
+        />
         <ExportMenu result={fullResult} baseName={effectiveName || "dataset"} />
       </ProjectSaveBar>
     </div>
