@@ -40,6 +40,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Toaster } from "@/components/ui/sonner";
 import { MobileBottomNav } from "@/components/mobile-bottom-nav";
+import { navSearchWithProject, projectIdFromSearch } from "@/lib/nav-project-search";
 
 function RootErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -129,8 +130,9 @@ type ProfileState = {
 };
 
 function AppHeader() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
+  const navProjectSearch = navSearchWithProject(projectIdFromSearch(search));
   const { user, signOut } = useAuth();
   const profile = profileFromUser(user);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -208,6 +210,7 @@ function AppHeader() {
                 <Link
                   key={t.to}
                   to={t.to}
+                  search={navProjectSearch}
                   aria-label={t.label}
                   className={
                     "h-11 min-w-[44px] px-4 my-auto flex items-center gap-2 text-[14px] font-semibold tracking-tight rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-coral/50 " +

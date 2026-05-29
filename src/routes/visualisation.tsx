@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import { ChartContainer } from "@/components/ui/chart";
 import { ProjectSaveBar } from "@/components/project-save-bar";
-import { useProjects, formatRelative } from "@/lib/projects-store";
+import { useProjects, formatRelative, getProject } from "@/lib/projects-store";
 import { saveProjectWork, type ChartDraft } from "@/lib/project-work";
 import * as api from "@/lib/api";
 import { useDatasetTables } from "@/lib/dataset-tables";
@@ -147,6 +147,7 @@ function NativeSelect({
 }
 
 function VisualisationPage() {
+  const navigate = useNavigate();
   const { projectId: searchProjectId } = Route.useSearch();
   const projects = useProjects();
   const tables = useDatasetTables();
@@ -215,10 +216,20 @@ function VisualisationPage() {
   const [savedCharts, setSavedCharts] = useState<ChartConfig[]>([]);
   const [saving, setSaving] = useState(false);
   const draftRestoredFor = useRef<string | null>(null);
+  const pendingSaveFlushRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     draftRestoredFor.current = null;
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    navigate({
+      to: "/visualisation",
+      search: { projectId },
+      replace: true,
+    });
+  }, [projectId, navigate]);
 
   useEffect(() => {
     if (!projectId || !project) {
@@ -355,6 +366,50 @@ function VisualisationPage() {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (!projectId || !project) return;
+    if (draftRestoredFor.current !== projectId) return;
+
+    const cur = JSON.stringify({ chartDraft, charts: savedCharts });
+    const saved = JSON.stringify({
+      chartDraft: project.chartDraft ?? null,
+      charts: project.charts ?? [],
+    });
+    if (cur === saved) {
+      pendingSaveFlushRef.current = null;
+      return;
+    }
+
+    let fired = false;
+    const saveFor = projectId;
+    const doSave = () => {
+      if (fired) return;
+      if (!getProject(saveFor)) {
+        pendingSaveFlushRef.current = null;
+        return;
+      }
+      fired = true;
+      pendingSaveFlushRef.current = null;
+      void saveProjectWork(saveFor, { chartDraft, charts: savedCharts }).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Project not found") || msg.includes("NOT_FOUND")) return;
+        toast.error("Couldn't auto-save visualisation", { description: msg });
+      });
+    };
+    pendingSaveFlushRef.current = doSave;
+    const t = setTimeout(doSave, 700);
+    return () => {
+      clearTimeout(t);
+      pendingSaveFlushRef.current = null;
+    };
+  }, [projectId, project, chartDraft, savedCharts]);
+
+  useEffect(() => {
+    return () => {
+      pendingSaveFlushRef.current?.();
+    };
+  }, []);
 
   // Chart export refs
   const chartHostRef = useRef<HTMLDivElement>(null);

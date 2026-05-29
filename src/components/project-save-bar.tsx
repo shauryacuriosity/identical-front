@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Save } from "lucide-react";
 
 export function ProjectSaveBar({
@@ -15,6 +16,21 @@ export function ProjectSaveBar({
   onSave: () => void;
   children?: React.ReactNode;
 }) {
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target;
+      if (!(el instanceof HTMLElement)) return;
+      const tag = el.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable) return;
+      if (disabled || saving) return;
+      e.preventDefault();
+      onSave();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [disabled, saving, onSave]);
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-hairline bg-canvas/85 backdrop-blur-md">
       <div className="mx-auto max-w-[1280px] px-6 h-14 flex items-center justify-between gap-4">

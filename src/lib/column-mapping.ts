@@ -40,8 +40,7 @@ const TARGET_ALIASES: Record<string, string[]> = {
     "wc",
     "abdominal circumference",
   ],
-  trig_mg_dl: ["trig_mg_dl", "trig", "triglycerides", "lbxtr", "tg", "serum_triglycerides"],
-  hdl_chol: ["hdl_chol", "hdl", "hdl_mg_dl", "lbdhdd", "hdl cholesterol"],
+  hdl_chol: ["hdl_chol", "hdl", "hdl_mg_dl", "lbdhdd", "lbdhdmsi", "hdl cholesterol"],
   bp_sys: ["bp_sys", "systolic", "systolic bp", "sbp", "avg_sys", "mean_sbp", "bpxsy1", "bpsys"],
   bp_dia: ["bp_dia", "diastolic", "diastolic bp", "dbp", "avg_dia", "mean_dbp", "bpxdi1", "bpdia"],
   glucose_fasting: [
@@ -49,9 +48,20 @@ const TARGET_ALIASES: Record<string, string[]> = {
     "glu",
     "glucose",
     "lbxglu",
+    "lbdglusi",
+    "lbxglusi",
     "fpg",
     "fasting glucose",
     "fasting_glucose",
+  ],
+  trig_mg_dl: [
+    "trig_mg_dl",
+    "trig",
+    "triglycerides",
+    "lbxtr",
+    "lbdtrsi",
+    "tg",
+    "serum_triglycerides",
   ],
   age_years: ["age_years", "age", "ridageyr", "age years"],
   sex: ["sex", "riagendr", "gender", "biological sex"],
@@ -64,6 +74,25 @@ const TARGET_ALIASES: Record<string, string[]> = {
 
 function compact(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+/** Reject obvious NHANES / lab column name mismatches before scoring. */
+function columnConflictsTarget(column: string, target: string): boolean {
+  const c = compact(column);
+  if (!c) return false;
+  if (target === "trig_mg_dl") {
+    return c.includes("glu") || c.includes("hdl") || c.includes("bp") || c.includes("waist");
+  }
+  if (target === "glucose_fasting") {
+    return c.includes("trig") || c.includes("hdl") || (c.includes("bp") && !c.includes("glu"));
+  }
+  if (target === "hdl_chol") {
+    return c.includes("glu") || c.includes("trig") || c.includes("bp");
+  }
+  if (target === "bp_sys" || target === "bp_dia") {
+    return c.includes("glu") || c.includes("trig") || c.includes("hdl");
+  }
+  return false;
 }
 
 function tokenize(text: string): string[] {
@@ -209,6 +238,7 @@ export function emptyMappings(fields: MappingField[]): MappingSuggestion[] {
 }
 
 function scoreColumnForTarget(column: string, target: string, rows: Row[]) {
+  if (columnConflictsTarget(column, target)) return 0;
   const ns = nameScore(column, target);
   const vs = valueScore(column, target, rows);
   return combinedScore(ns, vs, target);

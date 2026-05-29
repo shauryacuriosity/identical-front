@@ -29,14 +29,23 @@ export async function ensureDatasetInSupabase(entry: DatasetCatalogEntry): Promi
   if (lookupError) throw lookupError;
   if (existing) return;
 
-  const { error: insertError } = await supabase.from("datasets").insert({
+  const baseRow = {
     id: entry.id,
     name: entry.name,
     row_count: entry.row_count,
     status: entry.status ?? "ready",
     user_id: user.id,
+  };
+
+  let { error: insertError } = await supabase.from("datasets").insert({
+    ...baseRow,
     is_shared: false,
   });
+
+  // Production may lag migrations — omit is_shared when the column is not deployed yet.
+  if (insertError?.message?.includes("is_shared")) {
+    ({ error: insertError } = await supabase.from("datasets").insert(baseRow));
+  }
 
   if (insertError) throw insertError;
 }

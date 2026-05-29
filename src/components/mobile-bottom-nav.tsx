@@ -1,5 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Home, FilePlus, Shapes, Codesandbox } from "lucide-react";
+import { navSearchWithProject, projectIdFromSearch } from "@/lib/nav-project-search";
 
 const tabs = [
   { to: "/", label: "Home", icon: Home, match: (p: string) => p === "/" },
@@ -24,7 +25,8 @@ const tabs = [
 ] as const;
 
 export function MobileBottomNav() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navProjectSearch = navSearchWithProject(projectIdFromSearch(search));
 
   return (
     <nav
@@ -39,6 +41,7 @@ export function MobileBottomNav() {
             <Link
               key={t.to}
               to={t.to}
+              search={navProjectSearch}
               aria-label={t.label}
               aria-current={active ? "page" : undefined}
               className={

@@ -91,7 +91,18 @@ type RunRow = {
   started_at: string | null;
   finished_at: string | null;
   dataset_id: string;
+  method_config: {
+    prediction?: { model?: string } | null;
+  } | null;
 };
+
+type PredictionModelChoice = "both" | "xgb" | "logreg";
+
+function parsePredictionModel(run: RunRow | null | undefined): PredictionModelChoice {
+  const raw = run?.method_config?.prediction?.model;
+  if (raw === "xgb" || raw === "logreg" || raw === "both") return raw;
+  return "both";
+}
 
 type ShapMap = Record<string, number>;
 type ClusterSummary = {
@@ -112,7 +123,9 @@ function RunPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("analysis_runs")
-        .select("id,name,status,progress,error_message,started_at,finished_at,dataset_id")
+        .select(
+          "id,name,status,progress,error_message,started_at,finished_at,dataset_id,method_config",
+        )
         .eq("id", runId)
         .maybeSingle();
       if (error) throw error;
@@ -195,9 +208,13 @@ function RunPage() {
 
       {run && isComplete && (
         <>
-          <SummaryAndModelPanel runId={runId} />
+          <SummaryAndModelPanel runId={runId} predictionModel={parsePredictionModel(run)} />
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-4">
-            <ShapPanel runId={runId} />
+            {parsePredictionModel(run) !== "logreg" ? (
+              <ShapPanel runId={runId} />
+            ) : (
+              <LogisticFeaturesPanel runId={runId} />
+            )}
             <ClustersPanel runId={runId} />
           </div>
           <PredictionsPanel runId={runId} />
@@ -329,11 +346,19 @@ type EdaRow = {
 };
 type ModelRow = {
   xgboost_metrics_test: Record<string, number> | null;
+  logistic_metrics_test: Record<string, number> | null;
   shap_top_features: ShapMap | null;
+  top_logistic_features: string[] | null;
   figure_paths: unknown;
 };
 
-function SummaryAndModelPanel({ runId }: { runId: string }) {
+function SummaryAndModelPanel({
+  runId,
+  predictionModel,
+}: {
+  runId: string;
+  predictionModel: PredictionModelChoice;
+}) {
   const edaQ = useQuery({
     queryKey: ["eda_results", runId],
     queryFn: async () => {
@@ -352,7 +377,9 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("model_results")
-        .select("xgboost_metrics_test,shap_top_features,artifact_paths")
+        .select(
+          "xgboost_metrics_test,logistic_metrics_test,shap_top_features,top_logistic_features,artifact_paths",
+        )
         .eq("run_id", runId)
         .maybeSingle();
       if (error) throw error;
@@ -361,7 +388,17 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
   });
 
   const eda = edaQ.data;
-  const m = modelQ.data?.xgboost_metrics_test ?? null;
+  const modelRow = modelQ.data;
+  const m =
+    predictionModel === "logreg"
+      ? (modelRow?.logistic_metrics_test ?? null)
+      : (modelRow?.xgboost_metrics_test ?? null);
+  const modelLabel =
+    predictionModel === "logreg"
+      ? "Logistic Regression"
+      : predictionModel === "xgb"
+        ? "XGBoost"
+        : "XGBoost (primary score)";
 
   return (
     <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6">
@@ -445,7 +482,17 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
                   F1 <span className="mono text-ink">{num(m?.f1) ?? "—"}</span>
                 </span>
               </div>
-              <div className="mt-2 text-[11.5px] text-ink-3 italic">XGBoost · test-set only</div>
+              <div className="mt-2 text-[11.5px] text-ink-3 italic">
+                {modelLabel} · test-set only
+                {predictionModel === "both" && modelRow?.logistic_metrics_test && (
+                  <span className="block mt-0.5">
+                    Logistic AUC{" "}
+                    <span className="mono text-ink-2">
+                      {num(modelRow.logistic_metrics_test.weighted_auc) ?? "—"}
+                    </span>
+                  </span>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -455,6 +502,53 @@ function SummaryAndModelPanel({ runId }: { runId: string }) {
 }
 
 // ---------- SHAP ----------
+
+function LogisticFeaturesPanel({ runId }: { runId: string }) {
+  const q = useQuery({
+    queryKey: ["model_results_lr", runId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("model_results")
+        .select("top_logistic_features")
+        .eq("run_id", runId)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as { top_logistic_features: string[] | null } | null)?.top_logistic_features ?? [];
+    },
+  });
+
+  const features = q.data ?? [];
+
+  return (
+    <section className="rounded-2xl border border-hairline bg-surface p-6">
+      <PanelHeader
+        title="Top predictors of MetS"
+        subtitle="Largest absolute logistic coefficients (top 10)"
+      />
+      <div className="mt-4 min-h-[280px]">
+        {q.isLoading ? (
+          <div className="space-y-2.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonBlock key={i} className="h-5 w-full" />
+            ))}
+          </div>
+        ) : q.error ? (
+          <p className="text-[12.5px] text-ink-3">Failed to load — {(q.error as Error).message}</p>
+        ) : features.length === 0 ? (
+          <Em />
+        ) : (
+          <ul className="space-y-1.5">
+            {features.slice(0, 10).map((f) => (
+              <li key={f} className="text-[12.5px] mono text-ink truncate">
+                {f}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function ShapPanel({ runId }: { runId: string }) {
   const q = useQuery({
