@@ -31,6 +31,7 @@ import { useProjects, useProject, createProjectAsync, getProject } from "@/lib/p
 import {
   buildDatasetLabelMap,
   slotLabel,
+  slotLabelTitle,
   stripFileExtension,
 } from "@/lib/dataset-labels";
 
@@ -243,6 +244,7 @@ function DatasetBar({
   availableNames,
   rowCount,
   slotLabels,
+  slotLabelsLoading,
 }: {
   value: string;
   onChange: (next: string) => void;
@@ -251,11 +253,14 @@ function DatasetBar({
   availableNames: string[];
   rowCount?: number;
   slotLabels: Record<string, string>;
+  slotLabelsLoading?: boolean;
 }) {
   const [open, setOpen] = useState(value === "");
   const rowLabel = rowCount !== undefined ? `${rowCount.toLocaleString()} rows` : null;
   const isEmpty = value === "";
-  const displayValue = slotLabel(value, slotLabels);
+  const labelOpts = { labelsLoading: slotLabelsLoading };
+  const displayValue = slotLabel(value, slotLabels, labelOpts);
+  const displayTitle = slotLabelTitle(value, slotLabels, labelOpts);
   return (
     <div className="relative mb-2.5">
       <button
@@ -268,7 +273,9 @@ function DatasetBar({
             <span className="text-[13.5px] text-ink-2 italic">Please select a dataset</span>
           ) : (
             <>
-              <span className="font-mono text-[13.5px] text-ink">{displayValue}</span>
+              <span className="font-mono text-[13.5px] text-ink" title={displayTitle}>
+                {displayValue}
+              </span>
               {rowLabel && <span className="text-[11px] text-ink-3 tabular">· {rowLabel}</span>}
             </>
           )}
@@ -319,7 +326,7 @@ function DatasetBar({
                       : "text-ink hover:bg-surface-hover"
                 }`}
               >
-                {slotLabel(opt, slotLabels)}
+                {slotLabel(opt, slotLabels, labelOpts)}
                 {disabled && <span className="ml-2 font-sans text-[11px] text-ink-3">in use</span>}
               </button>
             );
@@ -373,6 +380,7 @@ type PartOptions = { kind: "list"; options: string[] } | { kind: "text" };
 type EditCtx = {
   slotNames: string[];
   slotLabels: Record<string, string>;
+  slotLabelsLoading?: boolean;
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
 };
@@ -452,6 +460,7 @@ function EditablePart({
   onChange,
   variant = "chip",
   labelFor,
+  titleFor,
 }: {
   value: string;
   mono?: boolean;
@@ -459,6 +468,7 @@ function EditablePart({
   onChange: (next: string) => void;
   variant?: "chip" | "sentence";
   labelFor?: (value: string) => string;
+  titleFor?: (value: string) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
@@ -490,6 +500,7 @@ function EditablePart({
           setOpen((o) => !o);
         }}
         className={`${btnBase} ${txt}`}
+        title={titleFor?.(value)}
       >
         {displayValue || <span className="text-ink-3">—</span>}
       </button>
@@ -585,7 +596,12 @@ const PipelineChip = ({
               mono={p.mono}
               opts={optionsForPart(step, p.label, ctx)}
               onChange={(next) => onUpdatePart(i, next)}
-              labelFor={(v) => (p.mono ? (ctx.slotLabels[v] ?? v) : v)}
+              labelFor={(v) =>
+                p.mono ? slotLabel(v, ctx.slotLabels, { labelsLoading: ctx.slotLabelsLoading }) : v
+              }
+              titleFor={(v) =>
+                p.mono ? slotLabelTitle(v, ctx.slotLabels, { labelsLoading: ctx.slotLabelsLoading }) : undefined
+              }
             />
             {i < step.parts.length - 1 && <span className="text-ink-3/60">·</span>}
           </span>
@@ -630,7 +646,16 @@ function SentenceFragment({
         opts={optionsForPart(step, label, ctx)}
         onChange={(next) => onUpdatePart(idx, next)}
         variant="sentence"
-        labelFor={(v) => ((mono ?? p.mono) ? (ctx.slotLabels[v] ?? v) : v)}
+        labelFor={(v) =>
+          (mono ?? p.mono)
+            ? slotLabel(v, ctx.slotLabels, { labelsLoading: ctx.slotLabelsLoading })
+            : v
+        }
+        titleFor={(v) =>
+          (mono ?? p.mono)
+            ? slotLabelTitle(v, ctx.slotLabels, { labelsLoading: ctx.slotLabelsLoading })
+            : undefined
+        }
       />
     );
   };
@@ -791,12 +816,14 @@ function PipelineSentence({
 function PipelineStrip({
   slotNames,
   slotLabels,
+  slotLabelsLoading,
   schemaBySlot,
   steps,
   setSteps,
 }: {
   slotNames: string[];
   slotLabels: Record<string, string>;
+  slotLabelsLoading?: boolean;
   schemaBySlot: Record<string, Attr[]>;
   steps: Step[];
   setSteps: React.Dispatch<React.SetStateAction<Step[]>>;
@@ -805,7 +832,7 @@ function PipelineStrip({
   const [view, setView] = useState<"compact" | "list">("compact");
   const chipRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const ctx: EditCtx = { slotNames, slotLabels, schemaBySlot, steps };
+  const ctx: EditCtx = { slotNames, slotLabels, slotLabelsLoading, schemaBySlot, steps };
 
   const updatePart = (stepId: string, partIndex: number, next: string) => {
     setSteps((prev) =>
@@ -1608,7 +1635,7 @@ function DatasetsPage() {
   const groups = datasetSlots.filter(Boolean).map((slot) => {
     const base = schemaBySlot[slot] ?? [];
     const items = q ? base.filter((a) => a.name.toLowerCase().includes(q)) : base;
-    return { slot, label: slotLabel(slot, slotLabels), items };
+    return { slot, label: slotLabel(slot, slotLabels, { labelsLoading: datasetsListQ.isLoading }), items };
   });
   const totalCount = groups.reduce((n, g) => n + g.items.length, 0);
 
@@ -1747,7 +1774,9 @@ function DatasetsPage() {
 
   const firstNamedSlot = datasetSlots.find(Boolean);
   const derivedNameFromDataset = firstNamedSlot
-    ? stripFileExtension(slotLabel(firstNamedSlot, slotLabels))
+    ? stripFileExtension(
+        slotLabel(firstNamedSlot, slotLabels, { labelsLoading: datasetsListQ.isLoading }),
+      )
     : "";
   const effectiveName = project?.name?.trim() ? project.name : derivedNameFromDataset;
   const isUntitled = !project?.name?.trim();
@@ -1893,6 +1922,7 @@ function DatasetsPage() {
               availableNames={availableNames}
               rowCount={rowCountBySlot[name]}
               slotLabels={slotLabels}
+              slotLabelsLoading={datasetsListQ.isLoading}
               onChange={(next) =>
                 setDatasetSlots((slots) => slots.map((s, idx) => (idx === i ? next : s)))
               }
@@ -1928,6 +1958,7 @@ function DatasetsPage() {
             <PipelineStrip
               slotNames={datasetSlots.filter(Boolean)}
               slotLabels={slotLabels}
+              slotLabelsLoading={datasetsListQ.isLoading}
               schemaBySlot={schemaBySlot}
               steps={steps}
               setSteps={setSteps}

@@ -210,12 +210,25 @@ function RunPage() {
         <>
           <SummaryAndModelPanel runId={runId} predictionModel={parsePredictionModel(run)} />
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-4">
-            {parsePredictionModel(run) !== "logreg" ? (
-              <ShapPanel runId={runId} />
+            {parsePredictionModel(run) === "both" ? (
+              <>
+                <div className="flex flex-col gap-4">
+                  <ShapPanel runId={runId} />
+                  <LogisticFeaturesPanel runId={runId} />
+                </div>
+                <ClustersPanel runId={runId} />
+              </>
+            ) : parsePredictionModel(run) !== "logreg" ? (
+              <>
+                <ShapPanel runId={runId} />
+                <ClustersPanel runId={runId} />
+              </>
             ) : (
-              <LogisticFeaturesPanel runId={runId} />
+              <>
+                <LogisticFeaturesPanel runId={runId} />
+                <ClustersPanel runId={runId} />
+              </>
             )}
-            <ClustersPanel runId={runId} />
           </div>
           <PredictionsPanel runId={runId} predictionModel={parsePredictionModel(run)} />
         </>
