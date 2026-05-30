@@ -83,7 +83,13 @@ export const TARGET_TO_CANONICAL: Record<string, string> = {
   trig_mg_dl: "LBXTR",
   hdl_chol: "LBDHDD",
   bp_sys: "BPXSY1",
+  bp_sys_2: "BPXSY2",
+  bp_sys_3: "BPXSY3",
+  bp_sys_4: "BPXSY4",
   bp_dia: "BPXDI1",
+  bp_dia_2: "BPXDI2",
+  bp_dia_3: "BPXDI3",
+  bp_dia_4: "BPXDI4",
   glucose_fasting: "LBXGLU",
   age_years: "RIDAGEYR",
   sex: "RIAGENDR",
@@ -94,13 +100,50 @@ export const TARGET_TO_CANONICAL: Record<string, string> = {
   kcal_total: "DR1IKCAL",
 };
 
+/** Analysis targets for optional NHANES BP reading slots 1–4. */
+export const BP_SYS_TARGETS = ["bp_sys", "bp_sys_2", "bp_sys_3", "bp_sys_4"] as const;
+export const BP_DIA_TARGETS = ["bp_dia", "bp_dia_2", "bp_dia_3", "bp_dia_4"] as const;
+
+export type SexEncoding = "nhanes" | "zero_one_male" | "text_mf_auto";
+
+/**
+ * Build `{ rawColumn: canonicalName }` entries for extra systolic/diastolic BP
+ * readings (slots 2–4). Primary BP rows use the clinical mapping suggestions.
+ */
+export function buildExtraBpMapping(
+  extraSys: (string | null)[],
+  extraDia: (string | null)[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  extraSys.forEach((col, i) => {
+    if (!col) return;
+    const canonical = TARGET_TO_CANONICAL[`bp_sys_${i + 2}`];
+    if (canonical) out[col] = canonical;
+  });
+  extraDia.forEach((col, i) => {
+    if (!col) return;
+    const canonical = TARGET_TO_CANONICAL[`bp_dia_${i + 2}`];
+    if (canonical) out[col] = canonical;
+  });
+  return out;
+}
+
 /**
  * Build a `{ rawColumn: canonicalName }` map from confirmed mapping suggestions,
  * suitable for the analysis run's `method_config.column_mapping`. Suggestions
  * without a selected column, or targets with no canonical, are skipped.
+ * An optional extra map (e.g. from buildExtraBpMapping) is merged last.
  */
-export function buildColumnMapping(...groups: MappingSuggestion[][]): Record<string, string> {
+export function buildColumnMapping(
+  ...args: [...MappingSuggestion[][], Record<string, string>?]
+): Record<string, string> {
   const out: Record<string, string> = {};
+  let extra: Record<string, string> | undefined;
+  const groups: MappingSuggestion[][] = [];
+  for (const arg of args) {
+    if (Array.isArray(arg)) groups.push(arg);
+    else extra = arg;
+  }
   for (const group of groups) {
     for (const s of group) {
       if (!s.column) continue;
@@ -108,6 +151,7 @@ export function buildColumnMapping(...groups: MappingSuggestion[][]): Record<str
       if (canonical) out[s.column] = canonical;
     }
   }
+  if (extra) Object.assign(out, extra);
   return out;
 }
 

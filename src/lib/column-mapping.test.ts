@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   autoMapAnalysisFields,
   buildColumnMapping,
+  buildExtraBpMapping,
   CLINICAL_FIELDS,
   DIETARY_FIELDS,
   emptyMappings,
@@ -34,6 +35,32 @@ describe("buildColumnMapping", () => {
     for (const f of [...CLINICAL_FIELDS, ...DIETARY_FIELDS]) {
       expect(TARGET_TO_CANONICAL[f.target], `missing canonical for ${f.target}`).toBeTruthy();
     }
+  });
+
+  it("merges extra BP reading columns into the mapping", () => {
+    const clinical = emptyMappings(CLINICAL_FIELDS).map((m) =>
+      m.target === "bp_sys" ? { ...m, column: "sbp1", score: 0.9 } : m,
+    );
+    const extra = { sbp2: "BPXSY2", sbp3: "BPXSY3", dbp2: "BPXDI2" };
+    expect(buildColumnMapping(clinical, [], extra)).toEqual({
+      sbp1: "BPXSY1",
+      sbp2: "BPXSY2",
+      sbp3: "BPXSY3",
+      dbp2: "BPXDI2",
+    });
+  });
+});
+
+describe("buildExtraBpMapping", () => {
+  it("maps optional systolic/diastolic slots to BPXSY2-4 and BPXDI2-4", () => {
+    expect(
+      buildExtraBpMapping(["BPXSY2", "BPXSY3", null], [null, "BPXDI3", "BPXDI4"]),
+    ).toEqual({
+      BPXSY2: "BPXSY2",
+      BPXSY3: "BPXSY3",
+      BPXDI3: "BPXDI3",
+      BPXDI4: "BPXDI4",
+    });
   });
 });
 

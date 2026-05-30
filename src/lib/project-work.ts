@@ -1,5 +1,6 @@
 import type { Step } from "@/lib/pipeline-exec";
 import type { ChartConfig, ChartType, Agg } from "@/lib/chart-config";
+import type { SexEncoding } from "@/lib/column-mapping";
 import * as api from "@/lib/api/projects";
 import type { Project } from "@/lib/projects-store";
 
@@ -21,6 +22,9 @@ export type AnalysisDraft = {
   selectedDatasetId: string | null;
   clinical: { field: string; target: string; column: string | null; score: number | null }[];
   dietary: { field: string; target: string; column: string | null; score: number | null }[];
+  extraBpSys?: (string | null)[];
+  extraBpDia?: (string | null)[];
+  sexEncoding?: SexEncoding;
   ageMin: number;
   ageMax: number;
   sex: "All" | "Female" | "Male";

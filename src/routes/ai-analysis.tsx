@@ -30,7 +30,6 @@ import {
   projectHasPipelineWork,
   projectSelectedCols,
 } from "@/lib/merged-datasets";
-import { buildDatasetLabelMap } from "@/lib/dataset-labels";
 import { USE_MOCK } from "@/lib/api/client";
 import { ProjectSaveBar } from "@/components/project-save-bar";
 import { useProjects, useProject, formatRelative } from "@/lib/projects-store";
@@ -40,12 +39,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   autoMapAnalysisFields,
   buildColumnMapping,
-  buildExtraBpMapping,
   CLINICAL_FIELDS,
   DIETARY_FIELDS,
   emptyMappings,
   type MappingSuggestion,
-  type SexEncoding,
 } from "@/lib/column-mapping";
 import { computeCohort } from "@/lib/cohort";
 
@@ -600,123 +597,6 @@ function MappingRow({
   );
 }
 
-function ColumnDropdown({
-  label,
-  value,
-  columns,
-  exclude,
-  onChange,
-}: {
-  label: string;
-  value: string | null;
-  columns: string[];
-  exclude?: Set<string>;
-  onChange: (column: string | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const options = exclude ? columns.filter((c) => !exclude.has(c) || c === value) : columns;
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-[1fr_16px_1fr] items-start sm:items-center gap-2 sm:gap-3 py-2 border-b border-hairline/40 last:border-b-0">
-      <span className="text-[12.5px] text-ink-2">{label}</span>
-      <ArrowRight className="hidden sm:block h-3 w-3 text-ink-3" />
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className={`mono inline-flex items-center gap-1.5 min-h-9 h-9 sm:min-h-0 sm:h-7 px-3 sm:px-2 rounded-md text-[12px] border transition-colors w-full sm:w-auto ${
-            value
-              ? "border-hairline bg-surface-hover text-ink hover:border-coral/40"
-              : "border-dashed border-hairline text-ink-3 hover:text-ink"
-          }`}
-        >
-          {value ?? "— optional"}
-          <ChevronDown
-            className={`h-3 w-3 text-ink-3 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-        {open && (
-          <div className="absolute z-10 mt-1 w-56 max-h-64 overflow-auto rounded-lg border border-hairline bg-surface shadow-[var(--shadow-md)] p-1">
-            <button
-              type="button"
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-              className={`mono w-full text-left text-[12px] px-2 py-1.5 rounded hover:bg-surface-hover ${
-                value == null ? "text-coral" : "text-ink-3"
-              }`}
-            >
-              — unmapped
-            </button>
-            {options.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  onChange(c);
-                  setOpen(false);
-                }}
-                className={`mono w-full text-left text-[12px] px-2 py-1.5 rounded hover:bg-surface-hover ${
-                  c === value ? "text-coral" : "text-ink"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function AdditionalBpReadings({
-  extraSys,
-  extraDia,
-  columns,
-  usedColumns,
-  onChangeSys,
-  onChangeDia,
-}: {
-  extraSys: (string | null)[];
-  extraDia: (string | null)[];
-  columns: string[];
-  usedColumns: Set<string>;
-  onChangeSys: (index: number, column: string | null) => void;
-  onChangeDia: (index: number, column: string | null) => void;
-}) {
-  return (
-    <div className="py-3 border-b border-hairline/60">
-      <p className="text-[12px] uppercase tracking-[0.1em] text-ink-3 font-medium mb-2">
-        Additional BP readings
-        <span className="ml-1.5 normal-case tracking-normal text-ink-3 font-normal">
-          (optional — NHANES slots 2–4)
-        </span>
-      </p>
-      <div className="rounded-lg border border-hairline/60 bg-surface/50 px-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="grid grid-cols-1 lg:grid-cols-2 gap-x-4">
-            <ColumnDropdown
-              label={`Systolic reading ${i + 2}`}
-              value={extraSys[i] ?? null}
-              columns={columns}
-              exclude={usedColumns}
-              onChange={(col) => onChangeSys(i, col)}
-            />
-            <ColumnDropdown
-              label={`Diastolic reading ${i + 2}`}
-              value={extraDia[i] ?? null}
-              columns={columns}
-              exclude={usedColumns}
-              onChange={(col) => onChangeDia(i, col)}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ---------- Step shell ----------
 
 function StepShell({
@@ -854,7 +734,6 @@ function AiAnalysisPage() {
 
   const visibleDatasets = useMemo(() => {
     const all = datasetsQ.data ?? [];
-    const labelMap = buildDatasetLabelMap(datasetsQ.data);
     if (projectId && project) {
       const allowed = new Set(project.datasets);
       const options: DatasetOption[] = [];
@@ -868,10 +747,7 @@ function AiAnalysisPage() {
       }
       for (const id of project.datasets) {
         if (!options.some((o) => o.id === id)) {
-          const name =
-            labelMap[id] ??
-            (datasetsQ.isLoading ? "Dataset (loading…)" : `Dataset (${id.slice(0, 8)}…)`);
-          options.push({ id, name, row_count: null });
+          options.push({ id, name: id, row_count: null });
         }
       }
       if (pipelineHasOutput(pipelineMergedQ.data)) {
@@ -887,7 +763,7 @@ function AiAnalysisPage() {
     return all
       .filter((d) => !datasetsInAnyProject.has(d.id))
       .map((d) => ({ ...d, badge: undefined as string | undefined }));
-  }, [datasetsQ.data, datasetsQ.isLoading, projectId, project, datasetsInAnyProject, pipelineMergedQ.data]);
+  }, [datasetsQ.data, projectId, project, datasetsInAnyProject, pipelineMergedQ.data]);
 
   useEffect(() => {
     if (!projectId || !project) return;
@@ -940,20 +816,6 @@ function AiAnalysisPage() {
 
   const [clinical, setClinical] = useState(() => emptyMappings(CLINICAL_FIELDS));
   const [dietary, setDietary] = useState(() => emptyMappings(DIETARY_FIELDS));
-  const [extraBpSys, setExtraBpSys] = useState<(string | null)[]>([null, null, null]);
-  const [extraBpDia, setExtraBpDia] = useState<(string | null)[]>([null, null, null]);
-  const [sexEncoding, setSexEncoding] = useState<SexEncoding>("nhanes");
-
-  const mappedColumns = useMemo(() => {
-    const used = new Set<string>();
-    for (const r of clinical) if (r.column) used.add(r.column);
-    for (const r of dietary) if (r.column) used.add(r.column);
-    for (const c of extraBpSys) if (c) used.add(c);
-    for (const c of extraBpDia) if (c) used.add(c);
-    return used;
-  }, [clinical, dietary, extraBpSys, extraBpDia]);
-
-  const sexColumnMapped = dietary.find((r) => r.target === "sex")?.column ?? null;
 
   const [ageMin, setAgeMin] = useState(20);
   const [ageMax, setAgeMax] = useState(65);
@@ -1051,12 +913,7 @@ function AiAnalysisPage() {
           // Confirmed column mappings, translated to the canonical names the
           // backend pipeline expects, so they are applied to the actual ML run
           // (not preview-only).
-          column_mapping: buildColumnMapping(
-            clinical,
-            dietary,
-            buildExtraBpMapping(extraBpSys, extraBpDia),
-          ),
-          sex_encoding: sexColumnMapped ? sexEncoding : undefined,
+          column_mapping: buildColumnMapping(clinical, dietary),
         },
         status: "pending",
       };
@@ -1206,9 +1063,6 @@ function AiAnalysisPage() {
     if (!selectedDatasetId) {
       setClinical(emptyMappings(CLINICAL_FIELDS));
       setDietary(emptyMappings(DIETARY_FIELDS));
-      setExtraBpSys([null, null, null]);
-      setExtraBpDia([null, null, null]);
-      setSexEncoding("nhanes");
       setMetsLabelCol(null);
       return;
     }
@@ -1238,9 +1092,6 @@ function AiAnalysisPage() {
     setSelectedDatasetId(d.selectedDatasetId);
     setClinical(d.clinical);
     setDietary(d.dietary);
-    setExtraBpSys(d.extraBpSys ?? [null, null, null]);
-    setExtraBpDia(d.extraBpDia ?? [null, null, null]);
-    setSexEncoding(d.sexEncoding ?? "nhanes");
     setAgeMin(d.ageMin);
     setAgeMax(d.ageMax);
     setSex(d.sex);
@@ -1262,9 +1113,6 @@ function AiAnalysisPage() {
     selectedDatasetId,
     clinical,
     dietary,
-    extraBpSys,
-    extraBpDia,
-    sexEncoding,
     ageMin,
     ageMax,
     sex,
@@ -1407,10 +1255,10 @@ function AiAnalysisPage() {
             >
               <Info className="h-4 w-4 text-coral mt-0.5 shrink-0" strokeWidth={1.75} />
               <p className="text-[12.5px] text-ink leading-snug">
-                <span className="font-medium">Confirmed mappings</span>
+                <span className="font-medium">Preview only</span>
                 <span className="text-ink-2">
                   {" "}
-                  are sent with your run and applied on the server.
+                  — column mappings are not yet applied to the ML run.
                 </span>
               </p>
             </div>
@@ -1467,41 +1315,18 @@ function AiAnalysisPage() {
                   </div>
                 )}
                 {clinical.map((r, i) => (
-                  <div key={r.target}>
-                    <MappingRow
-                      row={r}
-                      columns={datasetColumns}
-                      onChange={(col) =>
-                        setClinical((rows) => {
-                          const next = [...rows];
-                          next[i] = { ...next[i], column: col, score: null };
-                          return next;
-                        })
-                      }
-                    />
-                    {r.target === "bp_dia" && (
-                      <AdditionalBpReadings
-                        extraSys={extraBpSys}
-                        extraDia={extraBpDia}
-                        columns={datasetColumns}
-                        usedColumns={mappedColumns}
-                        onChangeSys={(idx, col) =>
-                          setExtraBpSys((prev) => {
-                            const next = [...prev];
-                            next[idx] = col;
-                            return next;
-                          })
-                        }
-                        onChangeDia={(idx, col) =>
-                          setExtraBpDia((prev) => {
-                            const next = [...prev];
-                            next[idx] = col;
-                            return next;
-                          })
-                        }
-                      />
-                    )}
-                  </div>
+                  <MappingRow
+                    key={r.target}
+                    row={r}
+                    columns={datasetColumns}
+                    onChange={(col) =>
+                      setClinical((rows) => {
+                        const next = [...rows];
+                        next[i] = { ...next[i], column: col, score: null };
+                        return next;
+                      })
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -1514,35 +1339,18 @@ function AiAnalysisPage() {
                 </h3>
                 <div className="rounded-xl border border-hairline bg-canvas/40 px-4">
                   {dietary.map((r, i) => (
-                    <div key={r.target}>
-                      <MappingRow
-                        row={r}
-                        columns={datasetColumns}
-                        onChange={(col) =>
-                          setDietary((rows) => {
-                            const next = [...rows];
-                            next[i] = { ...next[i], column: col, score: null };
-                            return next;
-                          })
-                        }
-                      />
-                      {r.target === "sex" && r.column && (
-                        <div className="py-3 border-b border-hairline/60 last:border-b-0">
-                          <label className="text-[12px] text-ink-2 block mb-1.5">
-                            Interpret as
-                          </label>
-                          <select
-                            value={sexEncoding}
-                            onChange={(e) => setSexEncoding(e.target.value as SexEncoding)}
-                            className="w-full sm:w-auto min-h-9 h-9 px-3 rounded-md border border-hairline bg-surface text-[12.5px] text-ink focus:outline-none focus:border-coral/50"
-                          >
-                            <option value="nhanes">NHANES (1=Male, 2=Female)</option>
-                            <option value="zero_one_male">0=Male, 1=Female</option>
-                            <option value="text_mf_auto">Text M/F only (auto)</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
+                    <MappingRow
+                      key={r.target}
+                      row={r}
+                      columns={datasetColumns}
+                      onChange={(col) =>
+                        setDietary((rows) => {
+                          const next = [...rows];
+                          next[i] = { ...next[i], column: col, score: null };
+                          return next;
+                        })
+                      }
+                    />
                   ))}
                   <button
                     onClick={() =>
@@ -1911,10 +1719,15 @@ function AiAnalysisPage() {
                           soon
                           info={METHOD_CLINICAL_INFO.hierarchical}
                         />
+                        <RadioRow
+                          disabled
+                          title="DBSCAN"
+                          hint="Density-based clusters without fixed k"
+                          tooltip="Coming soon"
+                          soon
+                          info={METHOD_CLINICAL_INFO.dbscan}
+                        />
                       </div>
-                      <p className="text-[12px] text-ink-3 mt-2">
-                        UMAP and DBSCAN are not available in this release.
-                      </p>
                     </div>
 
                     <div>
@@ -1937,10 +1750,18 @@ function AiAnalysisPage() {
                           hint="2D embedding on a dietary sample (≤2000 rows)"
                           info={METHOD_CLINICAL_INFO.tsne}
                         />
+                        <RadioRow
+                          disabled
+                          title="UMAP"
+                          hint="Non-linear 2D projection"
+                          tooltip="Coming soon"
+                          soon
+                          info={METHOD_CLINICAL_INFO.umap}
+                        />
                       </div>
                       <p className="text-[12px] text-ink-3 mt-2">
-                        Your PCA or t-SNE choice is sent with the run and used for the 2D cluster
-                        visualisation. The server also produces a PCA variance curve and elbow plot.
+                        Server always produces PCA variance curve, PCA scatter, K-Means cluster map,
+                        and t-SNE plot — projection choice here is not applied yet.
                       </p>
                     </div>
 
