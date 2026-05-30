@@ -72,6 +72,45 @@ const TARGET_ALIASES: Record<string, string[]> = {
   kcal_total: ["kcal_total", "dr1ikcal", "kcal", "energy", "calories", "energy_kcal"],
 };
 
+/**
+ * NHANES canonical column name the backend ML pipeline expects for each
+ * analysis target. The wizard's targets (e.g. "trig_mg_dl") are translated to
+ * these before being sent to the run so the backend's canonical mapper honors
+ * the user's confirmed mappings (see api/jobs/processor.apply_canonical_mapping).
+ */
+export const TARGET_TO_CANONICAL: Record<string, string> = {
+  waist_circ: "BMXWAIST",
+  trig_mg_dl: "LBXTR",
+  hdl_chol: "LBDHDD",
+  bp_sys: "BPXSY1",
+  bp_dia: "BPXDI1",
+  glucose_fasting: "LBXGLU",
+  age_years: "RIDAGEYR",
+  sex: "RIAGENDR",
+  diet_sodium_mg: "DR1ISODI",
+  fibre_g: "DR1IFIBE",
+  added_sugar_g: "DR1ISUGR",
+  sat_fat_g: "DR1ISFAT",
+  kcal_total: "DR1IKCAL",
+};
+
+/**
+ * Build a `{ rawColumn: canonicalName }` map from confirmed mapping suggestions,
+ * suitable for the analysis run's `method_config.column_mapping`. Suggestions
+ * without a selected column, or targets with no canonical, are skipped.
+ */
+export function buildColumnMapping(...groups: MappingSuggestion[][]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const group of groups) {
+    for (const s of group) {
+      if (!s.column) continue;
+      const canonical = TARGET_TO_CANONICAL[s.target];
+      if (canonical) out[s.column] = canonical;
+    }
+  }
+  return out;
+}
+
 function compact(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }

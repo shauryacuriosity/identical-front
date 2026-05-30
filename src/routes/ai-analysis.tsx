@@ -38,6 +38,7 @@ import { Slider } from "@/components/ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   autoMapAnalysisFields,
+  buildColumnMapping,
   CLINICAL_FIELDS,
   DIETARY_FIELDS,
   emptyMappings,
@@ -908,6 +909,10 @@ function AiAnalysisPage() {
           prediction: showPredict && predictOn ? { model: predictModel } : null,
           subgroup:
             showSubgroup && subgroupOn ? { algorithm: clusterAlg, k: 4, projection: dimRed } : null,
+          // Confirmed column mappings, translated to the canonical names the
+          // backend pipeline expects, so they are applied to the actual ML run
+          // (not preview-only).
+          column_mapping: buildColumnMapping(clinical, dietary),
         },
         status: "pending",
       };
