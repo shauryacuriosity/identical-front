@@ -44,6 +44,7 @@ import {
   emptyMappings,
   type MappingSuggestion,
 } from "@/lib/column-mapping";
+import { computeCohort } from "@/lib/cohort";
 
 export const Route = createFileRoute("/ai-analysis")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -972,24 +973,27 @@ function AiAnalysisPage() {
     }
   }, [currentStep]);
 
-  // Derived cohort numbers
-  const totalRows = selectedDataset?.row_count ?? FALLBACK_TOTAL_ROWS;
-  const cohort = useMemo(() => {
-    const ageBreadth = (ageMax - ageMin) / 100;
-    const sexFactor = sex === "All" ? 1 : 0.51;
-    const pregFactor = excludePregnant ? 0.96 : 1;
-    const completeFactor = requireComplete ? 0.92 : 1;
-    const included = Math.round(totalRows * ageBreadth * sexFactor * pregFactor * completeFactor);
-    const pct = totalRows > 0 ? (included / totalRows) * 100 : 0;
-    const prevalence = 18 + (ageMin + ageMax) / 20; // mock
-    const meanAge = (ageMin + ageMax) / 2;
-    return {
-      included,
-      pct,
-      prevalence: Math.min(prevalence, 38),
-      meanAge,
-    };
-  }, [ageMin, ageMax, sex, excludePregnant, requireComplete, totalRows]);
+  // Derived cohort numbers — computed from the REAL previewed rows (not mock
+  // factors), so missing columns can't move the count and fake data is flagged.
+  const totalRows = selectedDataset?.row_count ?? activePreview?.totalRows ?? FALLBACK_TOTAL_ROWS;
+  const cohort = useMemo(
+    () =>
+      computeCohort(
+        activePreview?.rows ?? [],
+        totalRows,
+        activePreview?.columns ?? [],
+        dietary,
+        { ageMin, ageMax, sex },
+        metsLabelCol,
+      ),
+    [activePreview, totalRows, dietary, ageMin, ageMax, sex, metsLabelCol],
+  );
+
+  // A dataset without a detectable sex column must not let the sex filter
+  // silently change the cohort — reset it to "All" and disable the control.
+  useEffect(() => {
+    if (!cohort.canFilterSex && sex !== "All") setSex("All");
+  }, [cohort.canFilterSex, sex]);
 
   const stepState = (key: StepKey): "locked" | "active" | "complete" => {
     if (completed.has(key)) return "complete";
@@ -1410,7 +1414,7 @@ function AiAnalysisPage() {
               <p className="text-[13.5px] text-ink-2 -mt-2">Filter your study population.</p>
 
               {/* Age range */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${cohort.canFilterAge ? "" : "opacity-50"}`}>
                 <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
                   Age range
                 </label>
@@ -1420,8 +1424,9 @@ function AiAnalysisPage() {
                     value={ageMin}
                     min={0}
                     max={ageMax - 1}
+                    disabled={!cohort.canFilterAge}
                     onChange={(e) => setAgeMin(Math.min(Number(e.target.value), ageMax - 1))}
-                    className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50"
+                    className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50 disabled:cursor-not-allowed"
                   />
                   <div className="flex-1 px-1 py-3 sm:py-2 [&_[role=slider]]:h-5 [&_[role=slider]]:w-5 [&_[role=slider]]:border-2">
                     <Slider
@@ -1429,6 +1434,7 @@ function AiAnalysisPage() {
                       max={100}
                       step={1}
                       minStepsBetweenThumbs={1}
+                      disabled={!cohort.canFilterAge}
                       value={[ageMin, ageMax]}
                       onValueChange={([min, max]) => {
                         setAgeMin(min);
@@ -1441,14 +1447,15 @@ function AiAnalysisPage() {
                     value={ageMax}
                     min={ageMin + 1}
                     max={100}
+                    disabled={!cohort.canFilterAge}
                     onChange={(e) => setAgeMax(Math.max(Number(e.target.value), ageMin + 1))}
-                    className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50"
+                    className="mono w-16 h-9 px-2 text-[13px] rounded-md border border-hairline bg-surface text-ink text-center focus:outline-none focus:border-coral/50 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
 
               {/* Sex */}
-              <div className="space-y-2">
+              <div className={`space-y-2 ${cohort.canFilterSex ? "" : "opacity-50"}`}>
                 <label className="text-[12px] uppercase tracking-[0.12em] text-ink-3 font-medium">
                   Sex
                 </label>
@@ -1457,7 +1464,8 @@ function AiAnalysisPage() {
                     <button
                       key={s}
                       onClick={() => setSex(s)}
-                      className={`min-h-11 h-11 px-4 rounded-full text-[12.5px] border transition-colors ${
+                      disabled={!cohort.canFilterSex}
+                      className={`min-h-11 h-11 px-4 rounded-full text-[12.5px] border transition-colors disabled:cursor-not-allowed ${
                         sex === s
                           ? "bg-coral text-white border-coral"
                           : "bg-surface border-hairline text-ink-2 hover:text-ink hover:border-coral/40"
@@ -1489,65 +1497,99 @@ function AiAnalysisPage() {
               <div className="text-[11px] uppercase tracking-[0.12em] text-ink-3 font-medium">
                 Cohort preview
               </div>
-              <div
-                className="mt-3 text-[26px] text-ink tabular leading-tight"
-                style={{ letterSpacing: "-0.02em" }}
-              >
-                {cohort.included.toLocaleString()}
-                <span className="text-[14px] text-ink-3 font-sans">
-                  {" "}
-                  of {totalRows.toLocaleString()} rows
-                </span>
-              </div>
-              <div className="text-[12.5px] text-ink-2 tabular">
-                {cohort.pct.toFixed(1)}% of dataset
-              </div>
-
-              <div className="mt-5">
-                <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-[12px] text-ink-2">Estimated MetS prevalence</span>
-                  <span className="text-[12.5px] text-ink font-medium tabular">
-                    {cohort.prevalence.toFixed(1)}%
-                  </span>
+              {!cohort.analyzable ? (
+                <div className="mt-3 text-[12.5px]">
+                  <div className="text-[15px] text-ink">No usable participant data</div>
+                  <p className="mt-1.5 text-ink-3 leading-relaxed">
+                    This dataset has no numeric clinical or demographic columns, so a cohort
+                    can't be defined or analyzed. Upload a dataset with real participant records.
+                  </p>
                 </div>
-                <div className="h-2 rounded-full overflow-hidden flex bg-hairline">
+              ) : (
+                <>
                   <div
-                    style={{
-                      width: `${100 - cohort.prevalence}%`,
-                      backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)",
-                    }}
-                  />
-                  <div
-                    style={{ width: `${cohort.prevalence}%`, backgroundColor: "var(--coral)" }}
-                  />
-                </div>
-                <div className="flex items-center gap-4 mt-2 text-[11px] text-ink-3">
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{
-                        backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)",
-                      }}
-                    />
-                    No MetS
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-coral" />
-                    MetS
-                  </span>
-                </div>
-              </div>
+                    className="mt-3 text-[26px] text-ink tabular leading-tight"
+                    style={{ letterSpacing: "-0.02em" }}
+                  >
+                    {cohort.included.toLocaleString()}
+                    <span className="text-[14px] text-ink-3 font-sans">
+                      {" "}
+                      of {totalRows.toLocaleString()} rows
+                    </span>
+                  </div>
+                  <div className="text-[12.5px] text-ink-2 tabular">
+                    {cohort.pct.toFixed(1)}% of dataset
+                    {cohort.sampled && (
+                      <span className="text-ink-3">
+                        {" "}
+                        · estimated from {cohort.sampleSize.toLocaleString()} sampled rows
+                      </span>
+                    )}
+                  </div>
 
-              <div className="mt-5 pt-4 border-t border-hairline/60 text-[12.5px] text-ink-2 tabular">
-                Mean age {cohort.meanAge.toFixed(1)} · 51% F / 49% M
-              </div>
+                  <div className="mt-5">
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span className="text-[12px] text-ink-2">MetS prevalence</span>
+                      <span className="text-[12.5px] text-ink font-medium tabular">
+                        {cohort.prevalence != null ? `${cohort.prevalence.toFixed(1)}%` : "—"}
+                      </span>
+                    </div>
+                    {cohort.prevalence != null ? (
+                      <>
+                        <div className="h-2 rounded-full overflow-hidden flex bg-hairline">
+                          <div
+                            style={{
+                              width: `${100 - cohort.prevalence}%`,
+                              backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)",
+                            }}
+                          />
+                          <div
+                            style={{
+                              width: `${cohort.prevalence}%`,
+                              backgroundColor: "var(--coral)",
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-4 mt-2 text-[11px] text-ink-3">
+                          <span className="flex items-center gap-1.5">
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{
+                                backgroundColor: "color-mix(in oklab, var(--data-sage) 70%, white)",
+                              }}
+                            />
+                            No MetS
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-coral" />
+                            MetS
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[11.5px] text-ink-3">
+                        Derived from labels after the run.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-hairline/60 text-[12px] text-ink-3 leading-relaxed space-y-0.5">
+                    {!cohort.canFilterAge && <div>No age column detected — age filter disabled.</div>}
+                    {!cohort.canFilterSex && <div>No sex column detected — sex filter disabled.</div>}
+                    {cohort.canFilterAge && cohort.canFilterSex && (
+                      <div>Filters applied to the mapped age &amp; sex columns.</div>
+                    )}
+                  </div>
+                </>
+              )}
             </aside>
           </div>
 
           <div className="flex justify-end mt-6">
             <button
               onClick={continueFromCohort}
-              className="min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition"
+              disabled={!cohort.analyzable}
+              className="min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-medium hover:opacity-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {methodSkipped ? "Continue to Run →" : "Continue to Method →"}
             </button>
