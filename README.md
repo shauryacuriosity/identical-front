@@ -1,5 +1,13 @@
 # Lotus Frontend (`identical-front`)
 
+> Migration notice (temporary mirror)
+>
+> The primary repository is now `AdrianMartinovici/CSIT321_Project` with the frontend at `apps/frontend/`.
+> This repo is being kept as a short-term mirror for transition only.
+> New development should happen in:
+>
+> `https://github.com/AdrianMartinovici/CSIT321_Project/tree/main/apps/frontend`
+
 TanStack Start + Vite web app for the CSIT321 Metabolic Syndrome analytics project.
 
 ## Prerequisites
