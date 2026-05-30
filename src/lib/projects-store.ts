@@ -107,7 +107,25 @@ export function refetchProjects(): Promise<void> {
   return hydrateProjectsFromApi();
 }
 
-void hydrateProjectsFromApi();
+/**
+ * Drive project hydration from the auth session. In real mode `/projects`
+ * requires a JWT, so we (re)fetch when a user signs in and clear the cache when
+ * they sign out — this also prevents one user's projects lingering in memory
+ * after a different user logs in. Mock mode keeps its in-memory seed untouched.
+ */
+export function syncProjectsForAuth(userId: string | null): void {
+  if (!REAL_API_MODE) return;
+  if (userId) {
+    void hydrateProjectsFromApi();
+  } else {
+    commit([]);
+    setHydrationState({ status: "idle", error: null });
+  }
+}
+
+// Mock mode has no auth gate, so hydrate immediately. Real mode waits for the
+// auth session (see syncProjectsForAuth wired in __root AuthGate).
+if (!REAL_API_MODE) void hydrateProjectsFromApi();
 
 function emit() {
   for (const l of listeners) l();

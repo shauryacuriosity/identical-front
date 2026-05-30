@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from "react";
 import appCss from "../styles.css?url";
 import lotusMark from "@/assets/logo_lotus.png";
 import { LotusMarkActive } from "@/components/lotus-mark-active";
-import { setProjectsQueryInvalidator } from "@/lib/projects-store";
+import { setProjectsQueryInvalidator, syncProjectsForAuth } from "@/lib/projects-store";
 import { setAuthTokenGetter } from "@/lib/api/client";
 import {
   AuthProvider,
@@ -807,6 +807,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setAuthTokenGetter(() => session?.access_token ?? null);
   }, [session]);
+
+  const authedUserId = session?.user?.id ?? null;
+  useEffect(() => {
+    syncProjectsForAuth(authedUserId);
+  }, [authedUserId]);
 
   useEffect(() => {
     if (loading) return;
