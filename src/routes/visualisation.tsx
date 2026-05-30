@@ -193,7 +193,7 @@ function VisualisationPage() {
       api.pipeline.preview({
         steps: project?.pipelineSteps ?? [],
         selectedCols,
-        limit: Number.POSITIVE_INFINITY,
+        limit: 0,
       }),
     enabled: !!project?.pipelineSteps?.length,
     staleTime: 5_000,

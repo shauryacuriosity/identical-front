@@ -1646,7 +1646,7 @@ function DatasetsPage() {
   });
   const fullQuery = useQuery({
     queryKey: ["pipeline", "datasets-page", steps, selectedCols, tablesSig, "full"],
-    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: Number.POSITIVE_INFINITY }),
+    queryFn: () => api.pipeline.preview({ steps, selectedCols, limit: 0 }),
     enabled: steps.length > 0,
     staleTime: 5_000,
     placeholderData: (prev) => prev,

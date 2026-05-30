@@ -217,7 +217,7 @@ function RunPage() {
             )}
             <ClustersPanel runId={runId} />
           </div>
-          <PredictionsPanel runId={runId} />
+          <PredictionsPanel runId={runId} predictionModel={parsePredictionModel(run)} />
         </>
       )}
     </div>
@@ -234,7 +234,7 @@ function StatusPill({ status }: { status: string }) {
     },
     failed: { bg: "var(--coral-tint)", fg: "var(--coral)" },
     error: { bg: "var(--coral-tint)", fg: "var(--coral)" },
-    pending: { bg: "var(--surface-hover)", fg: "var(--ink-2)" },
+    processing: { bg: "var(--coral-tint)", fg: "var(--coral)" },
     queued: { bg: "var(--coral-tint)", fg: "var(--coral)" },
   };
   const style = map[status] ?? map.pending;
@@ -352,6 +352,50 @@ type ModelRow = {
   figure_paths: unknown;
 };
 
+function ModelMetricBlock({
+  label,
+  m,
+  primary,
+}: {
+  label: string;
+  m: Record<string, number> | null;
+  primary?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[12px] text-ink-2 font-sans">
+        <span>{label}</span>
+        {primary && (
+          <span className="rounded-full border border-hairline px-1.5 py-px text-[9.5px] uppercase tracking-wide text-[var(--coral)]">
+            scores predictions
+          </span>
+        )}
+      </div>
+      <div
+        className="mt-1 text-[24px] tabular leading-none"
+        style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}
+      >
+        <span className="text-[12px] text-ink-3 font-sans mr-2">Accuracy</span>
+        <span className="mono">{num(m?.accuracy) ?? "—"}</span>
+      </div>
+      <div className="mt-1.5 text-[12.5px] text-ink-2 tabular flex flex-wrap gap-x-3 gap-y-1">
+        <span>
+          AUC <span className="mono text-ink">{num(m?.weighted_auc) ?? "—"}</span>
+        </span>
+        <span>
+          Precision <span className="mono text-ink">{num(m?.precision) ?? "—"}</span>
+        </span>
+        <span>
+          Recall <span className="mono text-ink">{num(m?.recall) ?? "—"}</span>
+        </span>
+        <span>
+          F1 <span className="mono text-ink">{num(m?.f1) ?? "—"}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function SummaryAndModelPanel({
   runId,
   predictionModel,
@@ -462,36 +506,28 @@ function SummaryAndModelPanel({
             <p className="mt-3 text-[12.5px] text-ink-3">
               Failed to load — {(modelQ.error as Error).message}
             </p>
+          ) : predictionModel === "both" &&
+            modelRow?.logistic_metrics_test &&
+            modelRow?.xgboost_metrics_test ? (
+            <>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                <ModelMetricBlock
+                  label="Logistic Regression"
+                  m={modelRow.logistic_metrics_test}
+                />
+                <ModelMetricBlock label="XGBoost" m={modelRow.xgboost_metrics_test} primary />
+              </div>
+              <div className="mt-3 text-[11.5px] text-ink-3 italic">
+                Weighted, test-set only. Per-subject scores below use XGBoost.
+              </div>
+            </>
           ) : (
             <>
-              <div
-                className="mt-2 text-[28px] tabular leading-none"
-                style={{ letterSpacing: "-0.02em", color: "var(--coral)" }}
-              >
-                <span className="text-[14px] text-ink-3 font-sans mr-2">Weighted AUC</span>
-                <span className="mono">{num(m?.weighted_auc) ?? "—"}</span>
+              <div className="mt-2">
+                <ModelMetricBlock label={modelLabel} m={m} primary />
               </div>
-              <div className="mt-2 text-[13px] text-ink-2 tabular flex flex-wrap gap-x-3 gap-y-1">
-                <span>
-                  Precision <span className="mono text-ink">{num(m?.precision) ?? "—"}</span>
-                </span>
-                <span>
-                  Recall <span className="mono text-ink">{num(m?.recall) ?? "—"}</span>
-                </span>
-                <span>
-                  F1 <span className="mono text-ink">{num(m?.f1) ?? "—"}</span>
-                </span>
-              </div>
-              <div className="mt-2 text-[11.5px] text-ink-3 italic">
-                {modelLabel} · test-set only
-                {predictionModel === "both" && modelRow?.logistic_metrics_test && (
-                  <span className="block mt-0.5">
-                    Logistic AUC{" "}
-                    <span className="mono text-ink-2">
-                      {num(modelRow.logistic_metrics_test.weighted_auc) ?? "—"}
-                    </span>
-                  </span>
-                )}
+              <div className="mt-3 text-[11.5px] text-ink-3 italic">
+                Weighted, test-set only.
               </div>
             </>
           )}
@@ -711,7 +747,14 @@ type PredictionRow = {
 
 const PAGE_SIZE = 50;
 
-function PredictionsPanel({ runId }: { runId: string }) {
+function PredictionsPanel({
+  runId,
+  predictionModel,
+}: {
+  runId: string;
+  predictionModel: PredictionModelChoice;
+}) {
+  const scoringModel = predictionModel === "logreg" ? "Logistic Regression" : "XGBoost";
   const [page, setPage] = useState(0);
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -740,7 +783,10 @@ function PredictionsPanel({ runId }: { runId: string }) {
 
   return (
     <section className="mt-4 rounded-2xl border border-hairline bg-surface p-6">
-      <PanelHeader title="Per-subject predictions" />
+      <PanelHeader
+        title="Per-subject predictions"
+        subtitle={`Scores & labels from ${scoringModel}. Covers all rows (train + test); the headline accuracy/AUC above is weighted on the held-out test set only, so a raw count here will differ.`}
+      />
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>

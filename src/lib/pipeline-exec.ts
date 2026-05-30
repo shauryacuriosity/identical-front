@@ -241,9 +241,13 @@ export function runPipeline(
     if (columns.length === 0) columns = allColumns;
   }
 
-  const limit = opts?.limit ?? PREVIEW_LIMIT;
+  // A non-positive or non-finite limit means "return every row" (save / export /
+  // visualisation paths). undefined falls back to the preview cap.
+  const rawLimit = opts?.limit;
+  const limit = rawLimit === undefined ? PREVIEW_LIMIT : rawLimit;
+  const unbounded = !Number.isFinite(limit) || limit <= 0;
   const totalRows = rows.length;
-  const truncated = totalRows > limit;
+  const truncated = !unbounded && totalRows > limit;
   const outRows = (truncated ? rows.slice(0, limit) : rows).map((r) => {
     const o: Row = {};
     for (const c of columns) o[c] = r[c];

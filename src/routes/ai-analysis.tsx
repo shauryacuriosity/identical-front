@@ -872,7 +872,7 @@ function AiAnalysisPage() {
         const full = await apiPipeline.preview({
           steps: project.pipelineSteps ?? [],
           selectedCols: projectSelectedCols(project),
-          limit: Number.POSITIVE_INFINITY,
+          limit: 0,
         });
         const saveName = `${project.name?.trim() || "Project"} (merged)`;
         const saved = await saveDerivedDataset({ name: saveName, result: full });
