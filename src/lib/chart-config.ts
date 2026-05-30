@@ -450,6 +450,10 @@ export function buildChartData(rows: Row[], columns: string[], config: ChartConf
       }
       const B = 12;
       const w = (hi - lo) / B || 1;
+      // Integer-valued columns (e.g. participant IDs like SEQN) should show
+      // integer bin boundaries, not 3-decimal values.
+      const xIsInteger = xs.every((v) => Number.isInteger(v));
+      const fmtBound = (val: number) => (xIsInteger ? String(Math.round(val)) : String(round(val)));
       binnedX = new Map();
       for (const r of rows) {
         const v = r[config.x];
@@ -461,7 +465,7 @@ export function buildChartData(rows: Row[], columns: string[], config: ChartConf
         let i = Math.floor((n - lo) / w);
         if (i >= B) i = B - 1;
         if (i < 0) i = 0;
-        const lbl = `${round(lo + i * w)}–${round(lo + (i + 1) * w)}`;
+        const lbl = `${fmtBound(lo + i * w)}–${fmtBound(lo + (i + 1) * w)}`;
         binnedX.set(v, lbl);
       }
     }
