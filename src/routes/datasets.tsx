@@ -307,7 +307,7 @@ function DatasetBar({
         </div>
       </button>
       {open && (
-        <div className="absolute z-20 mt-1.5 left-0 right-0 bg-surface rounded-lg shadow-[var(--shadow-lg)] overflow-hidden border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute z-20 mt-1.5 left-0 right-0 bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 max-h-[min(320px,50vh)] overflow-y-auto overscroll-contain animate-in fade-in slide-in-from-top-1 duration-150">
           {availableNames.map((opt) => {
             const disabled = opt !== value && usedNames.includes(opt);
             return (
@@ -1039,7 +1039,7 @@ function ProjectHeader({
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
         {open && (
-          <div className="absolute right-0 z-30 mt-1.5 min-w-[220px] bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="absolute right-0 z-30 mt-1.5 min-w-[220px] max-h-[min(320px,50vh)] overflow-y-auto overscroll-contain bg-surface rounded-lg shadow-[var(--shadow-lg)] border border-hairline py-1 animate-in fade-in slide-in-from-top-1 duration-150">
             {projects.length === 0 && (
               <div className="px-3 py-2 text-[12px] text-ink-3 italic">No projects yet</div>
             )}
@@ -1855,7 +1855,7 @@ function DatasetsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-4 sm:pt-6 pb-24 min-w-0">
+    <div className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-4 sm:pt-6 pb-36 lg:pb-28 min-w-0">
       <ProjectHeader
         projectId={projectId}
         effectiveName={effectiveName}

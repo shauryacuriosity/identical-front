@@ -11,6 +11,9 @@ import {
   isRunInProgress,
   canTriggerProcess,
   parseRunProgress,
+  parseFunctionMode,
+  isLabelsOnlyMode,
+  type FunctionMode,
 } from "@/lib/run-status";
 
 function RunErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -91,6 +94,7 @@ type RunRow = {
   started_at: string | null;
   finished_at: string | null;
   dataset_id: string;
+  function_mode: string | null;
   method_config: {
     prediction?: { model?: string } | null;
   } | null;
@@ -113,6 +117,8 @@ type ClusterSummary = {
   top_features?: { feature: string; mean: number }[] | null;
 };
 
+const PAGE_SIZE = 50;
+
 // ---------- Page ----------
 
 function RunPage() {
@@ -124,7 +130,7 @@ function RunPage() {
       const { data, error } = await supabase
         .from("analysis_runs")
         .select(
-          "id,name,status,progress,error_message,started_at,finished_at,dataset_id,method_config",
+          "id,name,status,progress,error_message,started_at,finished_at,dataset_id,function_mode,method_config",
         )
         .eq("id", runId)
         .maybeSingle();
@@ -140,6 +146,8 @@ function RunPage() {
   const queryClient = useQueryClient();
   const run = runQ.data;
   const status = run?.status ?? null;
+  const functionMode = parseFunctionMode(run?.function_mode);
+  const labelsOnly = isLabelsOnlyMode(functionMode);
   const isComplete = isRunComplete(status);
   const canStartProcessing =
     !USE_MOCK && run != null && canTriggerProcess(status, { startedAt: run.started_at });
@@ -198,6 +206,7 @@ function RunPage() {
       {run && !isComplete && (
         <RunProgressCard
           run={run}
+          functionMode={functionMode}
           canStart={canStartProcessing}
           canForceRetry={shouldForceRetry}
           onStart={(force) => processMutation.mutate(force)}
@@ -206,9 +215,24 @@ function RunPage() {
         />
       )}
 
-      {run && isComplete && (
+      {run && isComplete && labelsOnly && (
         <>
-          <SummaryAndModelPanel runId={runId} predictionModel={parsePredictionModel(run)} />
+          <SummaryAndModelPanel
+            runId={runId}
+            predictionModel={parsePredictionModel(run)}
+            functionMode={functionMode}
+          />
+          <LabelsSubjectsPanel runId={runId} />
+        </>
+      )}
+
+      {run && isComplete && !labelsOnly && (
+        <>
+          <SummaryAndModelPanel
+            runId={runId}
+            predictionModel={parsePredictionModel(run)}
+            functionMode={functionMode}
+          />
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-4">
             {parsePredictionModel(run) === "both" ? (
               <>
@@ -261,8 +285,30 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
+function formatProgressStep(step: string | null, labelsOnly: boolean): string | null {
+  if (!step) return null;
+  const key = step.toLowerCase();
+  const labels: Record<string, string> = labelsOnly
+    ? {
+        eda: "deriving MetS labels",
+        predictions: "saving participant labels",
+        complete: "complete",
+        queued: "queued",
+      }
+    : {
+        eda: "exploratory analysis",
+        models: "training models",
+        clustering: "clustering",
+        predictions: "scoring participants",
+        complete: "complete",
+        queued: "queued",
+      };
+  return labels[key] ?? step.replace(/_/g, " ");
+}
+
 function RunProgressCard({
   run,
+  functionMode,
   canStart,
   canForceRetry,
   onStart,
@@ -270,6 +316,7 @@ function RunProgressCard({
   startError,
 }: {
   run: RunRow;
+  functionMode: FunctionMode;
   canStart?: boolean;
   canForceRetry?: boolean;
   onStart?: (force?: boolean) => void;
@@ -279,6 +326,8 @@ function RunProgressCard({
   const { percent, step } = parseRunProgress(run.progress);
   const failed = isRunFailed(run.status);
   const pending = (run.status ?? "").toLowerCase() === "pending";
+  const labelsOnly = isLabelsOnlyMode(functionMode);
+  const stepLabel = formatProgressStep(step, labelsOnly);
 
   return (
     <section className="mt-6 rounded-2xl border border-hairline bg-surface p-6 flex flex-col items-center text-center">
@@ -289,13 +338,25 @@ function RunProgressCard({
       />
       <div className="mt-4">
         <PanelHeader
-          title={failed ? "Run failed" : pending ? "Waiting to start" : "Running analysis…"}
+          title={
+            failed
+              ? "Run failed"
+              : pending
+                ? "Waiting to start"
+                : labelsOnly
+                  ? "Generating MetS labels…"
+                  : "Running analysis…"
+          }
           subtitle={
             failed
               ? "Check the message below. You can retry if the issue was temporary."
               : pending
-                ? "Start processing to run the pipeline on your dataset."
-                : "This page updates automatically when results are ready."
+                ? labelsOnly
+                  ? "Start processing to derive MetS labels on your cohort (no model training)."
+                  : "Start processing to run the pipeline on your dataset."
+                : labelsOnly
+                  ? "Applying ATP III criteria and saving labels — this page updates automatically."
+                  : "This page updates automatically when results are ready."
           }
         />
       </div>
@@ -306,10 +367,8 @@ function RunProgressCard({
           </div>
           <div className="mt-2 text-[12px] text-ink-3 tabular">
             {percent.toFixed(0)}%
-            {step ? (
-              <span className="ml-2 normal-case tracking-normal text-ink-2">
-                · {step.replace(/_/g, " ")}
-              </span>
+            {stepLabel ? (
+              <span className="ml-2 normal-case tracking-normal text-ink-2">· {stepLabel}</span>
             ) : null}
           </div>
         </div>
@@ -324,7 +383,15 @@ function RunProgressCard({
           disabled={starting}
           className="mt-4 min-h-11 h-11 px-5 rounded-lg bg-coral text-white text-[13px] font-semibold hover:opacity-95 disabled:opacity-50"
         >
-          {starting ? "Starting…" : failed ? "Retry analysis" : "Start analysis"}
+          {starting
+            ? "Starting…"
+            : failed
+              ? labelsOnly
+                ? "Retry label generation"
+                : "Retry analysis"
+              : labelsOnly
+                ? "Generate labels"
+                : "Start analysis"}
         </button>
       )}
       {canForceRetry && onStart && (
@@ -412,10 +479,13 @@ function ModelMetricBlock({
 function SummaryAndModelPanel({
   runId,
   predictionModel,
+  functionMode,
 }: {
   runId: string;
   predictionModel: PredictionModelChoice;
+  functionMode: FunctionMode;
 }) {
+  const labelsOnly = isLabelsOnlyMode(functionMode);
   const edaQ = useQuery({
     queryKey: ["eda_results", runId],
     queryFn: async () => {
@@ -442,6 +512,7 @@ function SummaryAndModelPanel({
       if (error) throw error;
       return (data ?? null) as ModelRow | null;
     },
+    enabled: !labelsOnly,
   });
 
   const eda = edaQ.data;
@@ -509,8 +580,20 @@ function SummaryAndModelPanel({
         </div>
 
         <div className="md:pl-6">
-          <Caption>Model performance (test set)</Caption>
-          {modelQ.isLoading ? (
+          <Caption>{labelsOnly ? "MetS labels" : "Model performance (test set)"}</Caption>
+          {labelsOnly ? (
+            <div className="mt-3 text-[13px] text-ink-2 leading-relaxed">
+              <p>
+                This run applied MetS case definitions to your cohort. No prediction models were
+                trained.
+              </p>
+              <p className="mt-2 text-[12.5px] text-ink-3">
+                Use <span className="font-medium text-ink-2">Prediction</span> or{" "}
+                <span className="font-medium text-ink-2">Full analysis</span> in AI Analysis for
+                accuracy, SHAP, and clustering.
+              </p>
+            </div>
+          ) : modelQ.isLoading ? (
             <div className="mt-3 space-y-2">
               <SkeletonBlock className="h-7 w-32" />
               <SkeletonBlock className="h-3 w-48" />
@@ -544,6 +627,126 @@ function SummaryAndModelPanel({
               </div>
             </>
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------- MetS labels (labels_only runs) ----------
+
+function LabelsSubjectsPanel({ runId }: { runId: string }) {
+  const [page, setPage] = useState(0);
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const q = useQuery({
+    queryKey: ["analysis_predictions", runId, "labels", page],
+    queryFn: async () => {
+      const { data, error, count } = await supabase
+        .from("analysis_predictions")
+        .select("subject_id,predicted_prob,predicted_label,actual_label", { count: "exact" })
+        .eq("run_id", runId)
+        .order("subject_id", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return { rows: (data ?? []) as PredictionRow[], count: count ?? 0 };
+    },
+  });
+
+  const total = q.data?.count ?? 0;
+  const rows = q.data?.rows ?? [];
+  const lastPage = Math.max(0, Math.ceil(total / PAGE_SIZE) - 1);
+  const withLabel = rows.filter((r) => r.actual_label != null);
+  const metsPositive = withLabel.filter((r) => r.actual_label === true).length;
+
+  const labelCell = (v: boolean | null) => (v == null ? <Em /> : v ? "MetS" : "No MetS");
+
+  return (
+    <section className="mt-4 rounded-2xl border border-hairline bg-surface p-6">
+      <PanelHeader
+        title="Derived MetS labels"
+        subtitle="Per-participant MetS status from ATP III criteria (no model scores for this run)."
+      />
+      {withLabel.length > 0 && (
+        <p className="mt-2 text-[12.5px] text-ink-3 tabular">
+          This page: <span className="mono text-ink-2">{metsPositive}</span> /{" "}
+          <span className="mono text-ink-2">{withLabel.length}</span> with MetS in sample
+        </p>
+      )}
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-[13px]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-[0.1em] text-ink-3 border-b border-hairline">
+              <th className="py-2 px-2 font-medium">subject_id</th>
+              <th className="py-2 px-2 font-medium">MetS label</th>
+            </tr>
+          </thead>
+          <tbody>
+            {q.isLoading &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="border-b border-hairline/60">
+                  <td className="py-2.5 px-2">
+                    <SkeletonBlock className="h-3 w-20" />
+                  </td>
+                  <td className="py-2.5 px-2">
+                    <SkeletonBlock className="h-3 w-16" />
+                  </td>
+                </tr>
+              ))}
+            {!q.isLoading && q.error && (
+              <tr>
+                <td colSpan={2} className="py-3 px-2 text-[12.5px] text-ink-3">
+                  Failed to load — {(q.error as Error).message}
+                </td>
+              </tr>
+            )}
+            {!q.isLoading && !q.error && rows.length === 0 && (
+              <tr>
+                <td colSpan={2} className="py-3 px-2 text-[12.5px] text-ink-3">
+                  No label rows saved
+                </td>
+              </tr>
+            )}
+            {!q.isLoading &&
+              !q.error &&
+              rows.map((r) => (
+                <tr
+                  key={r.subject_id}
+                  className="border-b border-hairline/60 hover:bg-surface-hover/70 transition-colors"
+                >
+                  <td className="py-2.5 px-2 align-middle">
+                    <span className="mono">{r.subject_id}</span>
+                  </td>
+                  <td className="py-2.5 px-2 align-middle">
+                    <span className="mono">{labelCell(r.actual_label)}</span>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 flex items-center justify-between text-[12px] text-ink-3 tabular">
+        <span>
+          Showing <span className="mono">{total === 0 ? 0 : from + 1}</span>–
+          <span className="mono">{Math.min(to + 1, total)}</span> of{" "}
+          <span className="mono">{total.toLocaleString()}</span>
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0 || q.isLoading}
+            className="min-h-11 h-11 px-4 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Prev
+          </button>
+          <button
+            onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+            disabled={page >= lastPage || q.isLoading}
+            className="min-h-11 h-11 px-4 rounded-md border border-hairline text-ink-2 hover:text-ink hover:border-coral/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
         </div>
       </div>
     </section>
@@ -757,8 +960,6 @@ type PredictionRow = {
   actual_label: boolean | null;
   cluster_label: number | null;
 };
-
-const PAGE_SIZE = 50;
 
 function PredictionsPanel({
   runId,

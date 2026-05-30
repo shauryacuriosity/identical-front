@@ -37,6 +37,26 @@ export function canTriggerProcess(
   return false;
 }
 
+export type FunctionMode = "full" | "prediction_only" | "subgroup_only" | "labels_only";
+
+const VALID_FUNCTION_MODES = new Set<FunctionMode>([
+  "full",
+  "prediction_only",
+  "subgroup_only",
+  "labels_only",
+]);
+
+/** Wizard / API function_mode on analysis_runs. */
+export function parseFunctionMode(raw: string | null | undefined): FunctionMode {
+  const s = (raw ?? "full").trim().toLowerCase().replace(/-/g, "_");
+  if (VALID_FUNCTION_MODES.has(s as FunctionMode)) return s as FunctionMode;
+  return "full";
+}
+
+export function isLabelsOnlyMode(mode: FunctionMode): boolean {
+  return mode === "labels_only";
+}
+
 export function parseRunProgress(progress: unknown): { percent: number; step: string | null } {
   if (progress == null) return { percent: 0, step: null };
   if (typeof progress === "number" && !Number.isNaN(progress)) {
